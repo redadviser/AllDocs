@@ -1,0 +1,998 @@
+import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter/material.dart';
+
+import '../../common/app_constants.dart';
+import '../../common/glass_panel.dart';
+import '../../common/snapshot_builder.dart';
+import '../../models/models.dart';
+import '../../services/services.dart';
+import '../../theme/app_theme.dart';
+
+class ProfileScreen extends StatelessWidget {
+  const ProfileScreen({super.key, required this.documentsService});
+
+  final DocumentsService documentsService;
+
+  @override
+  Widget build(BuildContext context) {
+    return SnapshotBuilder(
+      documentsService: documentsService,
+      builder: (context, snapshot) {
+        final profile = snapshot.profile;
+
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
+          child: CustomScrollView(
+            key: const PageStorageKey('profile'),
+            slivers: [
+              const SliverToBoxAdapter(child: _ProfileTitle()),
+              const SliverToBoxAdapter(child: SizedBox(height: 18)),
+              SliverToBoxAdapter(child: _ProfileHeader(profile: profile)),
+              const SliverToBoxAdapter(child: SizedBox(height: 14)),
+              SliverToBoxAdapter(
+                child: _StoragePanel(summary: profile.storageSummary),
+              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 14)),
+              SliverToBoxAdapter(child: _StatsPanel(profile: profile)),
+              const SliverToBoxAdapter(child: SizedBox(height: 14)),
+              const SliverToBoxAdapter(child: _CustomizationPanel()),
+              const SliverToBoxAdapter(child: SizedBox(height: 14)),
+              SliverToBoxAdapter(
+                child: _SettingsPanel(
+                  snapshot: snapshot,
+                  documentsService: documentsService,
+                ),
+              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 14)),
+              SliverToBoxAdapter(
+                child: _ProfileWideAction(
+                  icon: Icons.shield_rounded,
+                  iconColor: const Color(0xFF37C66A),
+                  title: AppConstants.profileSecurity.tr(),
+                  subtitle: AppConstants.profileSecuritySubtitle.tr(),
+                ),
+              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 14)),
+              const SliverToBoxAdapter(child: _PremiumPanel()),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ProfileTitle extends StatelessWidget {
+  const _ProfileTitle();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            AppConstants.profileTitle.tr(),
+            style: const TextStyle(
+              color: AppTheme.text,
+              fontSize: 30,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ),
+        IconButton(
+          tooltip: AppConstants.profileSettings.tr(),
+          onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(AppConstants.profileSettingsHint.tr())),
+          ),
+          icon: const Icon(Icons.settings_outlined, size: 34),
+        ),
+      ],
+    );
+  }
+}
+
+class _ProfileHeader extends StatelessWidget {
+  const _ProfileHeader({required this.profile});
+
+  final UserProfile profile;
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassPanel(
+      padding: const EdgeInsets.all(22),
+      child: Row(
+        children: [
+          Stack(
+            children: [
+              Container(
+                width: 96,
+                height: 96,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: [Color(0xFF3F8DFF), Color(0xFF102D63)],
+                  ),
+                ),
+                child: const Center(
+                  child: Text(
+                    'PC',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                right: 0,
+                bottom: 2,
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: const BoxDecoration(
+                    color: AppTheme.primary,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.photo_camera_rounded,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(width: 22),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  profile.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppTheme.text,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  profile.email,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppTheme.mutedText,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.workspace_premium_rounded,
+                        color: AppTheme.primarySoft,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        profile.planName,
+                        style: const TextStyle(
+                          color: AppTheme.text,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Icon(Icons.chevron_right_rounded, size: 34),
+        ],
+      ),
+    );
+  }
+}
+
+class _StoragePanel extends StatelessWidget {
+  const _StoragePanel({required this.summary});
+
+  final StorageSummary summary;
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassPanel(
+      child: Row(
+        children: [
+          Container(
+            width: 58,
+            height: 58,
+            decoration: BoxDecoration(
+              color: AppTheme.primary.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppTheme.border),
+            ),
+            child: const Icon(Icons.inventory_2_outlined, size: 32),
+          ),
+          const SizedBox(width: 18),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        AppConstants.profileStorage.tr(),
+                        style: const TextStyle(
+                          color: AppTheme.text,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      AppConstants.profileStorageUsedOf.tr(
+                        namedArgs: {
+                          'used': summary.usedGb.toStringAsFixed(1),
+                          'total': summary.totalGb.toStringAsFixed(0),
+                        },
+                      ),
+                      style: const TextStyle(color: AppTheme.mutedText),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  AppConstants.profileStoragePercent.tr(
+                    namedArgs: {'percent': '${summary.usedPercent}'},
+                  ),
+                  style: const TextStyle(
+                    color: AppTheme.primarySoft,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(99),
+                  child: LinearProgressIndicator(
+                    value: summary.usedRatio,
+                    minHeight: 9,
+                    backgroundColor: AppTheme.surfaceSoft,
+                    color: AppTheme.primary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    _StorageLegend(
+                      color: AppTheme.primary,
+                      label: AppConstants.profileStorageUsed.tr(
+                        namedArgs: {'used': summary.usedGb.toStringAsFixed(1)},
+                      ),
+                    ),
+                    const SizedBox(width: 18),
+                    _StorageLegend(
+                      color: AppTheme.surfaceSoft,
+                      label: AppConstants.profileStorageAvailable.tr(
+                        namedArgs: {
+                          'available': summary.availableGb.toStringAsFixed(1),
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StorageLegend extends StatelessWidget {
+  const _StorageLegend({required this.color, required this.label});
+
+  final Color color;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Flexible(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 12,
+            height: 12,
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: AppTheme.mutedText),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatsPanel extends StatelessWidget {
+  const _StatsPanel({required this.profile});
+
+  final UserProfile profile;
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassPanel(
+      child: Row(
+        children: [
+          Expanded(
+            child: _StatCard(
+              icon: Icons.folder_rounded,
+              value: _formatNumber(profile.documentsCount),
+              label: AppConstants.profileDocuments.tr(),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: _StatCard(
+              icon: Icons.collections_bookmark,
+              iconColor: AppTheme.premium,
+              value: '${profile.categoriesCount}',
+              label: AppConstants.profileAlbums.tr(),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: _StatCard(
+              icon: Icons.star_rounded,
+              iconColor: AppTheme.warning,
+              value: '${profile.favoritesCount}',
+              label: AppConstants.profileFavorites.tr(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CustomizationPanel extends StatelessWidget {
+  const _CustomizationPanel();
+
+  static const _colors = <Color?>[
+    null,
+    Color(0xFF3F8DFF),
+    Color(0xFF16A3A9),
+    Color(0xFF7C5CFF),
+    Color(0xFFFFB84D),
+    Color(0xFFF8757D),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: Listenable.merge([
+        AppTheme.primaryColor,
+        AppTheme.textScaleFactor,
+        AppTheme.highContrastMode,
+      ]),
+      builder: (context, child) {
+        return GlassPanel(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SectionTitle(
+                icon: Icons.tune_rounded,
+                title: AppConstants.profileCustomization.tr(),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                AppConstants.profilePrimaryColor.tr(),
+                style: const TextStyle(
+                  color: AppTheme.text,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  for (final color in _colors) _ColorSwatch(color: color),
+                ],
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      AppConstants.profileFontSize.tr(),
+                      style: const TextStyle(
+                        color: AppTheme.text,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    '${(AppTheme.textScaleFactor.value * 100).round()}%',
+                    style: const TextStyle(color: AppTheme.primarySoft),
+                  ),
+                ],
+              ),
+              Slider(
+                min: AppTheme.minTextScaleFactor,
+                max: AppTheme.maxTextScaleFactor,
+                divisions: AppTheme.textScaleDivisions,
+                value: AppTheme.textScaleFactor.value,
+                onChanged: (value) => AppTheme.setTextScaleFactor(value),
+              ),
+              const Divider(height: 24),
+              Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.contrast_rounded,
+                      color: AppTheme.primarySoft,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          AppConstants.profileContrastMode.tr(),
+                          style: const TextStyle(
+                            color: AppTheme.text,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        SizedBox(height: 3),
+                        Text(
+                          AppConstants.profileContrastDescription.tr(),
+                          style: const TextStyle(color: AppTheme.mutedText),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Switch(
+                    value: AppTheme.highContrastMode.value,
+                    onChanged: AppTheme.setHighContrastMode,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ColorSwatch extends StatelessWidget {
+  const _ColorSwatch({required this.color});
+
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = AppTheme.primaryColor.value == color;
+    final swatchColor = color ?? AppTheme.primary;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(99),
+      onTap: () => AppTheme.setPrimaryColor(color),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        width: 42,
+        height: 42,
+        decoration: BoxDecoration(
+          color: color == null ? AppTheme.surfaceStrong : swatchColor,
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: selected ? Colors.white : AppTheme.border,
+            width: selected ? 3 : 1,
+          ),
+        ),
+        child: color == null
+            ? const Icon(Icons.restart_alt_rounded, color: AppTheme.primarySoft)
+            : selected
+            ? const Icon(Icons.check_rounded, color: Colors.white)
+            : null,
+      ),
+    );
+  }
+}
+
+class _StatCard extends StatelessWidget {
+  const _StatCard({
+    required this.icon,
+    required this.value,
+    required this.label,
+    this.iconColor = AppTheme.primary,
+  });
+
+  final IconData icon;
+  final String value;
+  final String label;
+  final Color iconColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceStrong.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.border.withValues(alpha: 0.65)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: iconColor, size: 24),
+          const SizedBox(height: 12),
+          Text(
+            value,
+            style: const TextStyle(
+              color: AppTheme.text,
+              fontSize: 22,
+              height: 1.05,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: AppTheme.mutedText, fontSize: 11),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SettingsPanel extends StatelessWidget {
+  const _SettingsPanel({
+    required this.snapshot,
+    required this.documentsService,
+  });
+
+  final DocumentsSnapshot snapshot;
+  final DocumentsService documentsService;
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassPanel(
+      child: Column(
+        children: [
+          _SettingsTile(
+            icon: Icons.cloud_outlined,
+            title: AppConstants.profileCloudSync.tr(),
+            value: AppConstants.profileActive.tr(),
+          ),
+          const Divider(height: 1),
+          _SettingsTile(
+            icon: Icons.settings_backup_restore_rounded,
+            title: AppConstants.profileAutoBackup.tr(),
+            value: AppConstants.profileDaily.tr(),
+          ),
+          const Divider(height: 1),
+          _SettingsTile(
+            icon: Icons.lock_outline_rounded,
+            title: AppConstants.profileBiometricLock.tr(),
+            trailingSwitch: true,
+          ),
+          const Divider(height: 1),
+          _SettingsTile(
+            icon: Icons.collections_bookmark_rounded,
+            title: AppConstants.profileAlbums.tr(),
+            onTap: () => _showAlbumsSheet(context, snapshot),
+          ),
+          const Divider(height: 1),
+          _SettingsTile(
+            icon: Icons.ios_share_rounded,
+            title: AppConstants.profileExportDocuments.tr(),
+            onTap: () => _exportDocuments(context),
+          ),
+          const Divider(height: 1),
+          _SettingsTile(
+            icon: Icons.language_rounded,
+            title: AppConstants.profileLanguage.tr(),
+            value: _languageName(context),
+            onTap: () => _showLanguageSheet(context),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _exportDocuments(BuildContext context) async {
+    final result = await documentsService.exportDocuments(
+      dialogTitle: AppConstants.profileExportPickerTitle.tr(),
+    );
+    if (!context.mounted) return;
+
+    final message = result.count == 0 || result.path == null
+        ? AppConstants.profileExportEmpty.tr()
+        : AppConstants.profileExportDone.tr(
+            namedArgs: {'count': '${result.count}', 'path': result.path!},
+          );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+}
+
+void _showAlbumsSheet(BuildContext context, DocumentsSnapshot snapshot) {
+  final albums = [
+    for (final shelf in snapshot.shelves)
+      for (final album in shelf.albums) (shelf: shelf, album: album),
+  ];
+
+  showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: AppTheme.surface,
+    showDragHandle: true,
+    builder: (context) {
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 4, 18, 18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      AppConstants.profileAlbums.tr(),
+                      style: const TextStyle(
+                        color: AppTheme.text,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: AppConstants.commonClose.tr(),
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              if (albums.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 18),
+                  child: Text(
+                    AppConstants.docshelfCreateFirstShelfMessage.tr(),
+                    style: const TextStyle(color: AppTheme.mutedText),
+                  ),
+                )
+              else
+                Flexible(
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: albums.length,
+                    separatorBuilder: (context, index) =>
+                        const Divider(height: 1),
+                    itemBuilder: (context, index) {
+                      final item = albums[index];
+                      final count = snapshot
+                          .documentsForAlbum(item.album.id)
+                          .length;
+                      return ListTile(
+                        leading: Icon(
+                          Icons.folder_rounded,
+                          color: Color(item.album.colorValue),
+                        ),
+                        title: Text(item.album.name),
+                        subtitle: Text(item.shelf.name),
+                        trailing: Text(
+                          AppConstants.docshelfDocumentCount.tr(
+                            namedArgs: {'count': '$count'},
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
+
+class _SettingsTile extends StatelessWidget {
+  const _SettingsTile({
+    required this.icon,
+    required this.title,
+    this.value,
+    this.trailingSwitch = false,
+    this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String? value;
+  final bool trailingSwitch;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: AppTheme.primary.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: AppTheme.primarySoft, size: 24),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(
+                title,
+                style: const TextStyle(
+                  color: AppTheme.text,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            if (value != null)
+              Text(
+                value!,
+                style: const TextStyle(
+                  color: AppTheme.primarySoft,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            if (trailingSwitch) Switch(value: true, onChanged: (_) {}),
+            if (!trailingSwitch && onTap != null) ...[
+              const SizedBox(width: 4),
+              const Icon(Icons.chevron_right_rounded, size: 28),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+String _languageName(BuildContext context) {
+  return switch (context.locale.languageCode) {
+    'en' => AppConstants.profileEnglish.tr(),
+    'es' => AppConstants.profileSpanish.tr(),
+    'fr' => AppConstants.profileFrench.tr(),
+    _ => AppConstants.profilePortuguese.tr(),
+  };
+}
+
+void _showLanguageSheet(BuildContext context) {
+  final options = [
+    (locale: const Locale('pt'), label: AppConstants.profilePortuguese.tr()),
+    (locale: const Locale('en'), label: AppConstants.profileEnglish.tr()),
+    (locale: const Locale('es'), label: AppConstants.profileSpanish.tr()),
+    (locale: const Locale('fr'), label: AppConstants.profileFrench.tr()),
+  ];
+
+  showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: AppTheme.surface,
+    showDragHandle: true,
+    builder: (sheetContext) {
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 4, 18, 18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                AppConstants.profileLanguage.tr(),
+                style: const TextStyle(
+                  color: AppTheme.text,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 8),
+              for (final option in options)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(option.label),
+                  trailing:
+                      context.locale.languageCode == option.locale.languageCode
+                      ? const Icon(
+                          Icons.check_circle_rounded,
+                          color: AppTheme.primary,
+                        )
+                      : null,
+                  onTap: () async {
+                    await context.setLocale(option.locale);
+                    if (sheetContext.mounted) Navigator.of(sheetContext).pop();
+                  },
+                ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
+
+class _ProfileWideAction extends StatelessWidget {
+  const _ProfileWideAction({
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassPanel(
+      child: Row(
+        children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              color: iconColor.withValues(alpha: 0.18),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(icon, color: iconColor, size: 28),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: AppTheme.text,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: const TextStyle(color: AppTheme.mutedText),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PremiumPanel extends StatelessWidget {
+  const _PremiumPanel();
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassPanel(
+      child: Row(
+        children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFFB66CFF), Color(0xFF6637D8)],
+              ),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Icon(
+              Icons.workspace_premium_rounded,
+              color: Colors.white,
+              size: 28,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  AppConstants.profilePremiumPlan.tr(),
+                  style: const TextStyle(
+                    color: AppTheme.text,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  AppConstants.profilePremiumRenewal.tr(),
+                  style: const TextStyle(color: AppTheme.mutedText),
+                ),
+              ],
+            ),
+          ),
+          OutlinedButton(
+            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(AppConstants.profileBackendFeature.tr())),
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFFB993FF),
+              side: const BorderSide(color: AppTheme.premium),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(99),
+              ),
+            ),
+            child: Text(AppConstants.profileManagePlan.tr()),
+          ),
+          const SizedBox(width: 4),
+          const Icon(Icons.chevron_right_rounded, size: 30),
+        ],
+      ),
+    );
+  }
+}
+
+String _formatNumber(int value) {
+  final text = value.toString();
+  final buffer = StringBuffer();
+
+  for (var i = 0; i < text.length; i++) {
+    final positionFromEnd = text.length - i;
+    buffer.write(text[i]);
+    if (positionFromEnd > 1 && positionFromEnd % 3 == 1) {
+      buffer.write('.');
+    }
+  }
+
+  return buffer.toString();
+}

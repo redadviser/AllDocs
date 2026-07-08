@@ -3,6 +3,7 @@
 *.lock
 *.log
 *.pyc
+*.env
 *.swp
 .buildlog/
 .history
