@@ -7,6 +7,37 @@
     "archive": "Archive",
     "profile": "Profil"
   },
+  "auth": {
+    "title": "Connexion à AllDocs",
+    "subtitle": "Organise tes documents en sécurité, d’abord sur l’appareil.",
+    "email": "Email",
+    "password": "Mot de passe",
+    "remember": "Se souvenir",
+    "forgot": "Oublié",
+    "login": "Se connecter",
+    "mock_hint": "Connexion simulée pendant la préparation de l’interface.",
+    "offline": "Mode local actif"
+  },
+  "security": {
+    "greeting_morning": "Bonjour, {name}",
+    "greeting_afternoon": "Bon après-midi, {name}",
+    "greeting_evening": "Bonsoir, {name}",
+    "create_pin_title": "Crée ton PIN",
+    "create_pin_subtitle": "Ce code protège l’accès local à AllDocs.",
+    "unlock_title": "Déverrouiller AllDocs",
+    "unlock_subtitle": "Utilise ton PIN ou la biométrie de l’appareil.",
+    "pin": "PIN",
+    "confirm_pin": "Confirmer le PIN",
+    "save_pin": "Enregistrer le PIN",
+    "unlock": "Entrer",
+    "enable_biometrics": "Activer la biométrie",
+    "use_biometrics": "Utiliser la biométrie",
+    "pin_length": "Le PIN doit contenir 4 chiffres.",
+    "pin_mismatch": "Les PIN ne correspondent pas.",
+    "invalid_pin": "PIN incorrect.",
+    "biometric_reason": "Déverrouiller AllDocs",
+    "biometric_unavailable": "Authentification biométrique impossible."
+  },
   "common": {
     "cancel": "Annuler",
     "create": "Créer",

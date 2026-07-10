@@ -7,6 +7,37 @@
     "archive": "Archivo",
     "profile": "Perfil"
   },
+  "auth": {
+    "title": "Entrar en AllDocs",
+    "subtitle": "Organiza tus documentos con seguridad, primero en el dispositivo.",
+    "email": "Email",
+    "password": "Contraseña",
+    "remember": "Recordar sesión",
+    "forgot": "Olvidé",
+    "login": "Entrar",
+    "mock_hint": "Login simulado mientras se prepara la interfaz.",
+    "offline": "Modo local activo"
+  },
+  "security": {
+    "greeting_morning": "Buenos días, {name}",
+    "greeting_afternoon": "Buenas tardes, {name}",
+    "greeting_evening": "Buenas noches, {name}",
+    "create_pin_title": "Crea tu PIN",
+    "create_pin_subtitle": "Este código protege el acceso local a AllDocs.",
+    "unlock_title": "Desbloquear AllDocs",
+    "unlock_subtitle": "Usa tu PIN o la biometría del dispositivo.",
+    "pin": "PIN",
+    "confirm_pin": "Confirmar PIN",
+    "save_pin": "Guardar PIN",
+    "unlock": "Entrar",
+    "enable_biometrics": "Activar biometría",
+    "use_biometrics": "Usar biometría",
+    "pin_length": "El PIN debe tener 4 números.",
+    "pin_mismatch": "Los PIN no coinciden.",
+    "invalid_pin": "PIN incorrecto.",
+    "biometric_reason": "Desbloquear AllDocs",
+    "biometric_unavailable": "No se pudo autenticar con biometría."
+  },
   "common": {
     "cancel": "Cancelar",
     "create": "Crear",

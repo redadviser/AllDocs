@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:pdfx/pdfx.dart';
 
 import '../../common/app_constants.dart';
 import '../../common/document_tile.dart';
@@ -31,6 +34,9 @@ class _ArchiveScreenState extends State<ArchiveScreen> {
         );
         final recentImports = _filterDocuments(snapshot.recentImports);
         final allHistory = _filterDocuments(snapshot.documents);
+        final visibleUnorganizedDocuments = unorganizedDocuments
+            .take(6)
+            .toList();
 
         return Padding(
           padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
@@ -73,6 +79,8 @@ class _ArchiveScreenState extends State<ArchiveScreen> {
                             context,
                             title: AppConstants.archiveUnorganized.tr(),
                             documents: unorganizedDocuments,
+                            snapshot: snapshot,
+                            showArchiveActions: true,
                           ),
                         ),
                       ),
@@ -80,20 +88,11 @@ class _ArchiveScreenState extends State<ArchiveScreen> {
                       if (unorganizedDocuments.isEmpty)
                         _ArchiveEmptyState(filtered: _selectedType != null)
                       else
-                        for (final document in unorganizedDocuments) ...[
-                          DocumentTile(
-                            document: document,
-                            onTap: () =>
-                                widget.documentsService.openDocument(document),
-                            trailing: _ArchiveActions(
-                              document: document,
-                              snapshot: snapshot,
-                              documentsService: widget.documentsService,
-                            ),
-                          ),
-                          if (document != unorganizedDocuments.last)
-                            const Divider(height: 1),
-                        ],
+                        _UnorganizedDocumentsGrid(
+                          documents: visibleUnorganizedDocuments,
+                          snapshot: snapshot,
+                          documentsService: widget.documentsService,
+                        ),
                     ],
                   ),
                 ),
@@ -226,6 +225,8 @@ class _ArchiveScreenState extends State<ArchiveScreen> {
     BuildContext context, {
     required String title,
     required List<DocumentFile> documents,
+    DocumentsSnapshot? snapshot,
+    bool showArchiveActions = false,
   }) {
     showModalBottomSheet<void>(
       context: context,
@@ -287,17 +288,38 @@ class _ArchiveScreenState extends State<ArchiveScreen> {
                               style: const TextStyle(color: AppTheme.mutedText),
                             ),
                           )
-                        : ListView.separated(
-                            controller: controller,
-                            itemCount: documents.length,
-                            separatorBuilder: (context, index) =>
-                                const Divider(height: 1),
-                            itemBuilder: (context, index) {
-                              final document = documents[index];
-                              return DocumentTile(
-                                document: document,
-                                onTap: () => widget.documentsService
-                                    .openDocument(document),
+                        : LayoutBuilder(
+                            builder: (context, constraints) {
+                              final spacing = constraints.maxWidth < 360
+                                  ? 10.0
+                                  : 12.0;
+
+                              final childAspectRatio = showArchiveActions
+                                  ? (constraints.maxWidth < 360 ? 0.56 : 0.60)
+                                  : (constraints.maxWidth < 360 ? 0.64 : 0.70);
+
+                              return GridView.builder(
+                                controller: controller,
+                                padding: const EdgeInsets.only(bottom: 12),
+                                itemCount: documents.length,
+                                gridDelegate:
+                                    SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: 2,
+                                      crossAxisSpacing: spacing,
+                                      mainAxisSpacing: spacing,
+                                      childAspectRatio: childAspectRatio,
+                                    ),
+                                itemBuilder: (context, index) {
+                                  final document = documents[index];
+
+                                  return _UnorganizedDocumentCard(
+                                    document: document,
+                                    snapshot: snapshot,
+                                    documentsService: widget.documentsService,
+                                    showArchiveActions:
+                                        showArchiveActions && snapshot != null,
+                                  );
+                                },
                               );
                             },
                           ),
@@ -652,42 +674,651 @@ class _TypeFilters extends StatelessWidget {
       ),
     ];
 
-    return SizedBox(
-      height: 48,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: filters.length,
-        separatorBuilder: (context, index) => const SizedBox(width: 10),
-        itemBuilder: (context, index) {
-          final filter = filters[index];
-          final selected = filter.type == selectedType;
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        for (final filter in filters)
+          Builder(
+            builder: (context) {
+              final selected = filter.type == selectedType;
+              return ChoiceChip(
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                visualDensity: VisualDensity.compact,
+                selected: selected,
+                onSelected: (_) => onSelected(filter.type),
+                avatar: Icon(
+                  filter.icon,
+                  color: selected ? Colors.white : AppTheme.primarySoft,
+                  size: 18,
+                ),
+                label: Text(filter.translatedLabel),
+                labelStyle: TextStyle(
+                  color: selected ? Colors.white : AppTheme.mutedText,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+                side: BorderSide(
+                  color: selected ? AppTheme.primary : AppTheme.border,
+                ),
+                backgroundColor: AppTheme.surface,
+                selectedColor: AppTheme.primary.withValues(alpha: 0.22),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(22),
+                ),
+              );
+            },
+          ),
+      ],
+    );
+  }
+}
 
-          return ChoiceChip(
-            selected: selected,
-            onSelected: (_) => onSelected(filter.type),
-            avatar: Icon(
-              filter.icon,
-              color: selected ? Colors.white : AppTheme.primarySoft,
-              size: 18,
+class _UnorganizedDocumentsGrid extends StatelessWidget {
+  const _UnorganizedDocumentsGrid({
+    required this.documents,
+    required this.snapshot,
+    required this.documentsService,
+  });
+
+  final List<DocumentFile> documents;
+  final DocumentsSnapshot snapshot;
+  final DocumentsService documentsService;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final spacing = constraints.maxWidth < 360 ? 10.0 : 12.0;
+
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: documents.length,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: spacing,
+            mainAxisSpacing: spacing,
+            childAspectRatio: constraints.maxWidth < 360 ? 0.56 : 0.60,
+          ),
+          itemBuilder: (context, index) {
+            final document = documents[index];
+
+            return _UnorganizedDocumentCard(
+              document: document,
+              snapshot: snapshot,
+              documentsService: documentsService,
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _UnorganizedDocumentCard extends StatelessWidget {
+  const _UnorganizedDocumentCard({
+    required this.document,
+    required this.snapshot,
+    required this.documentsService,
+    this.showArchiveActions = true,
+  });
+
+  final DocumentFile document;
+  final DocumentsSnapshot? snapshot;
+  final DocumentsService documentsService;
+  final bool showArchiveActions;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _documentColor(document.type);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: () => documentsService.openDocument(document),
+        child: Container(
+          padding: const EdgeInsets.all(9),
+          decoration: BoxDecoration(
+            color: AppTheme.surfaceStrong.withValues(alpha: 0.42),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: AppTheme.border.withValues(alpha: 0.72)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: _DocumentPreview(
+                  document: document,
+                  color: color,
+                  icon: _documentIcon(document.type),
+                  extension: _documentExtension(document.type),
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                height: 34,
+                child: Text(
+                  document.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppTheme.text,
+                    fontSize: 12.5,
+                    height: 1.15,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                '${document.dateLabel} • ${document.sizeLabel}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppTheme.mutedText,
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              if (showArchiveActions && snapshot != null) ...[
+                const SizedBox(height: 8),
+                SizedBox(
+                  height: 36,
+                  child: _ArchiveActions(
+                    document: document,
+                    snapshot: snapshot!,
+                    documentsService: documentsService,
+                    compact: true,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  IconData _documentIcon(DocumentType type) {
+    switch (type) {
+      case DocumentType.pdf:
+        return Icons.picture_as_pdf_rounded;
+      case DocumentType.word:
+        return Icons.description_rounded;
+      case DocumentType.excel:
+        return Icons.table_chart_rounded;
+      case DocumentType.image:
+        return Icons.image_rounded;
+    }
+  }
+
+  Color _documentColor(DocumentType type) {
+    switch (type) {
+      case DocumentType.pdf:
+        return const Color(0xFFFF6868);
+      case DocumentType.word:
+        return const Color(0xFF5C8DFF);
+      case DocumentType.excel:
+        return const Color(0xFF4CC58A);
+      case DocumentType.image:
+        return const Color(0xFF9B6DFF);
+    }
+  }
+
+  String _documentExtension(DocumentType type) {
+    switch (type) {
+      case DocumentType.pdf:
+        return 'PDF';
+      case DocumentType.word:
+        return 'DOC';
+      case DocumentType.excel:
+        return 'XLS';
+      case DocumentType.image:
+        return AppConstants.archiveImage.tr().toUpperCase();
+    }
+  }
+}
+
+class _DocumentPreview extends StatelessWidget {
+  const _DocumentPreview({
+    required this.document,
+    required this.color,
+    required this.icon,
+    required this.extension,
+  });
+
+  final DocumentFile document;
+  final Color color;
+  final IconData icon;
+  final String extension;
+
+  @override
+  Widget build(BuildContext context) {
+    final thumbnailSource = _previewSource(_documentThumbnailPath(document));
+    final filePath = _existingLocalPath(_documentFilePath(document));
+    final imagePreviewSource = document.type == DocumentType.image
+        ? _previewSource(_documentFilePath(document))
+        : null;
+    final previewSource = thumbnailSource ?? imagePreviewSource;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(15),
+      child: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.12),
+          border: Border.all(color: color.withValues(alpha: 0.22)),
+          borderRadius: BorderRadius.circular(15),
+        ),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            if (previewSource != null)
+              _ImagePreviewSource(
+                source: previewSource,
+                fallback: _FallbackDocumentPreview(
+                  color: color,
+                  icon: icon,
+                  extension: extension,
+                  type: document.type,
+                ),
+              )
+            else if (document.type == DocumentType.pdf && filePath != null)
+              _PdfFirstPagePreview(
+                filePath: filePath,
+                fallback: _FallbackDocumentPreview(
+                  color: color,
+                  icon: icon,
+                  extension: extension,
+                  type: document.type,
+                ),
+              )
+            else
+              _FallbackDocumentPreview(
+                color: color,
+                icon: icon,
+                extension: extension,
+                type: document.type,
+              ),
+            Positioned(
+              right: 8,
+              bottom: 8,
+              child: _ExtensionBadge(extension: extension, color: color),
             ),
-            label: Text(filter.translatedLabel),
-            labelStyle: TextStyle(
-              color: selected ? Colors.white : AppTheme.mutedText,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-            ),
-            side: BorderSide(
-              color: selected ? AppTheme.primary : AppTheme.border,
-            ),
-            backgroundColor: AppTheme.surface,
-            selectedColor: AppTheme.primary.withValues(alpha: 0.22),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(22),
-            ),
-          );
+            if (document.isNew)
+              Positioned(
+                top: 8,
+                left: 8,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary.withValues(alpha: 0.82),
+                    borderRadius: BorderRadius.circular(99),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.16),
+                    ),
+                  ),
+                  child: Text(
+                    AppConstants.archiveNew.tr(),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ImagePreviewSource extends StatelessWidget {
+  const _ImagePreviewSource({required this.source, required this.fallback});
+
+  final String source;
+  final Widget fallback;
+
+  @override
+  Widget build(BuildContext context) {
+    if (source.startsWith('http://') || source.startsWith('https://')) {
+      return Image.network(
+        source,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => fallback,
+      );
+    }
+
+    return Image.file(
+      File(source),
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) => fallback,
+    );
+  }
+}
+
+class _PdfFirstPagePreview extends StatefulWidget {
+  const _PdfFirstPagePreview({required this.filePath, required this.fallback});
+
+  final String filePath;
+  final Widget fallback;
+
+  @override
+  State<_PdfFirstPagePreview> createState() => _PdfFirstPagePreviewState();
+}
+
+class _PdfFirstPagePreviewState extends State<_PdfFirstPagePreview> {
+  late PdfController _controller;
+  bool _hasError = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = PdfController(
+      document: PdfDocument.openFile(widget.filePath),
+      initialPage: 1,
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant _PdfFirstPagePreview oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.filePath != widget.filePath) {
+      _controller.dispose();
+      _hasError = false;
+      _controller = PdfController(
+        document: PdfDocument.openFile(widget.filePath),
+        initialPage: 1,
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_hasError) return widget.fallback;
+
+    return IgnorePointer(
+      child: PdfView(
+        controller: _controller,
+        scrollDirection: Axis.vertical,
+        physics: const NeverScrollableScrollPhysics(),
+        onDocumentError: (_) => setState(() => _hasError = true),
+        onPageChanged: (page) {
+          if (page > 1) {
+            _controller.jumpToPage(1);
+          }
         },
       ),
     );
+  }
+}
+
+class _FallbackDocumentPreview extends StatelessWidget {
+  const _FallbackDocumentPreview({
+    required this.color,
+    required this.icon,
+    required this.extension,
+    required this.type,
+  });
+
+  final Color color;
+  final IconData icon;
+  final String extension;
+  final DocumentType type;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(14),
+      child: Center(
+        child: AspectRatio(
+          aspectRatio: 0.72,
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.92),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: color.withValues(alpha: 0.26)),
+              boxShadow: [
+                BoxShadow(
+                  color: color.withValues(alpha: 0.14),
+                  blurRadius: 16,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(icon, color: color, size: 22),
+                    const Spacer(),
+                    Text(
+                      extension,
+                      style: TextStyle(
+                        color: color,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                if (type == DocumentType.excel)
+                  Expanded(child: _ExcelSkeleton(color: color))
+                else
+                  Expanded(child: _TextSkeleton(color: color)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TextSkeleton extends StatelessWidget {
+  const _TextSkeleton({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          height: 10,
+          width: 54,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.22),
+            borderRadius: BorderRadius.circular(99),
+          ),
+        ),
+        const SizedBox(height: 12),
+        for (final widthFactor in const [1.0, 0.78, 0.92, 0.55]) ...[
+          FractionallySizedBox(
+            widthFactor: widthFactor,
+            child: Container(
+              height: 5,
+              decoration: BoxDecoration(
+                color: AppTheme.surfaceStrong.withValues(alpha: 0.34),
+                borderRadius: BorderRadius.circular(99),
+              ),
+            ),
+          ),
+          const SizedBox(height: 7),
+        ],
+      ],
+    );
+  }
+}
+
+class _ExcelSkeleton extends StatelessWidget {
+  const _ExcelSkeleton({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return GridView.builder(
+      padding: EdgeInsets.zero,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        crossAxisSpacing: 4,
+        mainAxisSpacing: 4,
+        childAspectRatio: 1.7,
+      ),
+      itemCount: 15,
+      itemBuilder: (context, index) {
+        return Container(
+          decoration: BoxDecoration(
+            color: index < 3
+                ? color.withValues(alpha: 0.22)
+                : AppTheme.surfaceStrong.withValues(alpha: 0.24),
+            borderRadius: BorderRadius.circular(3),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ExtensionBadge extends StatelessWidget {
+  const _ExtensionBadge({required this.extension, required this.color});
+
+  final String extension;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppTheme.surface.withValues(alpha: 0.88),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.16),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Text(
+        extension,
+        style: TextStyle(
+          color: color,
+          fontSize: 10,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+}
+
+String? _documentThumbnailPath(DocumentFile document) {
+  final dynamic value = document;
+
+  String? valid(dynamic candidate) {
+    if (candidate is String && candidate.trim().isNotEmpty) {
+      return candidate.trim();
+    }
+    return null;
+  }
+
+  try {
+    final path = valid(value.thumbnailPath);
+    if (path != null) return path;
+  } catch (_) {}
+
+  try {
+    final path = valid(value.previewPath);
+    if (path != null) return path;
+  } catch (_) {}
+
+  try {
+    final path = valid(value.coverPath);
+    if (path != null) return path;
+  } catch (_) {}
+
+  try {
+    final path = valid(value.thumbnailUrl);
+    if (path != null) return path;
+  } catch (_) {}
+
+  return null;
+}
+
+String? _documentFilePath(DocumentFile document) {
+  final dynamic value = document;
+
+  String? valid(dynamic candidate) {
+    if (candidate is String && candidate.trim().isNotEmpty) {
+      return candidate.trim();
+    }
+    return null;
+  }
+
+  try {
+    final path = valid(value.path);
+    if (path != null) return path;
+  } catch (_) {}
+
+  try {
+    final path = valid(value.filePath);
+    if (path != null) return path;
+  } catch (_) {}
+
+  try {
+    final path = valid(value.localPath);
+    if (path != null) return path;
+  } catch (_) {}
+
+  try {
+    final path = valid(value.uri);
+    if (path != null) return Uri.tryParse(path)?.toFilePath() ?? path;
+  } catch (_) {}
+
+  return null;
+}
+
+String? _previewSource(String? source) {
+  if (source == null || source.isEmpty) return null;
+  if (source.startsWith('http://') || source.startsWith('https://')) {
+    return source;
+  }
+
+  return _existingLocalPath(source);
+}
+
+String? _existingLocalPath(String? path) {
+  if (path == null || path.isEmpty) return null;
+  if (path.startsWith('file://')) {
+    path = Uri.tryParse(path)?.toFilePath() ?? path;
+  }
+
+  try {
+    return File(path).existsSync() ? path : null;
+  } catch (_) {
+    return null;
   }
 }
 
@@ -696,14 +1327,71 @@ class _ArchiveActions extends StatelessWidget {
     required this.document,
     required this.snapshot,
     required this.documentsService,
+    this.compact = false,
   });
 
   final DocumentFile document;
   final DocumentsSnapshot snapshot;
   final DocumentsService documentsService;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
+    if (compact) {
+      return Row(
+        children: [
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: () => _showArchiveTargets(context),
+              icon: const Icon(Icons.archive_outlined, size: 16),
+              label: Text(
+                AppConstants.archiveArchive.tr(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppTheme.primarySoft,
+                side: const BorderSide(color: AppTheme.border),
+                minimumSize: const Size(0, 36),
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                textStyle: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          SizedBox(
+            width: 36,
+            height: 36,
+            child: IconButton(
+              tooltip: AppConstants.commonFavorite.tr(),
+              padding: EdgeInsets.zero,
+              style: IconButton.styleFrom(
+                foregroundColor: AppTheme.primarySoft,
+                backgroundColor: AppTheme.surface.withValues(alpha: 0.54),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  side: const BorderSide(color: AppTheme.border),
+                ),
+              ),
+              onPressed: () => documentsService.toggleFavorite(document.id),
+              icon: Icon(
+                document.isFavorite
+                    ? Icons.star_rounded
+                    : Icons.star_outline_rounded,
+                size: 20,
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
     return Wrap(
       crossAxisAlignment: WrapCrossAlignment.center,
       spacing: 8,

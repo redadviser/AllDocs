@@ -51,6 +51,8 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>A AllDocs usa a câmara para digitalizar documentos localmente.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>A AllDocs usa Face ID para desbloquear documentos protegidos no dispositivo.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

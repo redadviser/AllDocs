@@ -3,8 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'common/app_constants.dart';
-import 'common/app_scaffold.dart';
-import 'common/storage_permission_gate.dart';
+import 'screens/auth/login_screen.dart';
 import 'theme/app_theme.dart';
 
 class AllDocsApp extends StatefulWidget {
@@ -84,7 +83,7 @@ class _AllDocsAppState extends State<AllDocsApp> {
                 child: scaledChild,
               );
             },
-            home: const StoragePermissionGate(child: MainNavScreen()),
+            home: const MockAuthGate(),
           ),
         );
       },

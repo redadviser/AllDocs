@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -26,6 +27,18 @@ void main() {
         child: const AllDocsApp(),
       ),
     );
+    await tester.pump(const Duration(milliseconds: 800));
+    await tester.pump(const Duration(milliseconds: 800));
+
+    expect(find.text('Entrar'), findsOneWidget);
+    await tester.tap(find.text('Entrar'));
+    await tester.pump(const Duration(milliseconds: 800));
+    await tester.pump(const Duration(seconds: 2));
+
+    expect(find.text('Cria o teu PIN'), findsOneWidget);
+    await tester.enterText(find.byType(EditableText).at(0), '1234');
+    await tester.enterText(find.byType(EditableText).at(1), '1234');
+    await tester.tap(find.text('Guardar PIN'));
     await tester.pump(const Duration(milliseconds: 800));
     await tester.pump(const Duration(milliseconds: 800));
 

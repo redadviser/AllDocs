@@ -8,62 +8,145 @@ import '../../models/models.dart';
 import '../../services/services.dart';
 import '../../theme/app_theme.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key, required this.documentsService});
 
   final DocumentsService documentsService;
 
   @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  late final PageController _settingsPageController;
+  int _settingsPage = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _settingsPageController = PageController();
+  }
+
+  @override
+  void dispose() {
+    _settingsPageController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return SnapshotBuilder(
-      documentsService: documentsService,
+      documentsService: widget.documentsService,
       builder: (context, snapshot) {
         final profile = snapshot.profile;
 
         return Padding(
           padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
-          child: CustomScrollView(
-            key: const PageStorageKey('profile'),
-            slivers: [
-              const SliverToBoxAdapter(child: _ProfileTitle()),
-              const SliverToBoxAdapter(child: SizedBox(height: 18)),
-              SliverToBoxAdapter(child: _ProfileHeader(profile: profile)),
-              const SliverToBoxAdapter(child: SizedBox(height: 14)),
-              SliverToBoxAdapter(
-                child: _StoragePanel(summary: profile.storageSummary),
+          child: Column(
+            children: [
+              _ProfileTitle(
+                settingsOpen: _settingsPage == 1,
+                onSettingsTap: _toggleSettingsPage,
               ),
-              const SliverToBoxAdapter(child: SizedBox(height: 14)),
-              SliverToBoxAdapter(child: _StatsPanel(profile: profile)),
-              const SliverToBoxAdapter(child: SizedBox(height: 14)),
-              const SliverToBoxAdapter(child: _CustomizationPanel()),
-              const SliverToBoxAdapter(child: SizedBox(height: 14)),
-              SliverToBoxAdapter(
-                child: _SettingsPanel(
-                  snapshot: snapshot,
-                  documentsService: documentsService,
+              const SizedBox(height: 18),
+              Expanded(
+                child: PageView(
+                  controller: _settingsPageController,
+                  physics: const BouncingScrollPhysics(),
+                  onPageChanged: (page) => setState(() => _settingsPage = page),
+                  children: [
+                    _ProfileOverviewPage(profile: profile),
+                    _ProfileSettingsPage(
+                      profile: profile,
+                      snapshot: snapshot,
+                      documentsService: widget.documentsService,
+                    ),
+                  ],
                 ),
               ),
-              const SliverToBoxAdapter(child: SizedBox(height: 14)),
-              SliverToBoxAdapter(
-                child: _ProfileWideAction(
-                  icon: Icons.shield_rounded,
-                  iconColor: const Color(0xFF37C66A),
-                  title: AppConstants.profileSecurity.tr(),
-                  subtitle: AppConstants.profileSecuritySubtitle.tr(),
-                ),
-              ),
-              const SliverToBoxAdapter(child: SizedBox(height: 14)),
-              const SliverToBoxAdapter(child: _PremiumPanel()),
             ],
           ),
         );
       },
     );
   }
+
+  void _toggleSettingsPage() {
+    final nextPage = _settingsPage == 0 ? 1 : 0;
+    setState(() => _settingsPage = nextPage);
+    _settingsPageController.animateToPage(
+      nextPage,
+      duration: const Duration(milliseconds: 360),
+      curve: Curves.easeOutCubic,
+    );
+  }
+}
+
+class _ProfileOverviewPage extends StatelessWidget {
+  const _ProfileOverviewPage({required this.profile});
+
+  final UserProfile profile;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      key: const PageStorageKey('profile_overview'),
+      physics: const BouncingScrollPhysics(),
+      children: [
+        _ProfileHeader(profile: profile),
+        const SizedBox(height: 14),
+        _StoragePanel(summary: profile.storageSummary),
+        const SizedBox(height: 14),
+        _StatsPanel(profile: profile),
+      ],
+    );
+  }
+}
+
+class _ProfileSettingsPage extends StatelessWidget {
+  const _ProfileSettingsPage({
+    required this.profile,
+    required this.snapshot,
+    required this.documentsService,
+  });
+
+  final UserProfile profile;
+  final DocumentsSnapshot snapshot;
+  final DocumentsService documentsService;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      key: const PageStorageKey('profile_settings'),
+      physics: const BouncingScrollPhysics(),
+      children: [
+        _ProfileHeader(profile: profile),
+        const SizedBox(height: 14),
+        const _CustomizationPanel(),
+        const SizedBox(height: 14),
+        _SettingsPanel(snapshot: snapshot, documentsService: documentsService),
+        const SizedBox(height: 14),
+        _ProfileWideAction(
+          icon: Icons.shield_rounded,
+          iconColor: const Color(0xFF37C66A),
+          title: AppConstants.profileSecurity.tr(),
+          subtitle: AppConstants.profileSecuritySubtitle.tr(),
+        ),
+        const SizedBox(height: 14),
+        const _PremiumPanel(),
+      ],
+    );
+  }
 }
 
 class _ProfileTitle extends StatelessWidget {
-  const _ProfileTitle();
+  const _ProfileTitle({
+    required this.settingsOpen,
+    required this.onSettingsTap,
+  });
+
+  final bool settingsOpen;
+  final VoidCallback onSettingsTap;
 
   @override
   Widget build(BuildContext context) {
@@ -81,10 +164,21 @@ class _ProfileTitle extends StatelessWidget {
         ),
         IconButton(
           tooltip: AppConstants.profileSettings.tr(),
-          onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(AppConstants.profileSettingsHint.tr())),
+          onPressed: onSettingsTap,
+          icon: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 220),
+            transitionBuilder: (child, animation) {
+              return RotationTransition(
+                turns: Tween<double>(begin: -0.12, end: 0).animate(animation),
+                child: ScaleTransition(scale: animation, child: child),
+              );
+            },
+            child: Icon(
+              settingsOpen ? Icons.close_rounded : Icons.settings_outlined,
+              key: ValueKey(settingsOpen),
+              size: settingsOpen ? 32 : 34,
+            ),
           ),
-          icon: const Icon(Icons.settings_outlined, size: 34),
         ),
       ],
     );
@@ -384,8 +478,8 @@ class _CustomizationPanel extends StatelessWidget {
 
   static const _colors = <Color?>[
     null,
-    Color(0xFF3F8DFF),
     Color(0xFF16A3A9),
+    Color(0xFFFF00FB),
     Color(0xFF7C5CFF),
     Color(0xFFFFB84D),
     Color(0xFFF8757D),
@@ -608,11 +702,7 @@ class _SettingsPanel extends StatelessWidget {
             value: AppConstants.profileDaily.tr(),
           ),
           const Divider(height: 1),
-          _SettingsTile(
-            icon: Icons.lock_outline_rounded,
-            title: AppConstants.profileBiometricLock.tr(),
-            trailingSwitch: true,
-          ),
+          const _BiometricSettingsTile(),
           const Divider(height: 1),
           _SettingsTile(
             icon: Icons.collections_bookmark_rounded,
@@ -651,6 +741,61 @@ class _SettingsPanel extends StatelessWidget {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(message)));
+  }
+}
+
+class _BiometricSettingsTile extends StatefulWidget {
+  const _BiometricSettingsTile();
+
+  @override
+  State<_BiometricSettingsTile> createState() => _BiometricSettingsTileState();
+}
+
+class _BiometricSettingsTileState extends State<_BiometricSettingsTile> {
+  final SecurityLockService _securityLockService = SecurityLockService();
+  bool _loading = true;
+  bool _enabled = false;
+  bool _canUseBiometrics = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _SettingsTile(
+      icon: Icons.lock_outline_rounded,
+      title: AppConstants.profileBiometricLock.tr(),
+      trailingSwitch: true,
+      switchValue: _enabled,
+      onSwitchChanged: _loading ? null : _setEnabled,
+    );
+  }
+
+  Future<void> _load() async {
+    final enabled = await _securityLockService.isBiometricEnabled();
+    final canUseBiometrics = await _securityLockService.canUseBiometrics();
+    if (!mounted) return;
+    setState(() {
+      _enabled = enabled && canUseBiometrics;
+      _canUseBiometrics = canUseBiometrics;
+      _loading = false;
+    });
+  }
+
+  Future<void> _setEnabled(bool enabled) async {
+    if (enabled && !_canUseBiometrics) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppConstants.securityBiometricUnavailable.tr())),
+      );
+      return;
+    }
+
+    await _securityLockService.setBiometricEnabled(enabled);
+    if (!mounted) return;
+    setState(() => _enabled = enabled);
   }
 }
 
@@ -742,6 +887,8 @@ class _SettingsTile extends StatelessWidget {
     required this.title,
     this.value,
     this.trailingSwitch = false,
+    this.switchValue = false,
+    this.onSwitchChanged,
     this.onTap,
   });
 
@@ -749,6 +896,8 @@ class _SettingsTile extends StatelessWidget {
   final String title;
   final String? value;
   final bool trailingSwitch;
+  final bool switchValue;
+  final ValueChanged<bool>? onSwitchChanged;
   final VoidCallback? onTap;
 
   @override
@@ -789,7 +938,8 @@ class _SettingsTile extends StatelessWidget {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-            if (trailingSwitch) Switch(value: true, onChanged: (_) {}),
+            if (trailingSwitch)
+              Switch(value: switchValue, onChanged: onSwitchChanged),
             if (!trailingSwitch && onTap != null) ...[
               const SizedBox(width: 4),
               const Icon(Icons.chevron_right_rounded, size: 28),

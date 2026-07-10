@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
 import '../../common/app_constants.dart';
+import '../../common/document_preview_card.dart';
 import '../../common/document_tile.dart';
 import '../../common/glass_panel.dart';
 import '../../common/snapshot_builder.dart';
@@ -153,22 +154,11 @@ class _ShelfPanel extends StatelessWidget {
           SectionTitle(
             icon: Icons.view_week_rounded,
             title: shelf.name,
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  tooltip: AppConstants.docshelfCreateAlbum.tr(),
-                  onPressed: () => _createAlbum(context),
-                  icon: const Icon(Icons.add_box_outlined),
-                  color: AppTheme.primarySoft,
-                ),
-                IconButton(
-                  tooltip: AppConstants.docshelfDeleteShelf.tr(),
-                  onPressed: () => _deleteShelf(context),
-                  icon: const Icon(Icons.delete_outline_rounded),
-                  color: AppTheme.mutedText,
-                ),
-              ],
+            trailing: IconButton(
+              tooltip: AppConstants.docshelfDeleteShelf.tr(),
+              onPressed: () => _deleteShelf(context),
+              icon: const Icon(Icons.delete_outline_rounded),
+              color: AppTheme.destructive,
             ),
           ),
           const SizedBox(height: 18),
@@ -289,16 +279,6 @@ class _ShelfPanel extends StatelessWidget {
                           ],
                         ),
                       ),
-                      IconButton.filled(
-                        onPressed: () async {
-                          final imported = await documentsService
-                              .importDocuments(albumId: album.id);
-                          if (context.mounted && imported > 0) {
-                            Navigator.of(context).pop();
-                          }
-                        },
-                        icon: const Icon(Icons.upload_file_rounded),
-                      ),
                       IconButton(
                         tooltip: AppConstants.docshelfDeleteAlbum.tr(),
                         onPressed: () async {
@@ -306,7 +286,7 @@ class _ShelfPanel extends StatelessWidget {
                           await _deleteAlbum(context, album);
                         },
                         icon: const Icon(Icons.delete_outline_rounded),
-                        color: AppTheme.mutedText,
+                        color: AppTheme.destructive,
                       ),
                     ],
                   ),
@@ -327,22 +307,39 @@ class _ShelfPanel extends StatelessWidget {
                               }
                             },
                           )
-                        : ListView.separated(
-                            controller: controller,
-                            itemCount: documents.length,
-                            separatorBuilder: (context, index) =>
-                                const Divider(height: 1),
-                            itemBuilder: (context, index) {
-                              final document = documents[index];
-                              return DocumentTile(
-                                document: document,
-                                onTap: () =>
-                                    documentsService.openDocument(document),
-                                trailing: _DocumentActions(
-                                  document: document,
-                                  documentsService: documentsService,
-                                  compact: true,
-                                ),
+                        : LayoutBuilder(
+                            builder: (context, constraints) {
+                              final spacing = constraints.maxWidth < 360
+                                  ? 10.0
+                                  : 12.0;
+
+                              return GridView.builder(
+                                controller: controller,
+                                itemCount: documents.length,
+                                padding: const EdgeInsets.only(bottom: 12),
+                                gridDelegate:
+                                    SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: 2,
+                                      crossAxisSpacing: spacing,
+                                      mainAxisSpacing: spacing,
+                                      childAspectRatio:
+                                          constraints.maxWidth < 360
+                                          ? 0.62
+                                          : 0.66,
+                                    ),
+                                itemBuilder: (context, index) {
+                                  final document = documents[index];
+                                  return DocumentPreviewCard(
+                                    document: document,
+                                    onTap: () =>
+                                        documentsService.openDocument(document),
+                                    trailing: _DocumentActions(
+                                      document: document,
+                                      documentsService: documentsService,
+                                      compact: true,
+                                    ),
+                                  );
+                                },
                               );
                             },
                           ),

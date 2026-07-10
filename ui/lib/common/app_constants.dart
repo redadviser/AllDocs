@@ -16,6 +16,35 @@ class AppConstants {
   static const navArchive = 'nav.archive';
   static const navProfile = 'nav.profile';
 
+  static const authTitle = 'auth.title';
+  static const authSubtitle = 'auth.subtitle';
+  static const authEmail = 'auth.email';
+  static const authPassword = 'auth.password';
+  static const authRemember = 'auth.remember';
+  static const authForgot = 'auth.forgot';
+  static const authLogin = 'auth.login';
+  static const authMockHint = 'auth.mock_hint';
+  static const authOffline = 'auth.offline';
+
+  static const securityGreetingMorning = 'security.greeting_morning';
+  static const securityGreetingAfternoon = 'security.greeting_afternoon';
+  static const securityGreetingEvening = 'security.greeting_evening';
+  static const securityCreatePinTitle = 'security.create_pin_title';
+  static const securityCreatePinSubtitle = 'security.create_pin_subtitle';
+  static const securityUnlockTitle = 'security.unlock_title';
+  static const securityUnlockSubtitle = 'security.unlock_subtitle';
+  static const securityPin = 'security.pin';
+  static const securityConfirmPin = 'security.confirm_pin';
+  static const securitySavePin = 'security.save_pin';
+  static const securityUnlock = 'security.unlock';
+  static const securityEnableBiometrics = 'security.enable_biometrics';
+  static const securityUseBiometrics = 'security.use_biometrics';
+  static const securityPinLength = 'security.pin_length';
+  static const securityPinMismatch = 'security.pin_mismatch';
+  static const securityInvalidPin = 'security.invalid_pin';
+  static const securityBiometricReason = 'security.biometric_reason';
+  static const securityBiometricUnavailable = 'security.biometric_unavailable';
+
   static const commonCancel = 'common.cancel';
   static const commonCreate = 'common.create';
   static const commonDelete = 'common.delete';
