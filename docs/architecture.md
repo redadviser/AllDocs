@@ -55,3 +55,30 @@ server/
 ```
 
 The mobile app should still cache locally even after a backend exists.
+
+## iOS scanning parity (known gap, accepted for now)
+
+`DocumentScannerService` uses `google_mlkit_document_scanner` on Android (real
+edge detection, auto-crop, multi-page capture). On iOS it falls back to a
+plain `image_picker` camera shot: no edge detection, no auto-crop, no
+multi-page batching. This is a real, currently-accepted gap, not an
+oversight — an iOS scanner reads worse than Apple's own free Notes app
+(which uses VisionKit).
+
+Researched options to close this later (evaluated 2026-07-28, re-check
+maintenance status before committing to one):
+
+- **`flutter_doc_scanner`** — wraps native `VNDocumentCameraViewController`
+  (VisionKit) on iOS and ML Kit on Android behind one API
+  (`getScanDocumentsUri()` returns page image URIs, compatible with our
+  existing OCR/searchable-PDF pipeline). v0.0.21, 162 likes/150 pub points,
+  but an unverified pub.dev uploader — worth a second look at adoption/issues
+  before depending on it.
+- **`cunning_document_scanner`**, **`doclens`**, **`aio_scanner`** — same
+  VisionKit-backed approach on iOS, not yet compared in depth.
+
+Decision: deferred. Ship with the `image_picker` fallback for now rather than
+add a native dependency from an unverified author without the ability to
+test on real iOS hardware in the session that evaluated it. Revisit as part
+of the roadmap's Phase 6 (hardening) before a paid iOS launch, testing
+candidates on a real device/simulator first.

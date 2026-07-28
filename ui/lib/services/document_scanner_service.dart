@@ -88,6 +88,9 @@ class DocumentScannerService {
     }
   }
 
+  // Known gap: unlike the Android path above, this has no edge detection,
+  // auto-crop, or multi-page capture. Accepted for now; see "iOS scanning
+  // parity" in docs/architecture.md for the plan to close it.
   Future<ScannedDocumentResult?> _scanWithFallbackCamera() async {
     final picked = await ImagePicker().pickImage(
       source: ImageSource.camera,
