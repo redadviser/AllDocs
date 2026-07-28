@@ -14,47 +14,47 @@ Recommended local stack for the next implementation step:
 - OS biometric APIs for app lock
 - Google Drive/OneDrive/iCloud integrations only as optional import/backup providers
 
-## When Backend Becomes Worth It
+## Backend (Phase 1: accounts)
 
-Add a backend once one of these becomes a product requirement:
+`Backend/` is an Express + TypeScript service, deliberately built as a
+sibling of `AllPhotos/Backend` rather than reinvented: same module layout
+(`src/modules/<name>/{<name>.routes,controller,service}.ts`), same
+`src/lib/db.ts` + `src/lib/auth.ts` shape, same CapRover deployment
+(`Dockerfile` + `captain-definition`), same local dev loop (`docker-compose`
+Postgres + `scripts/schema.sql` + `tsx watch`). This isn't NestJS, and it
+isn't S3/RevenueCat/Railway — it mirrors whatever AllPhotos already runs in
+production, since the two apps are the same "All\*" family and should not
+diverge in backend stack for no reason.
 
-- sign-in and subscription state shared across devices
-- cloud sync between multiple phones/tablets/web
-- shared document spaces
-- server-side OCR, classification, duplicate detection, or search indexing
-- encrypted backup catalog with restore across new devices
+**Shared accounts, separate app data.** AllPhotos and AllDocs are both
+"All\*" apps from the same suite, so a user's login (email + password) is
+shared between them: AllDocs' backend authenticates against AllPhotos'
+existing `users` table rather than creating its own. Concretely:
 
-Suggested backend shape then:
+- `ACCOUNTS_POSTGRES_*` env vars point AllDocs' backend at the `allphotos`
+  database (same Postgres server as AllDocs' own database in production,
+  different database) — read/write access to the `users` table only. AllDocs
+  never touches AllPhotos' own domain tables (`profiles`, `albums`, `photos`,
+  `shelves`, ...).
+- `POSTGRES_*` env vars (same names AllPhotos uses) point at AllDocs' own
+  `alldocs` database, holding only AllDocs-specific tables: `devices` this
+  phase, later `vaults`/`documents_metadata`/`reminders`/`subscriptions` per
+  the product roadmap.
+- Each backend issues and verifies its own JWT with its own `JWT_SECRET` —
+  there is no cross-app token handoff (a user still logs into each app
+  separately on their device), just a shared credential store. Sharing the
+  signing secret would add risk (a compromised AllDocs backend could forge
+  AllPhotos sessions) for no functional benefit.
+- Password hashing (bcrypt, cost 10) matches AllPhotos exactly, so a
+  password set in either app validates in both.
 
-```text
-server/
-  src/
-    modules/
-      documents/
-        controller.ts
-        service.ts
-        index.ts
-      categories/
-        controller.ts
-        service.ts
-        index.ts
-      sync/
-        controller.ts
-        service.ts
-        index.ts
-      users/
-        controller.ts
-        service.ts
-        index.ts
-    models/
-      document.ts
-      category.ts
-      user.ts
-    database/
-      postgres.ts
-```
+This means creating an account in AllDocs can create a *new* shared `users`
+row (if the email doesn't exist yet) that AllPhotos could also authenticate
+against later, and vice versa — that's the intended behavior, not a bug.
 
-The mobile app should still cache locally even after a backend exists.
+The mobile app should still cache locally even after a backend exists —
+Phase 3 of the roadmap (encrypted sync) is what actually starts sending
+document data to the server; Phase 1 is accounts only.
 
 ## iOS scanning parity (known gap, accepted for now)
 

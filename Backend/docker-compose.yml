@@ -1,0 +1,28 @@
+name: alldocs-dev
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: alldocs-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: alldocs
+      POSTGRES_USER: alldocs
+      POSTGRES_PASSWORD: alldocs!eupasoft!app!dev
+    ports:
+      # Mapped off the default 5432 so this can run alongside AllPhotos' own
+      # local dev Postgres without a port clash.
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-accounts-db.sh:/docker-entrypoint-initdb.d/001-init-accounts-db.sh:ro
+      - ./scripts/accounts-schema.sql:/docker-entrypoint-initdb.d/accounts-schema.sql:ro
+      - ./scripts/schema.sql:/docker-entrypoint-initdb.d/002-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U alldocs -d alldocs"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  postgres_data:
