@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../common/app_constants.dart';
 import '../../common/glass_panel.dart';
 import '../../common/snapshot_builder.dart';
+import '../../common/user_initials.dart';
 import '../../models/models.dart';
 import '../../services/services.dart';
 import '../../theme/app_theme.dart';
@@ -207,10 +208,10 @@ class _ProfileHeader extends StatelessWidget {
                     colors: [Color(0xFF3F8DFF), Color(0xFF102D63)],
                   ),
                 ),
-                child: const Center(
+                child: Center(
                   child: Text(
-                    'PC',
-                    style: TextStyle(
+                    initialsFromName(profile.name),
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 24,
                       fontWeight: FontWeight.w900,

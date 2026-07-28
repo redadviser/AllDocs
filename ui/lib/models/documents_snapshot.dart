@@ -45,4 +45,30 @@ class DocumentsSnapshot {
   List<DocumentFile> documentsForAlbum(String albumId) {
     return documents.where((document) => document.albumId == albumId).toList();
   }
+
+  DocumentsSnapshot copyWith({
+    List<DocumentShelf>? shelves,
+    List<DocumentFile>? documents,
+    List<DocumentCategory>? categories,
+    List<DocumentFile>? recentDocuments,
+    List<DocumentFile>? favoriteDocuments,
+    List<DocumentFile>? unorganizedDocuments,
+    List<DeviceFolder>? deviceFolders,
+    List<DocumentFile>? recentImports,
+    UserProfile? profile,
+    List<DocumentFile>? expiringDocuments,
+  }) {
+    return DocumentsSnapshot(
+      shelves: shelves ?? this.shelves,
+      documents: documents ?? this.documents,
+      categories: categories ?? this.categories,
+      recentDocuments: recentDocuments ?? this.recentDocuments,
+      favoriteDocuments: favoriteDocuments ?? this.favoriteDocuments,
+      unorganizedDocuments: unorganizedDocuments ?? this.unorganizedDocuments,
+      deviceFolders: deviceFolders ?? this.deviceFolders,
+      recentImports: recentImports ?? this.recentImports,
+      profile: profile ?? this.profile,
+      expiringDocuments: expiringDocuments ?? this.expiringDocuments,
+    );
+  }
 }

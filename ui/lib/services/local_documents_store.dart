@@ -648,10 +648,13 @@ class LocalDocumentsStore {
       deviceFolders: deviceFolders,
       recentImports: recentImports,
       expiringDocuments: expiringDocuments.take(5).toList(),
+      // Overwritten with the real signed-in user's name/email/plan by
+      // DocumentsService.loadSnapshot() — these are just the fallback values
+      // if that overlay is skipped (e.g. calling this store directly).
       profile: UserProfile(
-        name: 'Paulo Cunha',
-        email: 'paulo.cunha@email.com',
-        planName: 'Premium',
+        name: 'AllDocs',
+        email: '',
+        planName: 'Free',
         documentsCount: documents.length,
         categoriesCount: categories.length,
         favoritesCount: documents

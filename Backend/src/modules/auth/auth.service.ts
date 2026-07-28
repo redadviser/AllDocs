@@ -30,15 +30,20 @@ export async function login(email: string, password: string, device?: DeviceInfo
   return result
 }
 
-export async function signup(email: string, password: string, device?: DeviceInfo) {
-  const result = await signUp(email, password)
+export async function signup(
+  email: string,
+  password: string,
+  displayName?: string,
+  device?: DeviceInfo
+) {
+  const result = await signUp(email, password, displayName)
   await registerDevice(result.user.id, device)
   return result
 }
 
 export async function loginWithGoogle(idToken: string, device?: DeviceInfo) {
-  const { email } = await verifyGoogleIdToken(idToken)
-  const result = await findOrCreateUserByEmail(email)
+  const { email, name } = await verifyGoogleIdToken(idToken)
+  const result = await findOrCreateUserByEmail(email, name)
   await registerDevice(result.user.id, device)
   return result
 }

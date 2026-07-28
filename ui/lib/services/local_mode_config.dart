@@ -1,6 +1,7 @@
 class LocalModeConfig {
   const LocalModeConfig._();
 
-  // Flip this once the AllDocs backend exists and AuthService talks to it.
-  static const bool isLocalOnly = true;
+  // Real AllDocs/AllPhotos shared-account backend, deployed at
+  // https://all-docs-backend.triplanai.eupasoft.com.
+  static const bool isLocalOnly = false;
 }

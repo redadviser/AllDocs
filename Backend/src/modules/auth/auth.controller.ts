@@ -26,7 +26,7 @@ export async function login(req: Request, res: Response) {
 
 export async function signup(req: Request, res: Response) {
   try {
-    const { email, password, device } = req.body
+    const { email, password, displayName, device } = req.body
     if (!email || !password) {
       res.status(400).json({ error: 'Email and password are required' })
       return
@@ -36,7 +36,7 @@ export async function signup(req: Request, res: Response) {
       return
     }
 
-    const { user, token } = await authService.signup(email, password, device)
+    const { user, token } = await authService.signup(email, password, displayName, device)
     const cookie = sessionCookieConfig(token)
     res.cookie(cookie.name, cookie.value, cookie.options)
     res.json({ user })

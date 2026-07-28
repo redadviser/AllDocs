@@ -18,6 +18,7 @@ class AppConstants {
 
   static const authTitle = 'auth.title';
   static const authSubtitle = 'auth.subtitle';
+  static const authDisplayName = 'auth.display_name';
   static const authEmail = 'auth.email';
   static const authPassword = 'auth.password';
   static const authForgot = 'auth.forgot';
@@ -26,8 +27,8 @@ class AppConstants {
   static const authSignup = 'auth.signup';
   static const authToggleToSignup = 'auth.toggle_to_signup';
   static const authToggleToLogin = 'auth.toggle_to_login';
+  static const authContinueWithAllId = 'auth.continue_with_allid';
   static const authContinueWithGoogle = 'auth.continue_with_google';
-  static const authOrDivider = 'auth.or_divider';
   static const authOffline = 'auth.offline';
   static const authLoginError = 'auth.login_error';
 

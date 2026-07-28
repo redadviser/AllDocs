@@ -67,8 +67,9 @@ class _AuthGateState extends State<AuthGate> {
     return AllIdScreen(
       onLogin: (email, password) =>
           _completeAuth(() => AuthService.login(email, password)),
-      onSignup: (email, password) =>
-          _completeAuth(() => AuthService.signup(email, password)),
+      onSignup: (email, password, displayName) => _completeAuth(
+        () => AuthService.signup(email, password, displayName: displayName),
+      ),
       onGoogleSignIn: () => _completeAuth(AuthService.loginWithGoogle),
     );
   }

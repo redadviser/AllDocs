@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../common/app_constants.dart';
+import '../../common/user_initials.dart';
 import '../../services/services.dart';
 import '../../theme/app_theme.dart';
 
@@ -36,11 +37,12 @@ class _SecurityGateState extends State<SecurityGate> {
     if (_unlocked) return widget.child;
 
     if (_loading) {
-      return const _SecurityShell(
+      return _SecurityShell(
         greeting: '',
         title: '',
         subtitle: '',
-        child: Center(child: CircularProgressIndicator()),
+        userName: widget.userName,
+        child: const Center(child: CircularProgressIndicator()),
       );
     }
 
@@ -48,6 +50,7 @@ class _SecurityGateState extends State<SecurityGate> {
     if (!_hasPin) {
       return PinSetupScreen(
         greeting: greeting,
+        userName: widget.userName,
         canUseBiometrics: _canUseBiometrics,
         onCreated: _createPin,
       );
@@ -55,6 +58,7 @@ class _SecurityGateState extends State<SecurityGate> {
 
     return PinUnlockScreen(
       greeting: greeting,
+      userName: widget.userName,
       biometricEnabled: _biometricEnabled,
       canUseBiometrics: _canUseBiometrics,
       onUnlockWithPin: _unlockWithPin,
@@ -115,11 +119,13 @@ class PinSetupScreen extends StatefulWidget {
   const PinSetupScreen({
     super.key,
     required this.greeting,
+    required this.userName,
     required this.canUseBiometrics,
     required this.onCreated,
   });
 
   final String greeting;
+  final String userName;
   final bool canUseBiometrics;
   final Future<void> Function(String pin, bool enableBiometrics) onCreated;
 
@@ -143,6 +149,7 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
           ? AppConstants.securityConfirmPin.tr()
           : AppConstants.securityCreatePinTitle.tr(),
       subtitle: AppConstants.securityCreatePinSubtitle.tr(),
+      userName: widget.userName,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -244,6 +251,7 @@ class PinUnlockScreen extends StatefulWidget {
   const PinUnlockScreen({
     super.key,
     required this.greeting,
+    required this.userName,
     required this.biometricEnabled,
     required this.canUseBiometrics,
     required this.onUnlockWithPin,
@@ -251,6 +259,7 @@ class PinUnlockScreen extends StatefulWidget {
   });
 
   final String greeting;
+  final String userName;
   final bool biometricEnabled;
   final bool canUseBiometrics;
   final Future<bool> Function(String pin) onUnlockWithPin;
@@ -274,6 +283,7 @@ class _PinUnlockScreenState extends State<PinUnlockScreen> {
       greeting: widget.greeting,
       title: AppConstants.securityUnlockTitle.tr(),
       subtitle: AppConstants.securityUnlockSubtitle.tr(),
+      userName: widget.userName,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -364,12 +374,14 @@ class _SecurityShell extends StatelessWidget {
     required this.greeting,
     required this.title,
     required this.subtitle,
+    required this.userName,
     required this.child,
   });
 
   final String greeting;
   final String title;
   final String subtitle;
+  final String userName;
   final Widget child;
 
   @override
@@ -423,7 +435,7 @@ class _SecurityShell extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 28),
-                    const _SecurityAvatar(),
+                    _SecurityAvatar(userName: userName),
                     const SizedBox(height: 18),
                     if (showText) ...[
                       Text(
@@ -490,7 +502,9 @@ class _SecurityShell extends StatelessWidget {
 }
 
 class _SecurityAvatar extends StatelessWidget {
-  const _SecurityAvatar();
+  const _SecurityAvatar({required this.userName});
+
+  final String userName;
 
   @override
   Widget build(BuildContext context) {
@@ -517,10 +531,10 @@ class _SecurityAvatar extends StatelessWidget {
                 ),
               ],
             ),
-            child: const Center(
+            child: Center(
               child: Text(
-                'PC',
-                style: TextStyle(
+                initialsFromName(userName),
+                style: const TextStyle(
                   color: Colors.white,
                   fontSize: 26,
                   fontWeight: FontWeight.w900,

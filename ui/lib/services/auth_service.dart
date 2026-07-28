@@ -12,9 +12,10 @@ import 'google_auth_config.dart';
 import 'local_mode_config.dart';
 
 class _GoogleIdToken {
-  const _GoogleIdToken({required this.token, required this.email});
+  const _GoogleIdToken({required this.token, required this.email, this.name});
   final String token;
   final String email;
+  final String? name;
 }
 
 /// Storage seam for the session token, so tests can swap in an in-memory
@@ -53,6 +54,8 @@ class AuthService {
 
   static const _signedInKey = 'auth.signed_in.v1';
   static const _displayNameKey = 'auth.display_name.v1';
+  static const _emailKey = 'auth.email.v1';
+  static const _planKey = 'auth.plan.v1';
   static const _deviceIdKey = 'auth.device_id.v1';
 
   static Future<bool> isSignedIn() async {
@@ -68,14 +71,23 @@ class AuthService {
     return prefs.getString(_displayNameKey);
   }
 
-  static Future<String> login(String email, String password) async {
-    final name = _displayNameFromEmail(email);
+  static Future<String?> email() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_emailKey);
+  }
 
+  /// The shared "All" subscription plan (free/premium/pro), read from the
+  /// profiles row shared with AllPhotos — a purchase in either app unlocks
+  /// premium in both. Null until a real login/signup response has reported
+  /// one (always the case in local-only mode).
+  static Future<String?> plan() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_planKey);
+  }
+
+  static Future<String> login(String email, String password) async {
     if (LocalModeConfig.isLocalOnly) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool(_signedInKey, true);
-      await prefs.setString(_displayNameKey, name);
-      return name;
+      return _persistLocalSession(email: email);
     }
 
     final res = await ApiHelpers.post(
@@ -91,18 +103,16 @@ class AuthService {
       throw Exception(ApiHelpers.errorMessage(res, 'Login failed'));
     }
 
-    await _persistSession(res, name);
-    return name;
+    return _persistSession(res, fallbackEmail: email);
   }
 
-  static Future<String> signup(String email, String password) async {
-    final name = _displayNameFromEmail(email);
-
+  static Future<String> signup(
+    String email,
+    String password, {
+    String? displayName,
+  }) async {
     if (LocalModeConfig.isLocalOnly) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool(_signedInKey, true);
-      await prefs.setString(_displayNameKey, name);
-      return name;
+      return _persistLocalSession(email: email, displayName: displayName);
     }
 
     final res = await ApiHelpers.post(
@@ -111,6 +121,8 @@ class AuthService {
       body: jsonEncode({
         'email': email,
         'password': password,
+        if (displayName != null && displayName.trim().isNotEmpty)
+          'displayName': displayName.trim(),
         'device': await _deviceInfo(),
       }),
     );
@@ -118,21 +130,19 @@ class AuthService {
       throw Exception(ApiHelpers.errorMessage(res, 'Sign up failed'));
     }
 
-    await _persistSession(res, name);
-    return name;
+    return _persistSession(res, fallbackEmail: email, fallbackName: displayName);
   }
 
   static bool _googleSignInInitialized = false;
 
   static Future<String> loginWithGoogle() async {
     final googleToken = await _obtainGoogleIdToken();
-    final name = _displayNameFromEmail(googleToken.email);
 
     if (LocalModeConfig.isLocalOnly) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool(_signedInKey, true);
-      await prefs.setString(_displayNameKey, name);
-      return name;
+      return _persistLocalSession(
+        email: googleToken.email,
+        displayName: googleToken.name,
+      );
     }
 
     final res = await ApiHelpers.post(
@@ -147,8 +157,11 @@ class AuthService {
       throw Exception(ApiHelpers.errorMessage(res, 'Google sign-in failed'));
     }
 
-    await _persistSession(res, name);
-    return name;
+    return _persistSession(
+      res,
+      fallbackEmail: googleToken.email,
+      fallbackName: googleToken.name,
+    );
   }
 
   static Future<_GoogleIdToken> _obtainGoogleIdToken() async {
@@ -169,7 +182,11 @@ class AuthService {
     if (idToken == null) {
       throw Exception('Google did not return an ID token');
     }
-    return _GoogleIdToken(token: idToken, email: account.email);
+    return _GoogleIdToken(
+      token: idToken,
+      email: account.email,
+      name: account.displayName,
+    );
   }
 
   static Future<void> logout() async {
@@ -197,15 +214,68 @@ class AuthService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_signedInKey);
     await prefs.remove(_displayNameKey);
+    await prefs.remove(_emailKey);
+    await prefs.remove(_planKey);
   }
 
-  static Future<void> _persistSession(http.Response res, String name) async {
+  static Future<String> _persistLocalSession({
+    required String email,
+    String? displayName,
+  }) async {
+    final name = _resolveName(email, displayName);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_signedInKey, true);
+    await prefs.setString(_displayNameKey, name);
+    await prefs.setString(_emailKey, email);
+    await prefs.setString(_planKey, 'free');
+    return name;
+  }
+
+  /// Persists the session cookie plus whatever profile info the server
+  /// returned (email/displayName/plan, shared with AllPhotos via the
+  /// `profiles` table), falling back to locally-known values if the
+  /// response doesn't include them.
+  static Future<String> _persistSession(
+    http.Response res, {
+    required String fallbackEmail,
+    String? fallbackName,
+  }) async {
     final setCookie = res.headers['set-cookie'] ?? '';
     final match = RegExp(r'session_token=([^;]+)').firstMatch(setCookie);
     if (match != null) await tokenStore.write(match.group(1)!);
 
+    var email = fallbackEmail;
+    var name = _resolveName(fallbackEmail, fallbackName);
+    String? plan;
+
+    try {
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      final user = data['user'] as Map<String, dynamic>?;
+      if (user != null) {
+        email = user['email']?.toString() ?? email;
+        final serverName = user['displayName']?.toString();
+        if (serverName != null && serverName.trim().isNotEmpty) {
+          name = serverName.trim();
+        }
+        plan = user['plan']?.toString();
+      }
+    } catch (_) {
+      // Unexpected response shape; keep the locally-known email/name.
+    }
+
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_displayNameKey, name);
+    await prefs.setString(_emailKey, email);
+    if (plan != null) await prefs.setString(_planKey, plan);
+
+    return name;
+  }
+
+  static String _resolveName(String email, String? requested) {
+    final trimmed = requested?.trim();
+    return trimmed != null && trimmed.isNotEmpty
+        ? trimmed
+        : _displayNameFromEmail(email);
   }
 
   static Future<Map<String, String>> _deviceInfo() async {

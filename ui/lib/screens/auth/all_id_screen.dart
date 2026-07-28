@@ -2,14 +2,17 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
 import '../../common/app_constants.dart';
+import '../../services/local_mode_config.dart';
 import '../../theme/app_theme.dart';
 
 enum _AuthMode { login, signup }
 
 /// AllID: the shared account screen for the AllPhotos/AllDocs suite. Signing
 /// in or creating an account here works on both apps, since they
-/// authenticate against the same shared `users` table (see
-/// docs/architecture.md).
+/// authenticate against the same shared `users`/`profiles` tables (see
+/// docs/architecture.md). Starts as a two-button landing (AllID / Google);
+/// tapping AllID expands the card into the email/password (+ display name
+/// for signup) form.
 class AllIdScreen extends StatefulWidget {
   const AllIdScreen({
     super.key,
@@ -19,7 +22,8 @@ class AllIdScreen extends StatefulWidget {
   });
 
   final Future<void> Function(String email, String password) onLogin;
-  final Future<void> Function(String email, String password) onSignup;
+  final Future<void> Function(String email, String password, String displayName)
+  onSignup;
   final Future<void> Function() onGoogleSignIn;
 
   @override
@@ -27,14 +31,17 @@ class AllIdScreen extends StatefulWidget {
 }
 
 class _AllIdScreenState extends State<AllIdScreen> {
+  final TextEditingController _displayNameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
   _AuthMode _mode = _AuthMode.login;
+  bool _showForm = false;
   bool _submitting = false;
 
   @override
   void dispose() {
+    _displayNameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -61,7 +68,7 @@ class _AllIdScreenState extends State<AllIdScreen> {
       final password = _passwordController.text;
       return _mode == _AuthMode.login
           ? widget.onLogin(email, password)
-          : widget.onSignup(email, password);
+          : widget.onSignup(email, password, _displayNameController.text);
     });
   }
 
@@ -75,8 +82,6 @@ class _AllIdScreenState extends State<AllIdScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isLogin = _mode == _AuthMode.login;
-
     return Scaffold(
       body: DecoratedBox(
         decoration: const BoxDecoration(
@@ -106,122 +111,14 @@ class _AllIdScreenState extends State<AllIdScreen> {
                           color: AppTheme.border.withValues(alpha: 0.75),
                         ),
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          TextField(
-                            controller: _emailController,
-                            keyboardType: TextInputType.emailAddress,
-                            textInputAction: TextInputAction.next,
-                            decoration: InputDecoration(
-                              labelText: AppConstants.authEmail.tr(),
-                              prefixIcon: const Icon(Icons.email_outlined),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          TextField(
-                            controller: _passwordController,
-                            obscureText: true,
-                            textInputAction: TextInputAction.done,
-                            onSubmitted: (_) => _submit(),
-                            decoration: InputDecoration(
-                              labelText: AppConstants.authPassword.tr(),
-                              prefixIcon: const Icon(Icons.lock_outline),
-                            ),
-                          ),
-                          if (isLogin) ...[
-                            const SizedBox(height: 6),
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: TextButton(
-                                onPressed: () {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        AppConstants.authForgotHint.tr(),
-                                      ),
-                                    ),
-                                  );
-                                },
-                                child: Text(AppConstants.authForgot.tr()),
-                              ),
-                            ),
-                          ],
-                          const SizedBox(height: 8),
-                          FilledButton(
-                            onPressed: _submitting ? null : _submit,
-                            style: FilledButton.styleFrom(
-                              minimumSize: const Size.fromHeight(48),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                            ),
-                            child: Text(
-                              (isLogin
-                                      ? AppConstants.authLogin
-                                      : AppConstants.authSignup)
-                                  .tr(),
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          Center(
-                            child: TextButton(
-                              onPressed: _submitting ? null : _toggleMode,
-                              child: Text(
-                                (isLogin
-                                        ? AppConstants.authToggleToSignup
-                                        : AppConstants.authToggleToLogin)
-                                    .tr(),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Divider(
-                                  color: AppTheme.border.withValues(
-                                    alpha: 0.7,
-                                  ),
-                                ),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                ),
-                                child: Text(
-                                  AppConstants.authOrDivider.tr(),
-                                  style: const TextStyle(
-                                    color: AppTheme.mutedText,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                              Expanded(
-                                child: Divider(
-                                  color: AppTheme.border.withValues(
-                                    alpha: 0.7,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          OutlinedButton.icon(
-                            onPressed: _submitting ? null : _submitGoogle,
-                            icon: const Icon(Icons.g_mobiledata_rounded),
-                            label: Text(
-                              AppConstants.authContinueWithGoogle.tr(),
-                            ),
-                            style: OutlinedButton.styleFrom(
-                              minimumSize: const Size.fromHeight(48),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                            ),
-                          ),
-                        ],
+                      child: AnimatedSize(
+                        duration: const Duration(milliseconds: 320),
+                        curve: Curves.easeOutCubic,
+                        alignment: Alignment.topCenter,
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 220),
+                          child: _showForm ? _buildForm() : _buildLanding(),
+                        ),
                       ),
                     ),
                   ],
@@ -231,6 +128,138 @@ class _AllIdScreenState extends State<AllIdScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildLanding() {
+    return Column(
+      key: const ValueKey('landing'),
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        FilledButton.icon(
+          onPressed: () => setState(() => _showForm = true),
+          icon: const Icon(Icons.badge_outlined),
+          label: Text(AppConstants.authContinueWithAllId.tr()),
+          style: FilledButton.styleFrom(
+            minimumSize: const Size.fromHeight(48),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          ),
+        ),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          onPressed: _submitting ? null : _submitGoogle,
+          icon: const Icon(Icons.g_mobiledata_rounded),
+          label: Text(AppConstants.authContinueWithGoogle.tr()),
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size.fromHeight(48),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildForm() {
+    final isLogin = _mode == _AuthMode.login;
+
+    return Column(
+      key: const ValueKey('form'),
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            IconButton(
+              onPressed: _submitting
+                  ? null
+                  : () => setState(() => _showForm = false),
+              icon: const Icon(Icons.arrow_back_rounded),
+            ),
+            Expanded(
+              child: Text(
+                AppConstants.authTitle.tr(),
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: AppTheme.text,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            const SizedBox(width: 48),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (!isLogin) ...[
+          TextField(
+            controller: _displayNameController,
+            textInputAction: TextInputAction.next,
+            decoration: InputDecoration(
+              labelText: AppConstants.authDisplayName.tr(),
+              prefixIcon: const Icon(Icons.badge_outlined),
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+        TextField(
+          controller: _emailController,
+          keyboardType: TextInputType.emailAddress,
+          textInputAction: TextInputAction.next,
+          decoration: InputDecoration(
+            labelText: AppConstants.authEmail.tr(),
+            prefixIcon: const Icon(Icons.email_outlined),
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _passwordController,
+          obscureText: true,
+          textInputAction: TextInputAction.done,
+          onSubmitted: (_) => _submit(),
+          decoration: InputDecoration(
+            labelText: AppConstants.authPassword.tr(),
+            prefixIcon: const Icon(Icons.lock_outline),
+          ),
+        ),
+        if (isLogin) ...[
+          const SizedBox(height: 6),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(AppConstants.authForgotHint.tr())),
+                );
+              },
+              child: Text(AppConstants.authForgot.tr()),
+            ),
+          ),
+        ],
+        const SizedBox(height: 8),
+        FilledButton(
+          onPressed: _submitting ? null : _submit,
+          style: FilledButton.styleFrom(
+            minimumSize: const Size.fromHeight(48),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          ),
+          child: Text(
+            (isLogin ? AppConstants.authLogin : AppConstants.authSignup).tr(),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Center(
+          child: TextButton(
+            onPressed: _submitting ? null : _toggleMode,
+            child: Text(
+              (isLogin
+                      ? AppConstants.authToggleToSignup
+                      : AppConstants.authToggleToLogin)
+                  .tr(),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -277,34 +306,38 @@ class _AllIdHero extends StatelessWidget {
             fontWeight: FontWeight.w600,
           ),
         ),
-        const SizedBox(height: 14),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-          decoration: BoxDecoration(
-            color: AppTheme.success.withValues(alpha: 0.14),
-            borderRadius: BorderRadius.circular(99),
-            border: Border.all(color: AppTheme.success.withValues(alpha: 0.32)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(
-                Icons.offline_bolt_rounded,
-                color: AppTheme.success,
-                size: 17,
+        if (LocalModeConfig.isLocalOnly) ...[
+          const SizedBox(height: 14),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            decoration: BoxDecoration(
+              color: AppTheme.success.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(99),
+              border: Border.all(
+                color: AppTheme.success.withValues(alpha: 0.32),
               ),
-              const SizedBox(width: 6),
-              Text(
-                AppConstants.authOffline.tr(),
-                style: const TextStyle(
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.offline_bolt_rounded,
                   color: AppTheme.success,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
+                  size: 17,
                 ),
-              ),
-            ],
+                const SizedBox(width: 6),
+                Text(
+                  AppConstants.authOffline.tr(),
+                  style: const TextStyle(
+                    color: AppTheme.success,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
+        ],
       ],
     );
   }

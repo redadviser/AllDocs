@@ -19,11 +19,13 @@ export function isGoogleSignInConfigured(): boolean {
 
 export interface VerifiedGoogleUser {
   email: string
+  name?: string
 }
 
 // Verifies the ID token's signature/issuer/audience/expiry against Google's
-// public keys and returns the verified email. Never trust a client-supplied
-// email directly — only what Google itself signed.
+// public keys and returns the verified email (+ display name, if Google
+// shared one). Never trust a client-supplied email directly — only what
+// Google itself signed.
 export async function verifyGoogleIdToken(idToken: string): Promise<VerifiedGoogleUser> {
   const audiences = configuredAudiences()
   if (audiences.length === 0) {
@@ -37,5 +39,5 @@ export async function verifyGoogleIdToken(idToken: string): Promise<VerifiedGoog
     throw new Error('Google account has no verified email')
   }
 
-  return { email: payload.email }
+  return { email: payload.email, name: payload.name }
 }

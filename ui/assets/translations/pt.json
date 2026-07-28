@@ -10,6 +10,7 @@
   "auth": {
     "title": "AllID",
     "subtitle": "Uma conta para a AllPhotos e a AllDocs.",
+    "display_name": "Nome a apresentar",
     "email": "Email",
     "password": "Palavra-passe",
     "forgot": "Esqueci-me",
@@ -19,9 +20,9 @@
     "toggle_to_signup": "Ainda não tens conta? Cria a tua AllID",
     "toggle_to_login": "Já tens AllID? Entrar",
     "continue_with_google": "Continuar com Google",
-    "or_divider": "ou",
     "login_error": "Não foi possível iniciar sessão. Verifica os dados e tenta novamente.",
-    "offline": "Modo local ativo"
+    "offline": "Modo local ativo",
+    "continue_with_allid": "Continuar com AllID"
   },
   "security": {
     "greeting_morning": "Bom dia, {name}",

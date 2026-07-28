@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 import '../models/models.dart';
+import 'auth_service.dart';
 import 'local_documents_store.dart';
 
 class DocumentsService {
@@ -17,7 +18,28 @@ class DocumentsService {
   Future<DocumentsSnapshot> loadSnapshot() async {
     final snapshot = await _store.loadSnapshot();
     _syncDeviceFolderWatchers(snapshot.deviceFolders);
-    return snapshot;
+    return _withSignedInProfile(snapshot);
+  }
+
+  Future<DocumentsSnapshot> _withSignedInProfile(
+    DocumentsSnapshot snapshot,
+  ) async {
+    final name = await AuthService.displayName();
+    final email = await AuthService.email();
+    final plan = await AuthService.plan();
+
+    return snapshot.copyWith(
+      profile: snapshot.profile.copyWith(
+        name: name,
+        email: email,
+        planName: plan == null ? null : _planLabel(plan),
+      ),
+    );
+  }
+
+  String _planLabel(String plan) {
+    if (plan.isEmpty) return plan;
+    return plan[0].toUpperCase() + plan.substring(1);
   }
 
   Future<int> importDocuments({String? albumId}) async {
