@@ -8,16 +8,20 @@
     "profile": "Perfil"
   },
   "auth": {
-    "title": "Entrar en AllDocs",
-    "subtitle": "Organiza tus documentos con seguridad, primero en el dispositivo.",
+    "title": "AllID",
+    "subtitle": "Una cuenta para AllPhotos y AllDocs.",
     "email": "Email",
     "password": "Contraseña",
-    "remember": "Recordar sesión",
     "forgot": "Olvidé",
+    "forgot_hint": "La recuperación de contraseña aún no está disponible.",
     "login": "Entrar",
-    "mock_hint": "Login simulado mientras se prepara la interfaz.",
-    "offline": "Modo local activo",
-    "login_error": "No se pudo iniciar sesión. Comprueba tus datos e inténtalo de nuevo."
+    "signup": "Crear cuenta",
+    "toggle_to_signup": "¿Aún no tienes cuenta? Crea tu AllID",
+    "toggle_to_login": "¿Ya tienes AllID? Entrar",
+    "continue_with_google": "Continuar con Google",
+    "or_divider": "o",
+    "login_error": "No se pudo iniciar sesión. Comprueba tus datos e inténtalo de nuevo.",
+    "offline": "Modo local activo"
   },
   "security": {
     "greeting_morning": "Buenos días, {name}",

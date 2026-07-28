@@ -3,11 +3,19 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api_helpers.dart';
+import 'google_auth_config.dart';
 import 'local_mode_config.dart';
+
+class _GoogleIdToken {
+  const _GoogleIdToken({required this.token, required this.email});
+  final String token;
+  final String email;
+}
 
 /// Storage seam for the session token, so tests can swap in an in-memory
 /// fake instead of exercising flutter_secure_storage's platform channel
@@ -87,7 +95,92 @@ class AuthService {
     return name;
   }
 
+  static Future<String> signup(String email, String password) async {
+    final name = _displayNameFromEmail(email);
+
+    if (LocalModeConfig.isLocalOnly) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_signedInKey, true);
+      await prefs.setString(_displayNameKey, name);
+      return name;
+    }
+
+    final res = await ApiHelpers.post(
+      '/api/auth/signup',
+      headers: ApiHelpers.headersWithToken(),
+      body: jsonEncode({
+        'email': email,
+        'password': password,
+        'device': await _deviceInfo(),
+      }),
+    );
+    if (res.statusCode != 200 && res.statusCode != 201) {
+      throw Exception(ApiHelpers.errorMessage(res, 'Sign up failed'));
+    }
+
+    await _persistSession(res, name);
+    return name;
+  }
+
+  static bool _googleSignInInitialized = false;
+
+  static Future<String> loginWithGoogle() async {
+    final googleToken = await _obtainGoogleIdToken();
+    final name = _displayNameFromEmail(googleToken.email);
+
+    if (LocalModeConfig.isLocalOnly) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_signedInKey, true);
+      await prefs.setString(_displayNameKey, name);
+      return name;
+    }
+
+    final res = await ApiHelpers.post(
+      '/api/auth/google/signin',
+      headers: ApiHelpers.headersWithToken(),
+      body: jsonEncode({
+        'idToken': googleToken.token,
+        'device': await _deviceInfo(),
+      }),
+    );
+    if (res.statusCode != 200) {
+      throw Exception(ApiHelpers.errorMessage(res, 'Google sign-in failed'));
+    }
+
+    await _persistSession(res, name);
+    return name;
+  }
+
+  static Future<_GoogleIdToken> _obtainGoogleIdToken() async {
+    final googleSignIn = GoogleSignIn.instance;
+    if (!_googleSignInInitialized) {
+      await googleSignIn.initialize(
+        serverClientId: GoogleAuthConfig.serverClientId,
+      );
+      _googleSignInInitialized = true;
+    }
+
+    if (!googleSignIn.supportsAuthenticate()) {
+      throw Exception('Google sign-in is not supported on this device');
+    }
+
+    final account = await googleSignIn.authenticate();
+    final idToken = account.authentication.idToken;
+    if (idToken == null) {
+      throw Exception('Google did not return an ID token');
+    }
+    return _GoogleIdToken(token: idToken, email: account.email);
+  }
+
   static Future<void> logout() async {
+    if (_googleSignInInitialized) {
+      try {
+        await GoogleSignIn.instance.signOut();
+      } catch (_) {
+        // Best effort; local sign-out must still work if this fails.
+      }
+    }
+
     if (!LocalModeConfig.isLocalOnly) {
       final token = await tokenStore.read();
       try {

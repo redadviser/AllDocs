@@ -2,109 +2,35 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
 import '../../common/app_constants.dart';
-import '../../common/app_scaffold.dart';
-import '../../common/storage_permission_gate.dart';
-import '../../services/services.dart';
 import '../../theme/app_theme.dart';
-import 'security_gate.dart';
 
-class AuthGate extends StatefulWidget {
-  const AuthGate({super.key});
+enum _AuthMode { login, signup }
 
-  @override
-  State<AuthGate> createState() => _AuthGateState();
-}
-
-class _AuthGateState extends State<AuthGate> {
-  static const _fallbackUserName = 'AllDocs';
-
-  bool _loadingSession = true;
-  bool _signedIn = false;
-  String _userName = _fallbackUserName;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadSession();
-  }
-
-  Future<void> _loadSession() async {
-    final signedIn = await AuthService.isSignedIn();
-    final name = await AuthService.displayName();
-    if (!mounted) return;
-
-    setState(() {
-      _signedIn = signedIn;
-      _userName = name ?? _fallbackUserName;
-      _loadingSession = false;
-    });
-  }
-
-  Future<void> _handleLogin(String email, String password) async {
-    final name = await AuthService.login(email, password);
-    if (!mounted) return;
-    setState(() {
-      _userName = name;
-      _signedIn = true;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_loadingSession) {
-      return const _AuthLoadingScreen();
-    }
-
-    if (_signedIn) {
-      return SecurityGate(
-        userName: _userName,
-        child: const StoragePermissionGate(child: MainNavScreen()),
-      );
-    }
-
-    // Primeiro acesso: pede login. Depois o SecurityGate trata da criação do PIN
-    // e biometria, como já está implementado.
-    return LoginScreen(onLogin: _handleLogin);
-  }
-}
-
-class _AuthLoadingScreen extends StatelessWidget {
-  const _AuthLoadingScreen();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(
-      body: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [AppTheme.background, AppTheme.backgroundBottom],
-          ),
-        ),
-        child: Center(child: CircularProgressIndicator()),
-      ),
-    );
-  }
-}
-
-class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key, required this.onLogin});
+/// AllID: the shared account screen for the AllPhotos/AllDocs suite. Signing
+/// in or creating an account here works on both apps, since they
+/// authenticate against the same shared `users` table (see
+/// docs/architecture.md).
+class AllIdScreen extends StatefulWidget {
+  const AllIdScreen({
+    super.key,
+    required this.onLogin,
+    required this.onSignup,
+    required this.onGoogleSignIn,
+  });
 
   final Future<void> Function(String email, String password) onLogin;
+  final Future<void> Function(String email, String password) onSignup;
+  final Future<void> Function() onGoogleSignIn;
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  State<AllIdScreen> createState() => _AllIdScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
-  final TextEditingController _emailController = TextEditingController(
-    text: 'paulo.cunha@email.com',
-  );
-  final TextEditingController _passwordController = TextEditingController(
-    text: 'alldocs',
-  );
-  bool _remember = true;
+class _AllIdScreenState extends State<AllIdScreen> {
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+
+  _AuthMode _mode = _AuthMode.login;
   bool _submitting = false;
 
   @override
@@ -114,11 +40,11 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  Future<void> _submit() async {
+  Future<void> _run(Future<void> Function() action) async {
     if (_submitting) return;
     setState(() => _submitting = true);
     try {
-      await widget.onLogin(_emailController.text, _passwordController.text);
+      await action();
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -129,8 +55,28 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  Future<void> _submit() {
+    return _run(() {
+      final email = _emailController.text;
+      final password = _passwordController.text;
+      return _mode == _AuthMode.login
+          ? widget.onLogin(email, password)
+          : widget.onSignup(email, password);
+    });
+  }
+
+  Future<void> _submitGoogle() => _run(widget.onGoogleSignIn);
+
+  void _toggleMode() {
+    setState(() {
+      _mode = _mode == _AuthMode.login ? _AuthMode.signup : _AuthMode.login;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isLogin = _mode == _AuthMode.login;
+
     return Scaffold(
       body: DecoratedBox(
         decoration: const BoxDecoration(
@@ -149,7 +95,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _LoginHero(),
+                    const _AllIdHero(),
                     const SizedBox(height: 24),
                     Container(
                       padding: const EdgeInsets.all(18),
@@ -183,40 +129,25 @@ class _LoginScreenState extends State<LoginScreen> {
                               prefixIcon: const Icon(Icons.lock_outline),
                             ),
                           ),
-                          const SizedBox(height: 10),
-                          Row(
-                            children: [
-                              Checkbox(
-                                value: _remember,
-                                onChanged: (value) {
-                                  setState(() => _remember = value ?? true);
-                                },
-                              ),
-                              Expanded(
-                                child: Text(
-                                  AppConstants.authRemember.tr(),
-                                  style: const TextStyle(
-                                    color: AppTheme.mutedText,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                              TextButton(
+                          if (isLogin) ...[
+                            const SizedBox(height: 6),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton(
                                 onPressed: () {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       content: Text(
-                                        AppConstants.authMockHint.tr(),
+                                        AppConstants.authForgotHint.tr(),
                                       ),
                                     ),
                                   );
                                 },
                                 child: Text(AppConstants.authForgot.tr()),
                               ),
-                            ],
-                          ),
-                          const SizedBox(height: 14),
+                            ),
+                          ],
+                          const SizedBox(height: 8),
                           FilledButton(
                             onPressed: _submitting ? null : _submit,
                             style: FilledButton.styleFrom(
@@ -225,16 +156,69 @@ class _LoginScreenState extends State<LoginScreen> {
                                 borderRadius: BorderRadius.circular(14),
                               ),
                             ),
-                            child: Text(AppConstants.authLogin.tr()),
+                            child: Text(
+                              (isLogin
+                                      ? AppConstants.authLogin
+                                      : AppConstants.authSignup)
+                                  .tr(),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Center(
+                            child: TextButton(
+                              onPressed: _submitting ? null : _toggleMode,
+                              child: Text(
+                                (isLogin
+                                        ? AppConstants.authToggleToSignup
+                                        : AppConstants.authToggleToLogin)
+                                    .tr(),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Divider(
+                                  color: AppTheme.border.withValues(
+                                    alpha: 0.7,
+                                  ),
+                                ),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                ),
+                                child: Text(
+                                  AppConstants.authOrDivider.tr(),
+                                  style: const TextStyle(
+                                    color: AppTheme.mutedText,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                child: Divider(
+                                  color: AppTheme.border.withValues(
+                                    alpha: 0.7,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 12),
-                          Text(
-                            AppConstants.authMockHint.tr(),
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              color: AppTheme.mutedText,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
+                          OutlinedButton.icon(
+                            onPressed: _submitting ? null : _submitGoogle,
+                            icon: const Icon(Icons.g_mobiledata_rounded),
+                            label: Text(
+                              AppConstants.authContinueWithGoogle.tr(),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: const Size.fromHeight(48),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
                             ),
                           ),
                         ],
@@ -251,7 +235,9 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-class _LoginHero extends StatelessWidget {
+class _AllIdHero extends StatelessWidget {
+  const _AllIdHero();
+
   @override
   Widget build(BuildContext context) {
     return Column(
