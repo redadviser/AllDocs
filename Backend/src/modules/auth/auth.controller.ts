@@ -45,6 +45,24 @@ export async function signup(req: Request, res: Response) {
   }
 }
 
+export async function googleSignIn(req: Request, res: Response) {
+  try {
+    const { idToken, device } = req.body
+    if (!idToken) {
+      res.status(400).json({ error: 'idToken is required' })
+      return
+    }
+
+    const { user, token } = await authService.loginWithGoogle(idToken, device)
+    const cookie = sessionCookieConfig(token)
+    res.cookie(cookie.name, cookie.value, cookie.options)
+    res.json({ user })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Google sign-in failed'
+    res.status(401).json({ error: message })
+  }
+}
+
 export async function logout(_req: Request, res: Response) {
   const cookie = clearSessionCookieConfig()
   res.clearCookie(cookie.name, cookie.options)

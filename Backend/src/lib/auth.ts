@@ -58,6 +58,26 @@ export async function signIn(email: string, password: string) {
   }
 }
 
+// Used by Google sign-in: the same shared `users` row is reused whenever the
+// email matches, so a Google account and a password account with the same
+// email resolve to one identity — sign in with either, on either app.
+export async function findOrCreateUserByEmail(email: string) {
+  const existing = await accountsSql`SELECT id, email FROM users WHERE email = ${email}`
+  if (existing.length > 0) {
+    const user = { id: existing[0].id as string, email: existing[0].email as string }
+    return { user, token: await createToken(user.id, user.email) }
+  }
+
+  const id = crypto.randomUUID()
+  // Social-only accounts still need a password_hash value (the column is
+  // NOT NULL on the users table shared with AllPhotos) — a random, never
+  // issued hash satisfies that without creating a guessable password.
+  const passwordHash = await hashPassword(crypto.randomUUID())
+  await accountsSql`INSERT INTO users (id, email, password_hash) VALUES (${id}, ${email}, ${passwordHash})`
+
+  return { user: { id, email }, token: await createToken(id, email) }
+}
+
 export async function getCurrentUserFromToken(
   token: string | undefined
 ): Promise<{ id: string; email: string } | null> {

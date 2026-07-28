@@ -1,5 +1,6 @@
-import { signIn, signUp } from '../../lib/auth'
+import { findOrCreateUserByEmail, signIn, signUp } from '../../lib/auth'
 import { sql } from '../../lib/db'
+import { verifyGoogleIdToken } from '../../lib/google-auth'
 
 export interface DeviceInfo {
   id?: string
@@ -31,6 +32,13 @@ export async function login(email: string, password: string, device?: DeviceInfo
 
 export async function signup(email: string, password: string, device?: DeviceInfo) {
   const result = await signUp(email, password)
+  await registerDevice(result.user.id, device)
+  return result
+}
+
+export async function loginWithGoogle(idToken: string, device?: DeviceInfo) {
+  const { email } = await verifyGoogleIdToken(idToken)
+  const result = await findOrCreateUserByEmail(email)
   await registerDevice(result.user.id, device)
   return result
 }
