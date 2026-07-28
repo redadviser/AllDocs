@@ -6,8 +6,8 @@ import 'package:google_mlkit_document_scanner/google_mlkit_document_scanner.dart
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
+
+import 'searchable_pdf_builder.dart';
 
 class ScannedDocumentResult {
   const ScannedDocumentResult({
@@ -104,7 +104,7 @@ class DocumentScannerService {
   }) async {
     final pages = await _recognizePages(imagePaths);
     final text = pages
-        .map((page) => page['text']?.toString() ?? '')
+        .map((page) => page.text)
         .where((value) => value.trim().isNotEmpty)
         .join('\n\n')
         .trim();
@@ -112,7 +112,7 @@ class DocumentScannerService {
 
     try {
       await Isolate.run(() async {
-        await _writeSearchablePdf(outputPath: outputFile.path, pages: pages);
+        await buildSearchablePdf(outputPath: outputFile.path, pages: pages);
       });
 
       return ScannedDocumentResult(
@@ -142,37 +142,39 @@ class DocumentScannerService {
     }
   }
 
-  Future<List<Map<String, Object?>>> _recognizePages(
-    List<String> imagePaths,
-  ) async {
+  Future<List<ScannedPage>> _recognizePages(List<String> imagePaths) async {
     final recognizer = TextRecognizer(script: TextRecognitionScript.latin);
     try {
-      final pages = <Map<String, Object?>>[];
+      final pages = <ScannedPage>[];
       for (final imagePath in imagePaths) {
         final recognized = await recognizer.processImage(
           InputImage.fromFilePath(imagePath),
         );
-        final lines = <Map<String, Object?>>[];
+        final lines = <OcrTextLine>[];
         for (final block in recognized.blocks) {
           for (final line in block.lines) {
             final text = line.text.trim().replaceAll(RegExp(r'\s+'), ' ');
             final box = line.boundingBox;
             if (text.isEmpty || box.width <= 1 || box.height <= 1) continue;
-            lines.add({
-              'text': text,
-              'left': box.left,
-              'top': box.top,
-              'width': box.width,
-              'height': box.height,
-            });
+            lines.add(
+              OcrTextLine(
+                text: text,
+                left: box.left,
+                top: box.top,
+                width: box.width,
+                height: box.height,
+              ),
+            );
           }
         }
 
-        pages.add({
-          'imagePath': imagePath,
-          'text': recognized.text.trim(),
-          'lines': lines,
-        });
+        pages.add(
+          ScannedPage(
+            imagePath: imagePath,
+            text: recognized.text.trim(),
+            lines: lines,
+          ),
+        );
       }
       return pages;
     } finally {
@@ -212,76 +214,4 @@ class DocumentScannerService {
     final message = '${error.code} ${error.message ?? ''}'.toLowerCase();
     return message.contains('cancel');
   }
-}
-
-Future<void> _writeSearchablePdf({
-  required String outputPath,
-  required List<Map<String, Object?>> pages,
-}) async {
-  final pdf = pw.Document();
-
-  for (final page in pages) {
-    final imagePath = page['imagePath']?.toString();
-    if (imagePath == null || imagePath.isEmpty) continue;
-    final bytes = await File(imagePath).readAsBytes();
-    final image = pw.MemoryImage(bytes);
-    final pageWidth = (image.width ?? 1240).toDouble();
-    final pageHeight = (image.height ?? 1754).toDouble();
-
-    pdf.addPage(
-      pw.Page(
-        pageFormat: PdfPageFormat(pageWidth, pageHeight, marginAll: 0),
-        build: (_) {
-          return pw.FullPage(
-            ignoreMargins: true,
-            child: pw.Stack(
-              children: [
-                pw.Positioned.fill(child: pw.Image(image, fit: pw.BoxFit.fill)),
-                for (final line in (page['lines'] as List<dynamic>? ?? []))
-                  _ocrTextLayer(line, pageWidth, pageHeight),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  await File(outputPath).writeAsBytes(await pdf.save(), flush: true);
-}
-
-pw.Widget _ocrTextLayer(dynamic rawLine, double pageWidth, double pageHeight) {
-  final line = rawLine is Map ? rawLine : const <String, Object?>{};
-  final text = line['text']?.toString() ?? '';
-  final left = _doubleValue(line['left']).clamp(0.0, pageWidth);
-  final top = _doubleValue(line['top']).clamp(0.0, pageHeight);
-  final width = _doubleValue(line['width']).clamp(1.0, pageWidth - left);
-  final height = _doubleValue(line['height']).clamp(1.0, pageHeight - top);
-
-  return pw.Positioned(
-    left: left,
-    top: top,
-    child: pw.Opacity(
-      opacity: 0.01,
-      child: pw.SizedBox(
-        width: width,
-        height: height,
-        child: pw.Text(
-          text,
-          maxLines: 1,
-          overflow: pw.TextOverflow.clip,
-          softWrap: false,
-          style: pw.TextStyle(
-            color: PdfColors.black,
-            fontSize: (height * 0.78).clamp(4.0, 42.0),
-          ),
-        ),
-      ),
-    ),
-  );
-}
-
-double _doubleValue(Object? value) {
-  if (value is num) return value.toDouble();
-  return double.tryParse(value?.toString() ?? '') ?? 0;
 }
