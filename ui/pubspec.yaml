@@ -44,23 +44,22 @@ dependencies:
   pdfx: ^2.9.2
   local_auth: ^3.0.1
   crypto: ^3.0.7
+  archive: ^4.0.9
+  xml: ^6.6.1
+  google_mlkit_document_scanner: ^0.5.0
+  google_mlkit_text_recognition: ^0.16.0
+  pdf: ^3.12.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_launcher_icons: ^0.13.1
+  flutter_lints: ^6.0.0
 
 flutter_icons:
   android: true
   ios: true
   image_path: "assets/images/docs_icon.png"
-
-  # The "flutter_lints" package below contains a set of recommended lints to
-  # encourage good coding practices. The lint set provided by the package is
-  # activated in the `analysis_options.yaml` file located at the root of your
-  # package. See that file for information about deactivating specific lint
-  # rules and activating additional ones.
-  flutter_lints: ^6.0.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

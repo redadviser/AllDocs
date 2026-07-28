@@ -1,3 +1,4 @@
+export 'document_scanner_service.dart';
 export 'documents_service.dart';
 export 'local_documents_store.dart';
 export 'security_lock_service.dart';

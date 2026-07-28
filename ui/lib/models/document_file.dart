@@ -17,6 +17,9 @@ class DocumentFile {
     this.isFavorite = false,
     this.isNew = false,
     this.isImported = false,
+    this.pageCount,
+    this.isSearchable = false,
+    this.ocrText,
   });
 
   final String id;
@@ -34,6 +37,9 @@ class DocumentFile {
   final bool isFavorite;
   final bool isNew;
   final bool isImported;
+  final int? pageCount;
+  final bool isSearchable;
+  final String? ocrText;
 
   DocumentFile copyWith({
     String? id,
@@ -51,6 +57,9 @@ class DocumentFile {
     bool? isFavorite,
     bool? isNew,
     bool? isImported,
+    int? pageCount,
+    bool? isSearchable,
+    String? ocrText,
     bool clearAlbumId = false,
   }) {
     return DocumentFile(
@@ -69,6 +78,9 @@ class DocumentFile {
       isFavorite: isFavorite ?? this.isFavorite,
       isNew: isNew ?? this.isNew,
       isImported: isImported ?? this.isImported,
+      pageCount: pageCount ?? this.pageCount,
+      isSearchable: isSearchable ?? this.isSearchable,
+      ocrText: ocrText ?? this.ocrText,
     );
   }
 
@@ -89,6 +101,9 @@ class DocumentFile {
       isFavorite: json['is_favorite'] == true,
       isNew: json['is_new'] == true,
       isImported: json['is_imported'] == true,
+      pageCount: json['page_count'] is int ? json['page_count'] as int : null,
+      isSearchable: json['is_searchable'] == true,
+      ocrText: json['ocr_text']?.toString(),
     );
   }
 
@@ -109,6 +124,9 @@ class DocumentFile {
       'is_favorite': isFavorite,
       'is_new': isNew,
       'is_imported': isImported,
+      'page_count': pageCount,
+      'is_searchable': isSearchable,
+      'ocr_text': ocrText,
     };
   }
 }

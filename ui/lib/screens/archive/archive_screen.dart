@@ -1,8 +1,12 @@
+import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 
+import 'package:archive/archive.dart' as archive;
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:pdfx/pdfx.dart';
+import 'package:xml/xml.dart' as xml;
 
 import '../../common/app_constants.dart';
 import '../../common/document_tile.dart';
@@ -23,6 +27,7 @@ class ArchiveScreen extends StatefulWidget {
 
 class _ArchiveScreenState extends State<ArchiveScreen> {
   DocumentType? _selectedType;
+  bool _deepSearchInProgress = false;
 
   @override
   Widget build(BuildContext context) {
@@ -106,7 +111,12 @@ class _ArchiveScreenState extends State<ArchiveScreen> {
                         icon: Icons.folder_outlined,
                         title: AppConstants.archiveDeviceFolders.tr(),
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 12),
+                      _DeepDeviceSearchCard(
+                        loading: _deepSearchInProgress,
+                        onTap: () => _searchAllDeviceDocuments(context),
+                      ),
+                      const SizedBox(height: 12),
                       SizedBox(
                         height: 108,
                         child: ListView.separated(
@@ -188,11 +198,26 @@ class _ArchiveScreenState extends State<ArchiveScreen> {
   }
 
   Future<void> _scanDocument(BuildContext context) async {
-    final imported = await widget.documentsService.scanDocumentWithCamera();
-    if (!context.mounted || imported == 0) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(AppConstants.archiveDocumentImported.tr())),
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(
+      SnackBar(content: Text(AppConstants.archiveScanStarting.tr())),
     );
+
+    try {
+      final imported = await widget.documentsService.scanDocumentWithCamera();
+      if (!context.mounted) return;
+      messenger.hideCurrentSnackBar();
+      if (imported == 0) return;
+      messenger.showSnackBar(
+        SnackBar(content: Text(AppConstants.archiveScanDone.tr())),
+      );
+    } catch (_) {
+      if (!context.mounted) return;
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(
+        SnackBar(content: Text(AppConstants.archiveScanFailed.tr())),
+      );
+    }
   }
 
   Future<void> _openDeviceFolder(
@@ -212,6 +237,26 @@ class _ArchiveScreenState extends State<ArchiveScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(AppConstants.archiveFolderOpenFailed.tr())),
       );
+    }
+  }
+
+  Future<void> _searchAllDeviceDocuments(BuildContext context) async {
+    if (_deepSearchInProgress) return;
+    setState(() => _deepSearchInProgress = true);
+
+    try {
+      final scan = await widget.documentsService.scanAllDeviceDocuments(
+        title: AppConstants.archiveAllDeviceDocuments.tr(),
+      );
+      if (!context.mounted || scan == null) return;
+      _showDeviceFolderSheet(context, scan);
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppConstants.archiveFolderOpenFailed.tr())),
+      );
+    } finally {
+      if (mounted) setState(() => _deepSearchInProgress = false);
     }
   }
 
@@ -340,136 +385,9 @@ class _ArchiveScreenState extends State<ArchiveScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
-        return DraggableScrollableSheet(
-          initialChildSize: 0.76,
-          minChildSize: 0.45,
-          maxChildSize: 0.92,
-          expand: false,
-          builder: (context, controller) {
-            return Container(
-              padding: const EdgeInsets.fromLTRB(18, 16, 18, 12),
-              decoration: const BoxDecoration(
-                color: AppTheme.surface,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-              ),
-              child: Column(
-                children: [
-                  Container(
-                    width: 44,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: AppTheme.border,
-                      borderRadius: BorderRadius.circular(99),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.folder_open_rounded,
-                        color: AppTheme.primarySoft,
-                        size: 36,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              scan.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: AppTheme.text,
-                                fontSize: 18,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                            Text(
-                              AppConstants.archiveDeviceFolderFound.tr(
-                                namedArgs: {
-                                  'count': '${scan.documents.length}',
-                                },
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(color: AppTheme.mutedText),
-                            ),
-                          ],
-                        ),
-                      ),
-                      FilledButton(
-                        onPressed: scan.documents.isEmpty
-                            ? null
-                            : () async {
-                                final imported = await widget.documentsService
-                                    .importScannedDocuments(scan.documents);
-                                if (!context.mounted) return;
-                                Navigator.of(context).pop();
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      AppConstants.archiveImportedCount.tr(
-                                        namedArgs: {'count': '$imported'},
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              },
-                        child: Text(AppConstants.commonImportAll.tr()),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  Expanded(
-                    child: scan.documents.isEmpty
-                        ? Center(
-                            child: Text(
-                              AppConstants.archiveNoSupportedDocuments.tr(),
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(color: AppTheme.mutedText),
-                            ),
-                          )
-                        : ListView.separated(
-                            controller: controller,
-                            itemCount: scan.documents.length,
-                            separatorBuilder: (context, index) =>
-                                const Divider(height: 1),
-                            itemBuilder: (context, index) {
-                              final document = scan.documents[index];
-                              return DocumentTile(
-                                document: document,
-                                onTap: () => widget.documentsService
-                                    .openDocument(document),
-                                trailing: TextButton(
-                                  onPressed: () async {
-                                    final imported = await widget
-                                        .documentsService
-                                        .importScannedDocuments([document]);
-                                    if (!context.mounted) return;
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                          imported > 0
-                                              ? AppConstants
-                                                    .archiveDocumentImported
-                                                    .tr()
-                                              : AppConstants.archiveImportFailed
-                                                    .tr(),
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                  child: Text(AppConstants.commonImport.tr()),
-                                ),
-                              );
-                            },
-                          ),
-                  ),
-                ],
-              ),
-            );
-          },
+        return _DeviceScanSheet(
+          scan: scan,
+          documentsService: widget.documentsService,
         );
       },
     );
@@ -648,6 +566,95 @@ class _AddActionCard extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DeepDeviceSearchCard extends StatelessWidget {
+  const _DeepDeviceSearchCard({required this.loading, required this.onTap});
+
+  final bool loading;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(18),
+      onTap: loading ? null : onTap,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              AppTheme.primary.withValues(alpha: 0.26),
+              const Color(0xFF102F68).withValues(alpha: 0.9),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: AppTheme.primary.withValues(alpha: 0.32)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: loading
+                  ? const Padding(
+                      padding: EdgeInsets.all(12),
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(
+                      Icons.manage_search_rounded,
+                      color: Colors.white,
+                      size: 28,
+                    ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    loading
+                        ? AppConstants.archiveSearchingDevice.tr()
+                        : AppConstants.archiveSearchDevice.tr(),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppTheme.text,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    AppConstants.archiveSearchDeviceSubtitle.tr(),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppTheme.mutedText,
+                      fontSize: 11,
+                      height: 1.2,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Icon(
+              Icons.chevron_right_rounded,
+              color: AppTheme.primarySoft,
+            ),
+          ],
         ),
       ),
     );
@@ -936,6 +943,17 @@ class _DocumentPreview extends StatelessWidget {
                   type: document.type,
                 ),
               )
+            else if (document.type == DocumentType.word && filePath != null)
+              _WordDocumentPreview(
+                filePath: filePath,
+                color: color,
+                fallback: _FallbackDocumentPreview(
+                  color: color,
+                  icon: icon,
+                  extension: extension,
+                  type: document.type,
+                ),
+              )
             else
               _FallbackDocumentPreview(
                 color: color,
@@ -1062,6 +1080,161 @@ class _PdfFirstPagePreviewState extends State<_PdfFirstPagePreview> {
             _controller.jumpToPage(1);
           }
         },
+      ),
+    );
+  }
+}
+
+class _WordDocumentPreview extends StatefulWidget {
+  const _WordDocumentPreview({
+    required this.filePath,
+    required this.color,
+    required this.fallback,
+  });
+
+  final String filePath;
+  final Color color;
+  final Widget fallback;
+
+  @override
+  State<_WordDocumentPreview> createState() => _WordDocumentPreviewState();
+}
+
+class _WordDocumentPreviewState extends State<_WordDocumentPreview> {
+  late Future<String?> _previewText;
+
+  @override
+  void initState() {
+    super.initState();
+    _previewText = _loadPreviewText();
+  }
+
+  @override
+  void didUpdateWidget(covariant _WordDocumentPreview oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.filePath != widget.filePath) {
+      _previewText = _loadPreviewText();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<String?>(
+      future: _previewText,
+      builder: (context, snapshot) {
+        final text = snapshot.data?.trim();
+        if (snapshot.connectionState != ConnectionState.done) {
+          return _WordPreviewLoading(color: widget.color);
+        }
+        if (snapshot.hasError || text == null || text.isEmpty) {
+          return widget.fallback;
+        }
+        return _WordTextPreview(text: text, color: widget.color);
+      },
+    );
+  }
+
+  Future<String?> _loadPreviewText() async {
+    if (!widget.filePath.toLowerCase().endsWith('.docx')) return null;
+    return Isolate.run(() => _extractDocxPreviewText(widget.filePath));
+  }
+}
+
+class _WordTextPreview extends StatelessWidget {
+  const _WordTextPreview({required this.text, required this.color});
+
+  final String text;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      color: const Color(0xFFF8FAFC),
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 28),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 22,
+                height: 22,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Icon(Icons.description_rounded, color: color, size: 15),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Container(
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.22),
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Expanded(
+            child: Text(
+              text,
+              maxLines: 8,
+              overflow: TextOverflow.fade,
+              style: const TextStyle(
+                color: Color(0xFF253247),
+                fontSize: 9.8,
+                height: 1.35,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WordPreviewLoading extends StatelessWidget {
+  const _WordPreviewLoading({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      color: const Color(0xFFF8FAFC),
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 28),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            height: 10,
+            width: 80,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.18),
+              borderRadius: BorderRadius.circular(99),
+            ),
+          ),
+          const SizedBox(height: 14),
+          for (final width in const [1.0, 0.82, 0.92, 0.64, 0.74]) ...[
+            FractionallySizedBox(
+              widthFactor: width,
+              child: Container(
+                height: 5,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFD7DEE9),
+                  borderRadius: BorderRadius.circular(99),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ],
       ),
     );
   }
@@ -1530,6 +1703,527 @@ class _ArchiveEmptyState extends StatelessWidget {
   }
 }
 
+class _DeviceScanSheet extends StatefulWidget {
+  const _DeviceScanSheet({required this.scan, required this.documentsService});
+
+  final DeviceFolderScan scan;
+  final DocumentsService documentsService;
+
+  @override
+  State<_DeviceScanSheet> createState() => _DeviceScanSheetState();
+}
+
+class _DeviceScanSheetState extends State<_DeviceScanSheet> {
+  final Set<String> _importedIds = {};
+  DocumentType? _selectedType;
+  bool _importingAll = false;
+
+  List<DocumentFile> get _visibleDocuments {
+    final selectedType = _selectedType;
+    if (selectedType == null) return widget.scan.documents;
+    return widget.scan.documents
+        .where((document) => document.type == selectedType)
+        .toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.82,
+      minChildSize: 0.45,
+      maxChildSize: 0.94,
+      expand: false,
+      builder: (context, controller) {
+        return Container(
+          padding: const EdgeInsets.fromLTRB(18, 16, 18, 12),
+          decoration: const BoxDecoration(
+            color: AppTheme.surface,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            children: [
+              Container(
+                width: 44,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppTheme.border,
+                  borderRadius: BorderRadius.circular(99),
+                ),
+              ),
+              const SizedBox(height: 16),
+              _DeviceScanHeader(
+                scan: widget.scan,
+                importing: _importingAll,
+                onImportAll: widget.scan.documents.isEmpty ? null : _importAll,
+              ),
+              const SizedBox(height: 14),
+              Expanded(
+                child: widget.scan.documents.isEmpty
+                    ? Center(
+                        child: Text(
+                          AppConstants.archiveNoSupportedDocuments.tr(),
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: AppTheme.mutedText),
+                        ),
+                      )
+                    : CustomScrollView(
+                        controller: controller,
+                        slivers: [
+                          SliverToBoxAdapter(
+                            child: _DeviceTypeSummary(
+                              documents: widget.scan.documents,
+                              selectedType: _selectedType,
+                              onSelected: (type) {
+                                setState(() => _selectedType = type);
+                              },
+                            ),
+                          ),
+                          const SliverToBoxAdapter(child: SizedBox(height: 16)),
+                          for (final section in _sections(
+                            _visibleDocuments,
+                          )) ...[
+                            SliverToBoxAdapter(
+                              child: Padding(
+                                padding: const EdgeInsets.only(bottom: 10),
+                                child: SectionTitle(
+                                  icon: _documentIconFor(section.type),
+                                  title: _documentTypeLabel(section.type),
+                                  count: section.documents.length,
+                                ),
+                              ),
+                            ),
+                            SliverPadding(
+                              padding: const EdgeInsets.only(bottom: 18),
+                              sliver: SliverGrid.builder(
+                                itemCount: section.documents.length,
+                                gridDelegate:
+                                    const SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: 2,
+                                      crossAxisSpacing: 10,
+                                      mainAxisSpacing: 10,
+                                      childAspectRatio: 0.54,
+                                    ),
+                                itemBuilder: (context, index) {
+                                  final document = section.documents[index];
+                                  return _DeviceScanDocumentCard(
+                                    document: document,
+                                    imported: _importedIds.contains(
+                                      document.id,
+                                    ),
+                                    documentsService: widget.documentsService,
+                                    onImported: () {
+                                      setState(
+                                        () => _importedIds.add(document.id),
+                                      );
+                                    },
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
+                          const SliverToBoxAdapter(child: SizedBox(height: 20)),
+                        ],
+                      ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _importAll() async {
+    setState(() => _importingAll = true);
+    final imported = await widget.documentsService.importScannedDocuments(
+      widget.scan.documents,
+    );
+    if (!mounted) return;
+    setState(() {
+      _importingAll = false;
+      _importedIds.addAll(widget.scan.documents.map((document) => document.id));
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          AppConstants.archiveImportedCount.tr(
+            namedArgs: {'count': '$imported'},
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<({DocumentType type, List<DocumentFile> documents})> _sections(
+    List<DocumentFile> documents,
+  ) {
+    final order = const [
+      DocumentType.pdf,
+      DocumentType.word,
+      DocumentType.excel,
+      DocumentType.image,
+    ];
+
+    return [
+      for (final type in order)
+        if (documents.where((document) => document.type == type).isNotEmpty)
+          (
+            type: type,
+            documents: documents
+                .where((document) => document.type == type)
+                .toList(),
+          ),
+    ];
+  }
+}
+
+class _DeviceScanHeader extends StatelessWidget {
+  const _DeviceScanHeader({
+    required this.scan,
+    required this.importing,
+    required this.onImportAll,
+  });
+
+  final DeviceFolderScan scan;
+  final bool importing;
+  final VoidCallback? onImportAll;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: AppTheme.primary.withValues(alpha: 0.14),
+            borderRadius: BorderRadius.circular(15),
+            border: Border.all(color: AppTheme.border),
+          ),
+          child: Icon(
+            scan.folderId == 'device'
+                ? Icons.devices_rounded
+                : Icons.folder_open_rounded,
+            color: AppTheme.primarySoft,
+            size: 29,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                scan.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppTheme.text,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                AppConstants.archiveDeviceFolderFound.tr(
+                  namedArgs: {'count': '${scan.documents.length}'},
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: AppTheme.mutedText),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 10),
+        FilledButton(
+          onPressed: importing ? null : onImportAll,
+          child: importing
+              ? const SizedBox.square(
+                  dimension: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Text(AppConstants.commonImportAll.tr()),
+        ),
+      ],
+    );
+  }
+}
+
+class _DeviceTypeSummary extends StatelessWidget {
+  const _DeviceTypeSummary({
+    required this.documents,
+    required this.selectedType,
+    required this.onSelected,
+  });
+
+  final List<DocumentFile> documents;
+  final DocumentType? selectedType;
+  final ValueChanged<DocumentType?> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final counts = {
+      for (final type in DocumentType.values)
+        type: documents.where((document) => document.type == type).length,
+    };
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SectionTitle(
+          icon: Icons.category_rounded,
+          title: AppConstants.archiveDocumentTypes.tr(),
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _DeviceTypeChip(
+              icon: Icons.layers_rounded,
+              label: AppConstants.archiveAll.tr(),
+              count: documents.length,
+              selected: selectedType == null,
+              onTap: () => onSelected(null),
+            ),
+            for (final type in const [
+              DocumentType.pdf,
+              DocumentType.word,
+              DocumentType.excel,
+              DocumentType.image,
+            ])
+              _DeviceTypeChip(
+                icon: _documentIconFor(type),
+                label: _documentTypeLabel(type),
+                count: counts[type] ?? 0,
+                color: _documentColorFor(type),
+                selected: selectedType == type,
+                onTap: () => onSelected(type),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _DeviceTypeChip extends StatelessWidget {
+  const _DeviceTypeChip({
+    required this.icon,
+    required this.label,
+    required this.count,
+    required this.selected,
+    required this.onTap,
+    this.color = AppTheme.primary,
+  });
+
+  final IconData icon;
+  final String label;
+  final int count;
+  final bool selected;
+  final VoidCallback onTap;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        width: 126,
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: selected
+              ? color.withValues(alpha: 0.2)
+              : AppTheme.surfaceStrong.withValues(alpha: 0.44),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: selected ? color.withValues(alpha: 0.72) : AppTheme.border,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              color: selected ? color : AppTheme.primarySoft,
+              size: 22,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppTheme.text,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    AppConstants.archiveTypeCount.tr(
+                      namedArgs: {'count': '$count'},
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppTheme.mutedText,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DeviceScanDocumentCard extends StatefulWidget {
+  const _DeviceScanDocumentCard({
+    required this.document,
+    required this.imported,
+    required this.documentsService,
+    required this.onImported,
+  });
+
+  final DocumentFile document;
+  final bool imported;
+  final DocumentsService documentsService;
+  final VoidCallback onImported;
+
+  @override
+  State<_DeviceScanDocumentCard> createState() =>
+      _DeviceScanDocumentCardState();
+}
+
+class _DeviceScanDocumentCardState extends State<_DeviceScanDocumentCard> {
+  bool _importing = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final document = widget.document;
+    final color = _documentColorFor(document.type);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: () => widget.documentsService.openDocument(document),
+        child: Container(
+          padding: const EdgeInsets.all(9),
+          decoration: BoxDecoration(
+            color: AppTheme.surfaceStrong.withValues(alpha: 0.42),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: AppTheme.border.withValues(alpha: 0.72)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: _DocumentPreview(
+                  document: document,
+                  color: color,
+                  icon: _documentIconFor(document.type),
+                  extension: _documentExtensionFor(document.type),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                document.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppTheme.text,
+                  fontSize: 12,
+                  height: 1.12,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                AppConstants.archiveSourceFolder.tr(
+                  namedArgs: {'folder': _sourceFolderName(document)},
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppTheme.mutedText,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 6),
+              SizedBox(
+                height: 34,
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: widget.imported || _importing ? null : _import,
+                  icon: _importing
+                      ? const SizedBox.square(
+                          dimension: 13,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Icon(
+                          widget.imported
+                              ? Icons.check_rounded
+                              : Icons.download_rounded,
+                          size: 16,
+                        ),
+                  label: Text(
+                    widget.imported
+                        ? AppConstants.archiveDocumentImported.tr()
+                        : AppConstants.commonImport.tr(),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    textStyle: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w900,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _import() async {
+    setState(() => _importing = true);
+    final imported = await widget.documentsService.importScannedDocuments([
+      widget.document,
+    ]);
+    if (!mounted) return;
+    setState(() => _importing = false);
+    if (imported > 0) widget.onImported();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          imported > 0
+              ? AppConstants.archiveDocumentImported.tr()
+              : AppConstants.archiveImportFailed.tr(),
+        ),
+      ),
+    );
+  }
+}
+
 class _DeviceFolderCard extends StatelessWidget {
   const _DeviceFolderCard({required this.folder, required this.onTap});
 
@@ -1597,6 +2291,105 @@ String _deviceFolderTitle(DeviceFolder folder) {
     'drive' => AppConstants.archiveDeviceFolderDrive.tr(),
     _ => folder.title,
   };
+}
+
+IconData _documentIconFor(DocumentType type) {
+  switch (type) {
+    case DocumentType.pdf:
+      return Icons.picture_as_pdf_rounded;
+    case DocumentType.word:
+      return Icons.description_rounded;
+    case DocumentType.excel:
+      return Icons.table_chart_rounded;
+    case DocumentType.image:
+      return Icons.image_rounded;
+  }
+}
+
+Color _documentColorFor(DocumentType type) {
+  switch (type) {
+    case DocumentType.pdf:
+      return const Color(0xFFFF6868);
+    case DocumentType.word:
+      return const Color(0xFF5C8DFF);
+    case DocumentType.excel:
+      return const Color(0xFF4CC58A);
+    case DocumentType.image:
+      return const Color(0xFF9B6DFF);
+  }
+}
+
+String _documentExtensionFor(DocumentType type) {
+  switch (type) {
+    case DocumentType.pdf:
+      return 'PDF';
+    case DocumentType.word:
+      return 'DOC';
+    case DocumentType.excel:
+      return 'XLS';
+    case DocumentType.image:
+      return AppConstants.archiveImage.tr().toUpperCase();
+  }
+}
+
+String _documentTypeLabel(DocumentType type) {
+  return switch (type) {
+    DocumentType.pdf => 'PDF',
+    DocumentType.word => 'Word',
+    DocumentType.excel => 'Excel',
+    DocumentType.image => AppConstants.archiveImage.tr(),
+  };
+}
+
+String _sourceFolderName(DocumentFile document) {
+  final path = document.localPath;
+  if (path == null || path.trim().isEmpty) return '-';
+  final normalized = path.replaceAll('\\', '/');
+  final parts = normalized.split('/')..removeWhere((part) => part.isEmpty);
+  if (parts.length < 2) return normalized;
+  return parts[parts.length - 2];
+}
+
+String? _extractDocxPreviewText(String filePath) {
+  try {
+    final bytes = File(filePath).readAsBytesSync();
+    final files = archive.ZipDecoder().decodeBytes(bytes, verify: false);
+    archive.ArchiveFile? documentXml;
+    for (final file in files.files) {
+      if (file.name == 'word/document.xml' && file.isFile) {
+        documentXml = file;
+        break;
+      }
+    }
+    if (documentXml == null) return null;
+
+    final xmlText = utf8.decode(documentXml.content, allowMalformed: true);
+    final parsed = xml.XmlDocument.parse(xmlText);
+    final paragraphs = <String>[];
+
+    final xmlParagraphs = parsed.descendantElements.where((element) {
+      return element.name.qualified == 'w:p' || element.name.local == 'p';
+    });
+
+    for (final paragraph in xmlParagraphs) {
+      final buffer = StringBuffer();
+      final textNodes = paragraph.descendantElements.where((element) {
+        return element.name.qualified == 'w:t' || element.name.local == 't';
+      });
+      for (final textNode in textNodes) {
+        buffer.write(textNode.innerText);
+      }
+      final line = buffer.toString().replaceAll(RegExp(r'\s+'), ' ').trim();
+      if (line.isNotEmpty) paragraphs.add(line);
+      if (paragraphs.join('\n').length > 700) break;
+    }
+
+    final text = paragraphs.join('\n').trim();
+    if (text.isEmpty) return null;
+    return text.length > 700 ? '${text.substring(0, 700)}...' : text;
+  } catch (_) {
+    return null;
+  }
 }
 
 class _ImportedMiniCard extends StatelessWidget {

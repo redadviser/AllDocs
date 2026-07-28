@@ -1,13 +1,14 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../models/models.dart';
+import 'document_scanner_service.dart';
 
 class LocalDocumentsStore {
   const LocalDocumentsStore();
@@ -82,27 +83,28 @@ class LocalDocumentsStore {
   }
 
   Future<int> scanDocumentWithCamera({String? albumId}) async {
-    final picked = await ImagePicker().pickImage(
-      source: ImageSource.camera,
-      imageQuality: 92,
-    );
-    if (picked == null) return 0;
+    final scanned = await const DocumentScannerService().scanDocument();
+    if (scanned == null) return 0;
 
     final state = await _readState();
     final documents = _documentsRaw(state);
     final id = _newId('doc');
-    final fileName = 'scan_${_dateStamp(DateTime.now())}.jpg';
     final storedPath = await _copyPickedFile(
       id: id,
-      originalName: fileName,
-      pickedPath: picked.path,
+      originalName: scanned.fileName,
+      pickedPath: scanned.filePath,
       bytes: null,
     );
+    await scanned.cleanup();
+
     final importedDocument = await _documentFromStoredFile(
       id: id,
-      fileName: fileName,
+      fileName: scanned.fileName,
       storedPath: storedPath,
       albumId: albumId,
+      pageCount: scanned.pageCount,
+      isSearchable: scanned.searchable,
+      ocrText: scanned.ocrText,
     );
     documents.add(importedDocument.toJson());
 
@@ -144,6 +146,63 @@ class LocalDocumentsStore {
     paths[folderId] = path;
     await _writeState(state);
     return _scanDeviceFolder(folderId, path, title: folderTitle);
+  }
+
+  Future<DeviceFolderScan?> scanAllDeviceDocuments({String? title}) async {
+    final state = await _readState();
+    final paths = _deviceFolderPathsRaw(state);
+    final rootPaths = <String>[];
+    final seenPaths = <String>{};
+
+    void addPath(String path) {
+      final normalized = path.trim();
+      if (normalized.isEmpty || !seenPaths.add(normalized)) return;
+      rootPaths.add(normalized);
+    }
+
+    for (final folderId in const [
+      'documents',
+      'downloads',
+      'scans',
+      'drive',
+      'whatsapp',
+    ]) {
+      for (final candidate in _defaultDeviceFolderCandidates(folderId)) {
+        addPath(candidate);
+      }
+    }
+
+    for (final path in paths.values) {
+      addPath(path.toString());
+    }
+
+    if (Platform.isAndroid) addPath('/storage/emulated/0');
+
+    if (rootPaths.isEmpty) {
+      addPath((await _appDirectory()).path);
+    }
+
+    final roots = <Directory>[];
+    for (final path in rootPaths) {
+      final directory = Directory(path);
+      if (await directory.exists()) roots.add(directory);
+    }
+
+    if (roots.isEmpty) return null;
+
+    final documents = await _scanDirectories(
+      roots,
+      limit: 1800,
+      preferDocuments: true,
+    );
+    documents.sort(_newestFirst);
+
+    return DeviceFolderScan(
+      folderId: 'device',
+      path: roots.first.path,
+      title: title?.trim().isNotEmpty == true ? title!.trim() : 'Dispositivo',
+      documents: documents,
+    );
   }
 
   Future<int> importScannedDocuments(
@@ -465,6 +524,9 @@ class LocalDocumentsStore {
     required String fileName,
     required String storedPath,
     String? albumId,
+    int? pageCount,
+    bool isSearchable = false,
+    String? ocrText,
   }) async {
     final file = File(storedPath);
     final sizeBytes = await file.length();
@@ -484,6 +546,9 @@ class LocalDocumentsStore {
       albumId: albumId,
       isNew: albumId == null,
       isImported: true,
+      pageCount: pageCount,
+      isSearchable: isSearchable,
+      ocrText: ocrText,
     );
   }
 
@@ -834,37 +899,7 @@ class LocalDocumentsStore {
     final directory = Directory(path);
     if (!await directory.exists()) return null;
 
-    final documents = <DocumentFile>[];
-    await for (final entity in directory.list(
-      recursive: true,
-      followLinks: false,
-    )) {
-      if (entity is! File) continue;
-      final fileName = _fileNameFromPath(entity.path);
-      if (!_isSupportedFile(fileName)) continue;
-
-      try {
-        final stat = await entity.stat();
-        documents.add(
-          DocumentFile(
-            id: 'scan_${entity.path.hashCode}',
-            title: _titleFromFileName(fileName),
-            fileName: fileName,
-            type: documentTypeFromFileName(fileName),
-            dateLabel: _dateLabel(stat.modified),
-            timeLabel: _timeLabel(stat.modified),
-            sizeLabel: _formatBytes(stat.size),
-            localPath: entity.path,
-            sizeBytes: stat.size,
-            importedAt: stat.modified,
-          ),
-        );
-      } catch (_) {
-        continue;
-      }
-
-      if (documents.length >= 250) break;
-    }
+    final documents = await _scanDirectories([directory], limit: 500);
 
     documents.sort(_newestFirst);
     return DeviceFolderScan(
@@ -878,21 +913,32 @@ class LocalDocumentsStore {
   }
 
   Future<int> _countSupportedFiles(Directory directory) async {
-    var count = 0;
     try {
-      await for (final entity in directory.list(
-        recursive: true,
-        followLinks: false,
-      )) {
-        if (entity is! File) continue;
-        if (!_isSupportedFile(_fileNameFromPath(entity.path))) continue;
-        count++;
-        if (count >= 250) break;
-      }
+      return Isolate.run(() {
+        return _countSupportedFilesInPath(directory.path, limit: 250);
+      });
     } catch (_) {
       return 0;
     }
-    return count;
+  }
+
+  Future<List<DocumentFile>> _scanDirectories(
+    List<Directory> roots, {
+    required int limit,
+    bool preferDocuments = false,
+  }) async {
+    final rootPaths = roots.map((directory) => directory.path).toList();
+    final jsonDocuments = await Isolate.run(() {
+      return _scanDirectoryPaths(
+        rootPaths: rootPaths,
+        limit: limit,
+        preferDocuments: preferDocuments,
+      );
+    });
+
+    return jsonDocuments
+        .map((json) => DocumentFile.fromJson(Map<String, dynamic>.from(json)))
+        .toList();
   }
 
   String _newId(String prefix) {
@@ -916,11 +962,6 @@ class LocalDocumentsStore {
     final parts = path.split(Platform.pathSeparator)
       ..removeWhere((part) => part.isEmpty);
     return parts.isEmpty ? path : parts.last;
-  }
-
-  bool _isSupportedFile(String fileName) {
-    final lower = fileName.toLowerCase();
-    return _supportedExtensions.any((ext) => lower.endsWith('.$ext'));
   }
 
   String _safeFileName(String fileName) {
@@ -975,4 +1016,223 @@ class LocalDocumentsStore {
     }
     return candidate;
   }
+}
+
+List<Map<String, Object?>> _scanDirectoryPaths({
+  required List<String> rootPaths,
+  required int limit,
+  required bool preferDocuments,
+}) {
+  final documents = <Map<String, Object?>>[];
+  final seenFiles = <String>{};
+  final seenDirectories = <String>{};
+  final queue = [for (final path in rootPaths) Directory(path)];
+  final typeCounts = <String, int>{};
+  final typeCaps = preferDocuments
+      ? const {'pdf': 800, 'word': 500, 'excel': 500, 'image': 250}
+      : const <String, int>{};
+  final directoryLimit = preferDocuments ? 9000 : 2400;
+  var scannedDirectories = 0;
+
+  while (queue.isNotEmpty &&
+      documents.length < limit &&
+      scannedDirectories < directoryLimit) {
+    final directory = queue.removeAt(0);
+    final directoryPath = directory.path;
+    if (!seenDirectories.add(directoryPath)) continue;
+    if (_scanShouldSkipDirectory(directoryPath)) continue;
+    scannedDirectories++;
+
+    late final List<FileSystemEntity> children;
+    try {
+      children = directory.listSync(followLinks: false);
+    } catch (_) {
+      continue;
+    }
+
+    final childDirectories = <Directory>[];
+    final childFiles = <File>[];
+    for (final child in children) {
+      if (child is File) {
+        childFiles.add(child);
+      } else if (child is Directory) {
+        childDirectories.add(child);
+      }
+    }
+
+    childDirectories.sort((a, b) {
+      final priority = _scanDirectoryPriority(
+        a.path,
+      ).compareTo(_scanDirectoryPriority(b.path));
+      if (priority != 0) return priority;
+      return a.path.toLowerCase().compareTo(b.path.toLowerCase());
+    });
+    queue.addAll(childDirectories);
+
+    childFiles.sort((a, b) {
+      final typePriority = _scanFileTypePriority(
+        a.path,
+      ).compareTo(_scanFileTypePriority(b.path));
+      if (typePriority != 0) return typePriority;
+      return a.path.toLowerCase().compareTo(b.path.toLowerCase());
+    });
+
+    for (final file in childFiles) {
+      final path = file.path;
+      if (!seenFiles.add(path)) continue;
+
+      final fileName = _scanFileNameFromPath(path);
+      if (!_scanIsSupportedFile(fileName)) continue;
+      final type = documentTypeFromFileName(fileName).name;
+      final cap = typeCaps[type];
+      if (cap != null && (typeCounts[type] ?? 0) >= cap) continue;
+
+      try {
+        final stat = file.statSync();
+        typeCounts[type] = (typeCounts[type] ?? 0) + 1;
+        documents.add({
+          'id': 'scan_${path.hashCode}',
+          'title': _scanTitleFromFileName(fileName),
+          'file_name': fileName,
+          'type': type,
+          'date_label': _scanDateLabel(stat.modified),
+          'time_label': _scanTimeLabel(stat.modified),
+          'size_label': _scanFormatBytes(stat.size),
+          'local_path': path,
+          'size_bytes': stat.size,
+          'imported_at': stat.modified.toIso8601String(),
+        });
+      } catch (_) {
+        continue;
+      }
+
+      if (documents.length >= limit) break;
+    }
+  }
+
+  return documents;
+}
+
+int _countSupportedFilesInPath(String rootPath, {required int limit}) {
+  var count = 0;
+  var scannedDirectories = 0;
+  final queue = <Directory>[Directory(rootPath)];
+  final seenDirectories = <String>{};
+
+  while (queue.isNotEmpty && count < limit && scannedDirectories < 2400) {
+    final directory = queue.removeAt(0);
+    final directoryPath = directory.path;
+    if (!seenDirectories.add(directoryPath)) continue;
+    if (_scanShouldSkipDirectory(directoryPath)) continue;
+    scannedDirectories++;
+
+    late final List<FileSystemEntity> children;
+    try {
+      children = directory.listSync(followLinks: false);
+    } catch (_) {
+      continue;
+    }
+
+    for (final child in children) {
+      if (child is File) {
+        if (!_scanIsSupportedFile(_scanFileNameFromPath(child.path))) continue;
+        count++;
+        if (count >= limit) break;
+      } else if (child is Directory) {
+        queue.add(child);
+      }
+    }
+  }
+
+  return count;
+}
+
+int _scanDirectoryPriority(String path) {
+  final normalized = path.replaceAll('\\', '/').toLowerCase();
+  if (normalized.endsWith('/documents') ||
+      normalized.endsWith('/documentos') ||
+      normalized.contains('/documents/') ||
+      normalized.contains('/documentos/')) {
+    return 0;
+  }
+  if (normalized.endsWith('/download') ||
+      normalized.endsWith('/downloads') ||
+      normalized.contains('/download/') ||
+      normalized.contains('/downloads/')) {
+    return 1;
+  }
+  if (normalized.contains('/scans') || normalized.contains('/scanner')) {
+    return 2;
+  }
+  if (normalized.contains('/android/data') ||
+      normalized.contains('/android/media')) {
+    return 3;
+  }
+  if (normalized.contains('/whatsapp')) return 4;
+  if (normalized.contains('/dcim') ||
+      normalized.contains('/pictures') ||
+      normalized.contains('/movies') ||
+      normalized.contains('/music')) {
+    return 8;
+  }
+  return 5;
+}
+
+int _scanFileTypePriority(String path) {
+  final lower = path.toLowerCase();
+  if (lower.endsWith('.pdf')) return 0;
+  if (lower.endsWith('.doc') || lower.endsWith('.docx')) return 1;
+  if (lower.endsWith('.xls') || lower.endsWith('.xlsx')) return 2;
+  return 3;
+}
+
+bool _scanShouldSkipDirectory(String path) {
+  final normalized = path.replaceAll('\\', '/').toLowerCase();
+  return normalized.contains('/android/obb') ||
+      normalized.endsWith('/.thumbnails') ||
+      normalized.contains('/.thumbnails/') ||
+      normalized.endsWith('/cache') ||
+      normalized.contains('/cache/') ||
+      normalized.endsWith('/code_cache') ||
+      normalized.contains('/code_cache/');
+}
+
+bool _scanIsSupportedFile(String fileName) {
+  final lower = fileName.toLowerCase();
+  return LocalDocumentsStore._supportedExtensions.any(
+    (ext) => lower.endsWith('.$ext'),
+  );
+}
+
+String _scanFileNameFromPath(String path) {
+  final normalized = path.replaceAll('\\', '/');
+  final parts = normalized.split('/')..removeWhere((part) => part.isEmpty);
+  return parts.isEmpty ? path : parts.last;
+}
+
+String _scanTitleFromFileName(String fileName) {
+  final dot = fileName.lastIndexOf('.');
+  final base = dot > 0 ? fileName.substring(0, dot) : fileName;
+  return base.replaceAll('_', ' ').trim();
+}
+
+String _scanDateLabel(DateTime value) {
+  return '${_scanTwo(value.day)}/${_scanTwo(value.month)}/${value.year}';
+}
+
+String _scanTimeLabel(DateTime value) {
+  return '${_scanTwo(value.hour)}:${_scanTwo(value.minute)}';
+}
+
+String _scanTwo(int value) => value.toString().padLeft(2, '0');
+
+String _scanFormatBytes(int bytes) {
+  if (bytes >= 1024 * 1024 * 1024) {
+    return '${(bytes / 1024 / 1024 / 1024).toStringAsFixed(1)} GB';
+  }
+  if (bytes >= 1024 * 1024) {
+    return '${(bytes / 1024 / 1024).toStringAsFixed(1)} MB';
+  }
+  if (bytes >= 1024) return '${(bytes / 1024).round()} KB';
+  return '$bytes B';
 }

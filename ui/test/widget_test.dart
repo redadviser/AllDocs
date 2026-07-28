@@ -1,7 +1,6 @@
 import 'dart:io';
 
 import 'package:easy_localization/easy_localization.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -36,9 +35,10 @@ void main() {
     await tester.pump(const Duration(seconds: 2));
 
     expect(find.text('Cria o teu PIN'), findsOneWidget);
-    await tester.enterText(find.byType(EditableText).at(0), '1234');
-    await tester.enterText(find.byType(EditableText).at(1), '1234');
-    await tester.tap(find.text('Guardar PIN'));
+    await _tapPin(tester, '1234');
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.text('Confirmar PIN'), findsWidgets);
+    await _tapPin(tester, '1234');
     await tester.pump(const Duration(milliseconds: 800));
     await tester.pump(const Duration(milliseconds: 800));
 
@@ -46,4 +46,11 @@ void main() {
     expect(find.text('Arquivo'), findsOneWidget);
     expect(find.text('Perfil'), findsOneWidget);
   });
+}
+
+Future<void> _tapPin(WidgetTester tester, String pin) async {
+  for (final digit in pin.split('')) {
+    await tester.tap(find.text(digit));
+    await tester.pump(const Duration(milliseconds: 80));
+  }
 }

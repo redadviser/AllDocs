@@ -95,6 +95,9 @@ class AppConstants {
       'archive.select_from_phone_subtitle';
   static const archiveScanDocumentTitle = 'archive.scan_document_title';
   static const archiveScanDocumentSubtitle = 'archive.scan_document_subtitle';
+  static const archiveScanStarting = 'archive.scan_starting';
+  static const archiveScanDone = 'archive.scan_done';
+  static const archiveScanFailed = 'archive.scan_failed';
   static const archiveImportCloudTitle = 'archive.import_cloud_title';
   static const archiveImportCloudSubtitle = 'archive.import_cloud_subtitle';
   static const archiveAll = 'archive.all';
@@ -112,6 +115,13 @@ class AppConstants {
   static const archiveDeviceFolderScans = 'archive.device_folder_scans';
   static const archiveDeviceFolderDrive = 'archive.device_folder_drive';
   static const archiveDeviceFolderCount = 'archive.device_folder_count';
+  static const archiveSearchDevice = 'archive.search_device';
+  static const archiveSearchDeviceSubtitle = 'archive.search_device_subtitle';
+  static const archiveSearchingDevice = 'archive.searching_device';
+  static const archiveAllDeviceDocuments = 'archive.all_device_documents';
+  static const archiveDocumentTypes = 'archive.document_types';
+  static const archiveTypeCount = 'archive.type_count';
+  static const archiveSourceFolder = 'archive.source_folder';
   static const archiveFolderOpenFailed = 'archive.folder_open_failed';
   static const archiveDeviceFolderFound = 'archive.device_folder_found';
   static const archiveImportedCount = 'archive.imported_count';

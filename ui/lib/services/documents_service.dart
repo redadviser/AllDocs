@@ -46,6 +46,10 @@ class DocumentsService {
     return scan;
   }
 
+  Future<DeviceFolderScan?> scanAllDeviceDocuments({String? title}) {
+    return _store.scanAllDeviceDocuments(title: title);
+  }
+
   Future<int> importScannedDocuments(
     List<DocumentFile> documents, {
     String? albumId,
