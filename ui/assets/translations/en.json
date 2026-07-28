@@ -16,7 +16,8 @@
     "forgot": "Forgot",
     "login": "Sign in",
     "mock_hint": "Mock login while the interface is being prepared.",
-    "offline": "Local mode active"
+    "offline": "Local mode active",
+    "login_error": "We couldn't sign you in. Check your details and try again."
   },
   "security": {
     "greeting_morning": "Good morning, {name}",

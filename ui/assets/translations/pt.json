@@ -16,7 +16,8 @@
     "forgot": "Esqueci-me",
     "login": "Entrar",
     "mock_hint": "Login mockado para preparar a interface.",
-    "offline": "Modo local ativo"
+    "offline": "Modo local ativo",
+    "login_error": "Não foi possível iniciar sessão. Verifica os dados e tenta novamente."
   },
   "security": {
     "greeting_morning": "Bom dia, {name}",

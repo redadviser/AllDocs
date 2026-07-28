@@ -16,7 +16,8 @@
     "forgot": "Oublié",
     "login": "Se connecter",
     "mock_hint": "Connexion simulée pendant la préparation de l’interface.",
-    "offline": "Mode local actif"
+    "offline": "Mode local actif",
+    "login_error": "Connexion impossible. Vérifie tes informations et réessaie."
   },
   "security": {
     "greeting_morning": "Bonjour, {name}",

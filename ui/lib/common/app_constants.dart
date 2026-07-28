@@ -25,6 +25,7 @@ class AppConstants {
   static const authLogin = 'auth.login';
   static const authMockHint = 'auth.mock_hint';
   static const authOffline = 'auth.offline';
+  static const authLoginError = 'auth.login_error';
 
   static const securityGreetingMorning = 'security.greeting_morning';
   static const securityGreetingAfternoon = 'security.greeting_afternoon';

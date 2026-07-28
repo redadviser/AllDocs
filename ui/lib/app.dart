@@ -83,7 +83,7 @@ class _AllDocsAppState extends State<AllDocsApp> {
                 child: scaledChild,
               );
             },
-            home: const MockAuthGate(),
+            home: const AuthGate(),
           ),
         );
       },

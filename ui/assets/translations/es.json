@@ -16,7 +16,8 @@
     "forgot": "Olvidé",
     "login": "Entrar",
     "mock_hint": "Login simulado mientras se prepara la interfaz.",
-    "offline": "Modo local activo"
+    "offline": "Modo local activo",
+    "login_error": "No se pudo iniciar sesión. Comprueba tus datos e inténtalo de nuevo."
   },
   "security": {
     "greeting_morning": "Buenos días, {name}",

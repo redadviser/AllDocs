@@ -8,55 +8,63 @@ import '../../services/services.dart';
 import '../../theme/app_theme.dart';
 import 'security_gate.dart';
 
-class MockAuthGate extends StatefulWidget {
-  const MockAuthGate({super.key});
+class AuthGate extends StatefulWidget {
+  const AuthGate({super.key});
 
   @override
-  State<MockAuthGate> createState() => _MockAuthGateState();
+  State<AuthGate> createState() => _AuthGateState();
 }
 
-class _MockAuthGateState extends State<MockAuthGate> {
-  static const _mockUserName = 'Paulo Cunha';
+class _AuthGateState extends State<AuthGate> {
+  static const _fallbackUserName = 'AllDocs';
 
-  final SecurityLockService _securityLockService = SecurityLockService();
-
-  bool _checkingSecurity = true;
+  bool _loadingSession = true;
   bool _signedIn = false;
+  String _userName = _fallbackUserName;
 
   @override
   void initState() {
     super.initState();
-    _loadSavedSecurityState();
+    _loadSession();
   }
 
-  Future<void> _loadSavedSecurityState() async {
-    final hasPin = await _securityLockService.hasPin();
+  Future<void> _loadSession() async {
+    final signedIn = await AuthService.isSignedIn();
+    final name = await AuthService.displayName();
     if (!mounted) return;
 
     setState(() {
-      // Se já existe PIN guardado, o utilizador já fez o primeiro login/setup.
-      // A partir daqui a app entra sempre pelo SecurityGate: biometria ou PIN.
-      _signedIn = hasPin;
-      _checkingSecurity = false;
+      _signedIn = signedIn;
+      _userName = name ?? _fallbackUserName;
+      _loadingSession = false;
+    });
+  }
+
+  Future<void> _handleLogin(String email, String password) async {
+    final name = await AuthService.login(email, password);
+    if (!mounted) return;
+    setState(() {
+      _userName = name;
+      _signedIn = true;
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_checkingSecurity) {
+    if (_loadingSession) {
       return const _AuthLoadingScreen();
     }
 
     if (_signedIn) {
-      return const SecurityGate(
-        userName: _mockUserName,
-        child: StoragePermissionGate(child: MainNavScreen()),
+      return SecurityGate(
+        userName: _userName,
+        child: const StoragePermissionGate(child: MainNavScreen()),
       );
     }
 
     // Primeiro acesso: pede login. Depois o SecurityGate trata da criação do PIN
     // e biometria, como já está implementado.
-    return LoginScreen(onLogin: () => setState(() => _signedIn = true));
+    return LoginScreen(onLogin: _handleLogin);
   }
 }
 
@@ -83,7 +91,7 @@ class _AuthLoadingScreen extends StatelessWidget {
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key, required this.onLogin});
 
-  final VoidCallback onLogin;
+  final Future<void> Function(String email, String password) onLogin;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -97,12 +105,28 @@ class _LoginScreenState extends State<LoginScreen> {
     text: 'alldocs',
   );
   bool _remember = true;
+  bool _submitting = false;
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (_submitting) return;
+    setState(() => _submitting = true);
+    try {
+      await widget.onLogin(_emailController.text, _passwordController.text);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(AppConstants.authLoginError.tr())));
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
   }
 
   @override
@@ -153,7 +177,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             controller: _passwordController,
                             obscureText: true,
                             textInputAction: TextInputAction.done,
-                            onSubmitted: (_) => widget.onLogin(),
+                            onSubmitted: (_) => _submit(),
                             decoration: InputDecoration(
                               labelText: AppConstants.authPassword.tr(),
                               prefixIcon: const Icon(Icons.lock_outline),
@@ -194,7 +218,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           const SizedBox(height: 14),
                           FilledButton(
-                            onPressed: widget.onLogin,
+                            onPressed: _submitting ? null : _submit,
                             style: FilledButton.styleFrom(
                               minimumSize: const Size.fromHeight(48),
                               shape: RoundedRectangleBorder(
