@@ -1,3 +1,4 @@
+import 'document_semantic_type.dart';
 import 'document_type.dart';
 
 class DocumentFile {
@@ -20,6 +21,9 @@ class DocumentFile {
     this.pageCount,
     this.isSearchable = false,
     this.ocrText,
+    this.semanticType,
+    this.classificationConfidence,
+    this.validityDate,
   });
 
   final String id;
@@ -41,6 +45,21 @@ class DocumentFile {
   final bool isSearchable;
   final String? ocrText;
 
+  /// Best-guess document type from on-device OCR-text classification (see
+  /// [DocumentClassifier]). Null for documents imported before this existed,
+  /// or where classification hasn't run.
+  final DocumentSemanticType? semanticType;
+
+  /// 0.0-1.0 confidence in [semanticType]. UI should treat low-confidence
+  /// results as a suggestion, never file documents automatically on the
+  /// strength of this alone.
+  final double? classificationConfidence;
+
+  /// Expiry/validity date extracted from the document's OCR text, for types
+  /// where that's meaningful (ID documents, insurance, warranties,
+  /// contracts). Drives the local "expiring soon" reminders.
+  final DateTime? validityDate;
+
   DocumentFile copyWith({
     String? id,
     String? title,
@@ -60,6 +79,9 @@ class DocumentFile {
     int? pageCount,
     bool? isSearchable,
     String? ocrText,
+    DocumentSemanticType? semanticType,
+    double? classificationConfidence,
+    DateTime? validityDate,
     bool clearAlbumId = false,
   }) {
     return DocumentFile(
@@ -81,6 +103,10 @@ class DocumentFile {
       pageCount: pageCount ?? this.pageCount,
       isSearchable: isSearchable ?? this.isSearchable,
       ocrText: ocrText ?? this.ocrText,
+      semanticType: semanticType ?? this.semanticType,
+      classificationConfidence:
+          classificationConfidence ?? this.classificationConfidence,
+      validityDate: validityDate ?? this.validityDate,
     );
   }
 
@@ -104,6 +130,14 @@ class DocumentFile {
       pageCount: json['page_count'] is int ? json['page_count'] as int : null,
       isSearchable: json['is_searchable'] == true,
       ocrText: json['ocr_text']?.toString(),
+      semanticType: documentSemanticTypeFromName(
+        json['semantic_type']?.toString(),
+      ),
+      classificationConfidence: (json['classification_confidence'] as num?)
+          ?.toDouble(),
+      validityDate: DateTime.tryParse(
+        json['validity_date']?.toString() ?? '',
+      ),
     );
   }
 
@@ -127,6 +161,9 @@ class DocumentFile {
       'page_count': pageCount,
       'is_searchable': isSearchable,
       'ocr_text': ocrText,
+      'semantic_type': semanticType?.name,
+      'classification_confidence': classificationConfidence,
+      'validity_date': validityDate?.toIso8601String(),
     };
   }
 }

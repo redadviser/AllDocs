@@ -7,6 +7,7 @@ import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 
+import 'document_classifier.dart';
 import 'searchable_pdf_builder.dart';
 
 class ScannedDocumentResult {
@@ -17,6 +18,9 @@ class ScannedDocumentResult {
     required this.searchable,
     required this.ocrText,
     required this.cleanupPaths,
+    this.semanticType,
+    this.classificationConfidence,
+    this.validityDate,
   });
 
   final String filePath;
@@ -25,6 +29,9 @@ class ScannedDocumentResult {
   final bool searchable;
   final String? ocrText;
   final List<String> cleanupPaths;
+  final DocumentSemanticType? semanticType;
+  final double? classificationConfidence;
+  final DateTime? validityDate;
 
   Future<void> cleanup() async {
     for (final path in cleanupPaths) {
@@ -111,6 +118,9 @@ class DocumentScannerService {
         .where((value) => value.trim().isNotEmpty)
         .join('\n\n')
         .trim();
+    final classification = text.isEmpty
+        ? null
+        : const DocumentClassifier().classify(text);
     final outputFile = await _temporaryPdfFile();
 
     try {
@@ -129,6 +139,9 @@ class DocumentScannerService {
           ?fallbackPdfPath,
           ...imagePaths,
         ],
+        semanticType: classification?.semanticType,
+        classificationConfidence: classification?.confidence,
+        validityDate: classification?.validityDate,
       );
     } catch (_) {
       if (fallbackPdfPath != null) {
@@ -139,6 +152,9 @@ class DocumentScannerService {
           searchable: false,
           ocrText: text.isEmpty ? null : text,
           cleanupPaths: [fallbackPdfPath, ...imagePaths],
+          semanticType: classification?.semanticType,
+          classificationConfidence: classification?.confidence,
+          validityDate: classification?.validityDate,
         );
       }
       rethrow;

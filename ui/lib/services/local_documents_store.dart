@@ -105,6 +105,9 @@ class LocalDocumentsStore {
       pageCount: scanned.pageCount,
       isSearchable: scanned.searchable,
       ocrText: scanned.ocrText,
+      semanticType: scanned.semanticType,
+      classificationConfidence: scanned.classificationConfidence,
+      validityDate: scanned.validityDate,
     );
     documents.add(importedDocument.toJson());
 
@@ -527,6 +530,9 @@ class LocalDocumentsStore {
     int? pageCount,
     bool isSearchable = false,
     String? ocrText,
+    DocumentSemanticType? semanticType,
+    double? classificationConfidence,
+    DateTime? validityDate,
   }) async {
     final file = File(storedPath);
     final sizeBytes = await file.length();
@@ -549,6 +555,9 @@ class LocalDocumentsStore {
       pageCount: pageCount,
       isSearchable: isSearchable,
       ocrText: ocrText,
+      semanticType: semanticType,
+      classificationConfidence: classificationConfidence,
+      validityDate: validityDate,
     );
   }
 
