@@ -176,5 +176,24 @@
   },
   "error": {
     "load_documents": "Could not load documents."
+  },
+  "document_type": {
+    "invoice": "Invoice",
+    "receipt": "Receipt",
+    "contract": "Contract",
+    "identity_document": "ID document",
+    "medical": "Medical",
+    "insurance": "Insurance",
+    "warranty": "Warranty",
+    "other": "Document"
+  },
+  "reminders": {
+    "channel_name": "Expiry reminders",
+    "channel_description": "Alerts when a document is about to expire",
+    "expiring_title": "Document expiring soon",
+    "expiring_body": "A {type} of yours expires on {date}",
+    "section_title": "Expiring soon",
+    "empty": "No documents expiring soon",
+    "due_label": "Expires {date}"
   }
 }

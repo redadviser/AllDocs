@@ -174,6 +174,23 @@ class AppConstants {
   static const profileManagePlan = 'profile.manage_plan';
   static const profileBackendFeature = 'profile.backend_feature';
 
+  static const documentTypeInvoice = 'document_type.invoice';
+  static const documentTypeReceipt = 'document_type.receipt';
+  static const documentTypeContract = 'document_type.contract';
+  static const documentTypeIdentityDocument = 'document_type.identity_document';
+  static const documentTypeMedical = 'document_type.medical';
+  static const documentTypeInsurance = 'document_type.insurance';
+  static const documentTypeWarranty = 'document_type.warranty';
+  static const documentTypeOther = 'document_type.other';
+
+  static const remindersChannelName = 'reminders.channel_name';
+  static const remindersChannelDescription = 'reminders.channel_description';
+  static const remindersExpiringTitle = 'reminders.expiring_title';
+  static const remindersExpiringBody = 'reminders.expiring_body';
+  static const remindersSectionTitle = 'reminders.section_title';
+  static const remindersEmpty = 'reminders.empty';
+  static const remindersDueLabel = 'reminders.due_label';
+
   static const permissionStorageTitle = 'permission.storage_title';
   static const permissionStorageMessage = 'permission.storage_message';
   static const permissionStorageButton = 'permission.storage_button';

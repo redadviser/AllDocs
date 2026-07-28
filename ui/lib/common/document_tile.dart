@@ -1,5 +1,7 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
+import 'app_constants.dart';
 import '../models/models.dart';
 import '../theme/app_theme.dart';
 import 'document_file_icon.dart';
@@ -22,11 +24,16 @@ class DocumentTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final validityDate = document.validityDate;
     final metaParts = [
       documentTypeLabel(document.type),
       document.dateLabel,
       if (document.timeLabel != null) document.timeLabel!,
       document.sizeLabel,
+      if (validityDate != null)
+        AppConstants.remindersDueLabel.tr(
+          namedArgs: {'date': DateFormat.yMMMd().format(validityDate)},
+        ),
     ];
 
     return InkWell(

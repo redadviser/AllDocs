@@ -176,5 +176,24 @@
   },
   "error": {
     "load_documents": "Impossible de charger les documents."
+  },
+  "document_type": {
+    "invoice": "Facture",
+    "receipt": "Reçu",
+    "contract": "Contrat",
+    "identity_document": "Pièce d'identité",
+    "medical": "Document médical",
+    "insurance": "Assurance",
+    "warranty": "Garantie",
+    "other": "Document"
+  },
+  "reminders": {
+    "channel_name": "Rappels d'expiration",
+    "channel_description": "Alertes quand un document est sur le point d'expirer",
+    "expiring_title": "Document bientôt expiré",
+    "expiring_body": "Un document de type {type} expire le {date}",
+    "section_title": "Expire bientôt",
+    "empty": "Aucun document n'expire bientôt",
+    "due_label": "Expire le {date}"
   }
 }

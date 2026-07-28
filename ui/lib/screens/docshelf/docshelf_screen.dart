@@ -79,6 +79,27 @@ class DocshelfScreen extends StatelessWidget {
                   documentsService: documentsService,
                 ),
               ),
+              if (snapshot.expiringDocuments.isNotEmpty) ...[
+                const SliverToBoxAdapter(child: SizedBox(height: 16)),
+                SliverToBoxAdapter(
+                  child: _DocumentsPanel(
+                    title: AppConstants.remindersSectionTitle.tr(),
+                    icon: Icons.hourglass_bottom_rounded,
+                    actionLabel: AppConstants.commonViewAll.tr(),
+                    documents: snapshot.expiringDocuments,
+                    allDocuments:
+                        snapshot.documents
+                            .where((document) => document.validityDate != null)
+                            .toList()
+                          ..sort(
+                            (a, b) =>
+                                a.validityDate!.compareTo(b.validityDate!),
+                          ),
+                    emptyMessage: AppConstants.remindersEmpty.tr(),
+                    documentsService: documentsService,
+                  ),
+                ),
+              ],
             ],
           ),
         );

@@ -176,5 +176,24 @@
   },
   "error": {
     "load_documents": "No se pudieron cargar los documentos."
+  },
+  "document_type": {
+    "invoice": "Factura",
+    "receipt": "Recibo",
+    "contract": "Contrato",
+    "identity_document": "Documento de identidad",
+    "medical": "Documento médico",
+    "insurance": "Seguro",
+    "warranty": "Garantía",
+    "other": "Documento"
+  },
+  "reminders": {
+    "channel_name": "Recordatorios de caducidad",
+    "channel_description": "Avisos cuando un documento está a punto de caducar",
+    "expiring_title": "Documento a punto de caducar",
+    "expiring_body": "Un documento de tipo {type} caduca el {date}",
+    "section_title": "Caducan pronto",
+    "empty": "No hay documentos a punto de caducar",
+    "due_label": "Caduca el {date}"
   }
 }

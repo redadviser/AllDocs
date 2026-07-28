@@ -16,6 +16,7 @@ class DocumentsSnapshot {
     required this.deviceFolders,
     required this.recentImports,
     required this.profile,
+    this.expiringDocuments = const [],
   });
 
   final List<DocumentShelf> shelves;
@@ -27,6 +28,10 @@ class DocumentsSnapshot {
   final List<DeviceFolder> deviceFolders;
   final List<DocumentFile> recentImports;
   final UserProfile profile;
+
+  /// Documents with a known [DocumentFile.validityDate], soonest first —
+  /// backs the "expiring soon" reminders section.
+  final List<DocumentFile> expiringDocuments;
 
   DocumentAlbum? albumById(String albumId) {
     for (final shelf in shelves) {

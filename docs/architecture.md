@@ -14,6 +14,44 @@ Recommended local stack for the next implementation step:
 - OS biometric APIs for app lock
 - Google Drive/OneDrive/iCloud integrations only as optional import/backup providers
 
+## On-device classification and expiry reminders (Phase 1: no backend needed)
+
+`DocumentClassifier` (services) runs right after OCR in the scan pipeline
+(`DocumentScannerService`) and is pure/rule-based: keyword matching across
+pt/en/es/fr yields a `DocumentSemanticType` (invoice, receipt, contract,
+identity document, medical, insurance, warranty, other) with a 0-1
+confidence, plus a validity/expiry date extracted near a "valid until"-style
+phrase for the types where that's meaningful. Nothing currently auto-files
+based on this — it's stored on `DocumentFile` and shown as metadata
+(`DocumentTile` shows the due date when present), never used to silently
+move a document into an album.
+
+`ReminderScheduler` (pure) decides *when* a local notification should fire
+(`validityDate - leadTime`, default 14 days) and computes a stable
+per-document notification id; `ExpiryReminderService` is the actual
+`flutter_local_notifications` integration, called from
+`LocalDocumentsStore.scanDocumentWithCamera` (best-effort, never breaks
+scanning) and `deleteDocument` (cancels the reminder). This is entirely
+on-device — no server involved, unlike the roadmap's later Phase 4
+cross-device push, which is a deliberate, disclosed exception to
+zero-knowledge sync that this local-only version isn't.
+
+The Docshelf screen shows an "Expiring soon" panel (mirroring the existing
+Recent/Favorites panels) whenever `DocumentsSnapshot.expiringDocuments` is
+non-empty.
+
+Known limitations, accepted for this first pass:
+- Rule-based classification will misfire on formats/languages it wasn't
+  built for (a v1 problem the roadmap's Phase 6 addresses with a trained
+  on-device model once there's real accept/reject data to train on).
+- Date parsing assumes DD/MM/YYYY (matches pt/es/fr; ambiguous for en-US
+  MM/DD dates).
+- `flutter_local_notifications`/`timezone` are new platform-channel
+  dependencies with no automated test coverage of the actual notification
+  delivery (the pure decision logic in `ReminderScheduler` is fully tested;
+  the plugin integration itself isn't runnable in this environment — no
+  device was available to verify a notification actually fires).
+
 ## Backend (Phase 1: accounts)
 
 `Backend/` is an Express + TypeScript service, deliberately built as a

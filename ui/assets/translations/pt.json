@@ -176,5 +176,24 @@
   },
   "error": {
     "load_documents": "Não foi possível carregar os documentos."
+  },
+  "document_type": {
+    "invoice": "Fatura",
+    "receipt": "Recibo",
+    "contract": "Contrato",
+    "identity_document": "Documento de identificação",
+    "medical": "Documento médico",
+    "insurance": "Seguro",
+    "warranty": "Garantia",
+    "other": "Documento"
+  },
+  "reminders": {
+    "channel_name": "Lembretes de validade",
+    "channel_description": "Avisos quando um documento está prestes a expirar",
+    "expiring_title": "Documento a expirar",
+    "expiring_body": "Um documento do tipo {type} expira a {date}",
+    "section_title": "A expirar em breve",
+    "empty": "Sem documentos a expirar em breve",
+    "due_label": "Expira a {date}"
   }
 }

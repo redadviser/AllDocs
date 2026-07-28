@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
@@ -9,6 +10,9 @@ import 'package:path_provider/path_provider.dart';
 
 import '../models/models.dart';
 import 'document_scanner_service.dart';
+import 'expiry_reminder_service.dart';
+
+final _expiryReminderService = ExpiryReminderService();
 
 class LocalDocumentsStore {
   const LocalDocumentsStore();
@@ -113,6 +117,7 @@ class LocalDocumentsStore {
 
     if (albumId != null) _addDocumentToAlbum(state, albumId, id);
     await _writeState(state);
+    unawaited(_syncReminderBestEffort(importedDocument));
     return 1;
   }
 
@@ -399,6 +404,25 @@ class LocalDocumentsStore {
       if (await file.exists()) await file.delete();
     }
     await _writeState(state);
+    unawaited(_cancelReminderBestEffort(documentId));
+  }
+
+  Future<void> _syncReminderBestEffort(DocumentFile document) async {
+    try {
+      await _expiryReminderService.syncReminder(document);
+    } catch (_) {
+      // Scheduling a local notification is best-effort and must never break
+      // the scan/import flow it's attached to.
+    }
+  }
+
+  Future<void> _cancelReminderBestEffort(String documentId) async {
+    try {
+      await _expiryReminderService.cancelReminder(documentId);
+    } catch (_) {
+      // Best-effort; a stray notification for a deleted document is a minor
+      // annoyance, not worth surfacing an error for.
+    }
   }
 
   Future<void> openDocument(DocumentFile document) async {
@@ -603,6 +627,11 @@ class LocalDocumentsStore {
         .where((document) => document.albumId == null || document.albumId == '')
         .toList();
     final recentImports = documents.take(4).toList();
+    final expiringDocuments =
+        documents.where((document) => document.validityDate != null).toList()
+          ..sort(
+            (a, b) => a.validityDate!.compareTo(b.validityDate!),
+          );
     final usedBytes = documents.fold<int>(
       0,
       (total, document) => total + document.sizeBytes,
@@ -618,6 +647,7 @@ class LocalDocumentsStore {
       unorganizedDocuments: unorganizedDocuments,
       deviceFolders: deviceFolders,
       recentImports: recentImports,
+      expiringDocuments: expiringDocuments.take(5).toList(),
       profile: UserProfile(
         name: 'Paulo Cunha',
         email: 'paulo.cunha@email.com',
