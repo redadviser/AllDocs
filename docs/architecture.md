@@ -56,6 +56,31 @@ The mobile app should still cache locally even after a backend exists —
 Phase 3 of the roadmap (encrypted sync) is what actually starts sending
 document data to the server; Phase 1 is accounts only.
 
+### Flutter side (AuthService)
+
+`AuthService` (`ui/lib/services/auth_service.dart`) now has a real
+`/api/auth/login` call path, gated behind `LocalModeConfig.isLocalOnly`
+(still `true` by default — flipping it is a deliberate, separate step once
+the backend is actually deployed somewhere reachable). The session token is
+kept behind an `AuthTokenStore` seam (real implementation backed by
+`flutter_secure_storage`, swappable in tests) rather than
+`SharedPreferences`, since a real JWT is a more sensitive artifact than the
+local-only mock flag it replaces.
+
+Two known gaps, left out deliberately rather than by oversight:
+
+- **No signup UI yet.** `LoginScreen` only calls `AuthService.login`; there's
+  no screen or toggle to create a new shared account. This is fine while
+  `isLocalOnly` stays `true`, but must be built before flipping it, or no
+  real user will be able to get past the login screen.
+- **The real network branch has no automated test.** `LocalModeConfig.
+  isLocalOnly` is a hardcoded `const`, so a test can't flip it to exercise
+  the network path without a larger refactor. It was instead verified
+  manually end-to-end against the real Backend (signup, duplicate-email
+  rejection, me, logout, login, wrong-password rejection, device upsert —
+  see the Backend section above). Worth revisiting once `isLocalOnly` is
+  actually flipped for real users.
+
 ## iOS scanning parity (known gap, accepted for now)
 
 `DocumentScannerService` uses `google_mlkit_document_scanner` on Android (real
