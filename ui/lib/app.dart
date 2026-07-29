@@ -33,9 +33,7 @@ class _AllDocsAppState extends State<AllDocsApp> {
           value: SystemUiOverlayStyle(
             statusBarColor: Colors.transparent,
             statusBarIconBrightness: Brightness.light,
-            systemNavigationBarColor: AppTheme.highContrastMode.value
-                ? Colors.black
-                : AppTheme.background,
+            systemNavigationBarColor: AppTheme.background,
             systemNavigationBarIconBrightness: Brightness.light,
           ),
           child: MaterialApp(

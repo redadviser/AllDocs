@@ -27,40 +27,42 @@ class _MainNavScreenState extends State<MainNavScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final highContrast = AppTheme.highContrastMode.value;
-    final screens = [
-      DocshelfScreen(documentsService: _documentsService),
-      ArchiveScreen(documentsService: _documentsService),
-      ProfileScreen(documentsService: _documentsService),
-    ];
+    // Wrapping the whole scaffold (not just the nav bar) means a color/
+    // contrast change re-runs this build and constructs fresh (non-const)
+    // tab screens, so Docshelf/Archive/Profile all pick up the new theme
+    // immediately instead of only updating next time they happen to
+    // rebuild for an unrelated reason.
+    return AnimatedBuilder(
+      animation: Listenable.merge([
+        AppTheme.primaryColor,
+        AppTheme.highContrastMode,
+      ]),
+      builder: (context, child) {
+        final screens = [
+          DocshelfScreen(documentsService: _documentsService),
+          ArchiveScreen(documentsService: _documentsService),
+          ProfileScreen(documentsService: _documentsService),
+        ];
 
-    return Scaffold(
-      body: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: highContrast
-                ? const [Colors.black, Colors.black]
-                : const [AppTheme.background, AppTheme.backgroundBottom],
+        return Scaffold(
+          body: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [AppTheme.background, AppTheme.backgroundBottom],
+              ),
+            ),
+            child: SafeArea(
+              child: IndexedStack(index: _selectedIndex, children: screens),
+            ),
           ),
-        ),
-        child: SafeArea(
-          child: IndexedStack(index: _selectedIndex, children: screens),
-        ),
-      ),
-      bottomNavigationBar: AnimatedBuilder(
-        animation: Listenable.merge([
-          AppTheme.primaryColor,
-          AppTheme.highContrastMode,
-        ]),
-        builder: (context, child) {
-          return _AllDocsNavBar(
+          bottomNavigationBar: _AllDocsNavBar(
             selectedIndex: _selectedIndex,
             onSelected: _selectPage,
-          );
-        },
-      ),
+          ),
+        );
+      },
     );
   }
 

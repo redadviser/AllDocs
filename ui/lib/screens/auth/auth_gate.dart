@@ -80,7 +80,7 @@ class _AuthLoadingScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
+    return Scaffold(
       body: DecoratedBox(
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -89,7 +89,7 @@ class _AuthLoadingScreen extends StatelessWidget {
             colors: [AppTheme.background, AppTheme.backgroundBottom],
           ),
         ),
-        child: Center(child: CircularProgressIndicator()),
+        child: const Center(child: CircularProgressIndicator()),
       ),
     );
   }

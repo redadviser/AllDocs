@@ -14,8 +14,8 @@ class AppTheme {
   static const String _textScaleFactorKey = 'theme.text_scale_factor';
   static const String _highContrastKey = 'theme.high_contrast';
 
-  static const Color background = Color(0xFF07111F);
-  static const Color backgroundBottom = Color(0xFF0B1A2E);
+  static const Color _defaultBackground = Color(0xFF07111F);
+  static const Color _defaultBackgroundBottom = Color(0xFF0B1A2E);
   static const Color surface = Color(0xFF0D2138);
   static const Color surfaceStrong = Color(0xFF132D49);
   static const Color surfaceSoft = Color(0xFF1A3858);
@@ -35,13 +35,37 @@ class AppTheme {
     return primaryColor.value ?? primary;
   }
 
+  /// Dark backdrop, hue-matched to whatever primary color the user picked
+  /// (falls back to the fixed defaults when none is set, for an exact match
+  /// with the original look).
+  static Color get background {
+    if (highContrastMode.value) return Colors.black;
+    final custom = primaryColor.value;
+    if (custom == null) return _defaultBackground;
+    return _darkTone(custom, saturation: 0.63, lightness: 0.075);
+  }
+
+  static Color get backgroundBottom {
+    if (highContrastMode.value) return Colors.black;
+    final custom = primaryColor.value;
+    if (custom == null) return _defaultBackgroundBottom;
+    return _darkTone(custom, saturation: 0.61, lightness: 0.112);
+  }
+
+  static Color _darkTone(
+    Color seed, {
+    required double saturation,
+    required double lightness,
+  }) {
+    final hue = HSLColor.fromColor(seed).hue;
+    return HSLColor.fromAHSL(1.0, hue, saturation, lightness).toColor();
+  }
+
   static ThemeData get darkTheme {
     final base = ThemeData.dark(useMaterial3: true);
 
     return base.copyWith(
-      scaffoldBackgroundColor: highContrastMode.value
-          ? Colors.black
-          : background,
+      scaffoldBackgroundColor: background,
       colorScheme: ColorScheme.fromSeed(
         seedColor: accent,
         brightness: Brightness.dark,
