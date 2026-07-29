@@ -11,17 +11,31 @@ export interface DeviceInfo {
 // "sessions and devices" security surface has real data, and so later
 // phases (push reminders) have somewhere to store a push token per device.
 // Lives in AllDocs' own database, never AllPhotos'.
+//
+// Best-effort by design: this must never fail login/signup/Google sign-in.
+// The account (users/profiles, shared with AllPhotos) is the source of
+// truth; device tracking is secondary bookkeeping. A schema drift or a
+// transient issue here (e.g. this table missing a migration on a fresh
+// deploy) should degrade to "no device recorded", not "couldn't sign in" —
+// which is exactly what happened before this was wrapped: the devices
+// INSERT threw when the table didn't exist yet, and that failure aborted
+// the whole request even though the users/profiles rows had already
+// committed.
 async function registerDevice(userId: string, device?: DeviceInfo) {
   if (!device?.id) return
 
-  await sql`
-    INSERT INTO devices (id, user_id, platform, last_seen_at)
-    VALUES (${device.id}, ${userId}, ${device.platform ?? 'unknown'}, NOW())
-    ON CONFLICT (id) DO UPDATE
-      SET user_id = EXCLUDED.user_id,
-          platform = EXCLUDED.platform,
-          last_seen_at = NOW()
-  `
+  try {
+    await sql`
+      INSERT INTO devices (id, user_id, platform, last_seen_at)
+      VALUES (${device.id}, ${userId}, ${device.platform ?? 'unknown'}, NOW())
+      ON CONFLICT (id) DO UPDATE
+        SET user_id = EXCLUDED.user_id,
+            platform = EXCLUDED.platform,
+            last_seen_at = NOW()
+    `
+  } catch (error) {
+    console.error('registerDevice failed (non-fatal):', error)
+  }
 }
 
 export async function login(email: string, password: string, device?: DeviceInfo) {
