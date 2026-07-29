@@ -17,18 +17,10 @@ class MainNavScreen extends StatefulWidget {
 
 class _MainNavScreenState extends State<MainNavScreen> {
   final DocumentsService _documentsService = DocumentsService.local();
-  late final PageController _pageController;
   int _selectedIndex = 0;
 
   @override
-  void initState() {
-    super.initState();
-    _pageController = PageController();
-  }
-
-  @override
   void dispose() {
-    _pageController.dispose();
     _documentsService.dispose();
     super.dispose();
   }
@@ -54,11 +46,7 @@ class _MainNavScreenState extends State<MainNavScreen> {
           ),
         ),
         child: SafeArea(
-          child: PageView(
-            controller: _pageController,
-            onPageChanged: (index) => setState(() => _selectedIndex = index),
-            children: screens,
-          ),
+          child: IndexedStack(index: _selectedIndex, children: screens),
         ),
       ),
       bottomNavigationBar: AnimatedBuilder(
@@ -79,11 +67,6 @@ class _MainNavScreenState extends State<MainNavScreen> {
   void _selectPage(int index) {
     if (_selectedIndex == index) return;
     setState(() => _selectedIndex = index);
-    _pageController.animateToPage(
-      index,
-      duration: const Duration(milliseconds: 240),
-      curve: Curves.easeOutCubic,
-    );
   }
 }
 
