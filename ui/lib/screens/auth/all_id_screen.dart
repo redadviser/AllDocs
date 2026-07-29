@@ -137,23 +137,68 @@ class _AllIdScreenState extends State<AllIdScreen> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        FilledButton.icon(
-          onPressed: () => setState(() => _showForm = true),
-          icon: const Icon(Icons.badge_outlined),
-          label: Text(AppConstants.authContinueWithAllId.tr()),
-          style: FilledButton.styleFrom(
-            minimumSize: const Size.fromHeight(48),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: AppTheme.primary.withValues(alpha: 0.28),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: FilledButton.icon(
+            onPressed: () => setState(() => _showForm = true),
+            icon: const Icon(Icons.fingerprint_rounded),
+            label: Text(AppConstants.authContinueWithAllId.tr()),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(50),
+              textStyle: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 14),
+        Row(
+          children: [
+            Expanded(
+              child: Divider(color: AppTheme.border.withValues(alpha: 0.6)),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              child: Text(
+                AppConstants.authOrDivider.tr(),
+                style: const TextStyle(
+                  color: AppTheme.dimText,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            Expanded(
+              child: Divider(color: AppTheme.border.withValues(alpha: 0.6)),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
         OutlinedButton.icon(
           onPressed: _submitting ? null : _submitGoogle,
-          icon: const Icon(Icons.g_mobiledata_rounded),
+          icon: const _GoogleMark(),
           label: Text(AppConstants.authContinueWithGoogle.tr()),
           style: OutlinedButton.styleFrom(
-            minimumSize: const Size.fromHeight(48),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            minimumSize: const Size.fromHeight(50),
+            foregroundColor: AppTheme.text,
+            side: BorderSide(color: AppTheme.border.withValues(alpha: 0.9)),
+            textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
           ),
         ),
       ],
@@ -237,14 +282,32 @@ class _AllIdScreenState extends State<AllIdScreen> {
           ),
         ],
         const SizedBox(height: 8),
-        FilledButton(
-          onPressed: _submitting ? null : _submit,
-          style: FilledButton.styleFrom(
-            minimumSize: const Size.fromHeight(48),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: AppTheme.primary.withValues(alpha: 0.28),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
+              ),
+            ],
           ),
-          child: Text(
-            (isLogin ? AppConstants.authLogin : AppConstants.authSignup).tr(),
+          child: FilledButton(
+            onPressed: _submitting ? null : _submit,
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(50),
+              textStyle: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+            child: Text(
+              (isLogin ? AppConstants.authLogin : AppConstants.authSignup).tr(),
+            ),
           ),
         ),
         const SizedBox(height: 10),
@@ -264,6 +327,32 @@ class _AllIdScreenState extends State<AllIdScreen> {
   }
 }
 
+/// A small "G" mark standing in for the Google logo — Material has no real
+/// Google icon, and the closest built-in one (g_mobiledata) is an unrelated
+/// Android connectivity symbol, not a brand mark.
+class _GoogleMark extends StatelessWidget {
+  const _GoogleMark();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 20,
+      height: 20,
+      alignment: Alignment.center,
+      decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+      child: const Text(
+        'G',
+        style: TextStyle(
+          color: Color(0xFF4285F4),
+          fontSize: 13,
+          fontWeight: FontWeight.w900,
+          height: 1,
+        ),
+      ),
+    );
+  }
+}
+
 class _AllIdHero extends StatelessWidget {
   const _AllIdHero();
 
@@ -272,17 +361,31 @@ class _AllIdHero extends StatelessWidget {
     return Column(
       children: [
         Container(
-          width: 82,
-          height: 82,
+          width: 80,
+          height: 80,
           decoration: BoxDecoration(
-            color: AppTheme.primary.withValues(alpha: 0.18),
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: AppTheme.border),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                AppTheme.primary.withValues(alpha: 0.28),
+                AppTheme.primary.withValues(alpha: 0.06),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: AppTheme.border.withValues(alpha: 0.8)),
+            boxShadow: [
+              BoxShadow(
+                color: AppTheme.primary.withValues(alpha: 0.16),
+                blurRadius: 22,
+                offset: const Offset(0, 10),
+              ),
+            ],
           ),
           child: const Icon(
             Icons.folder_copy_rounded,
             color: AppTheme.primarySoft,
-            size: 42,
+            size: 38,
           ),
         ),
         const SizedBox(height: 18),
@@ -291,8 +394,8 @@ class _AllIdHero extends StatelessWidget {
           textAlign: TextAlign.center,
           style: const TextStyle(
             color: AppTheme.text,
-            fontSize: 28,
-            fontWeight: FontWeight.w900,
+            fontSize: 27,
+            fontWeight: FontWeight.w800,
           ),
         ),
         const SizedBox(height: 8),

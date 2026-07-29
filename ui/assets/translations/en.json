@@ -9,7 +9,7 @@
   },
   "auth": {
     "title": "AllID",
-    "subtitle": "One account for AllPhotos and AllDocs.",
+    "subtitle": "Your account for AllPhotos and AllDocs.",
     "display_name": "Display name",
     "email": "Email",
     "password": "Password",
@@ -20,6 +20,7 @@
     "toggle_to_signup": "New here? Create an AllID",
     "toggle_to_login": "Already have an AllID? Sign in",
     "continue_with_google": "Continue with Google",
+    "or_divider": "or",
     "login_error": "We couldn't sign you in. Check your details and try again.",
     "offline": "Local mode active",
     "continue_with_allid": "Continue with AllID"
