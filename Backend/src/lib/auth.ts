@@ -2,7 +2,7 @@ import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
 import { SignJWT, jwtVerify } from 'jose'
 import type { Request } from 'express'
-import { accountsSql } from './db'
+import { accountsSql, sql } from './db'
 
 // Own signing secret — deliberately not shared with AllPhotos. A token
 // issued here must never be valid on the AllPhotos backend, even though
@@ -32,8 +32,12 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
   return bcrypt.compare(password, hash)
 }
 
-async function createToken(userId: string, email: string): Promise<string> {
-  return new SignJWT({ sub: userId, email })
+// `deviceId` (when the client sent one) is embedded so a session can be
+// revoked by deleting that device's row — see getCurrentUserFromToken.
+// Tokens issued before this existed simply have no deviceId claim, so they
+// fall back to the old behavior (valid until expiry, not revocable).
+async function createToken(userId: string, email: string, deviceId?: string): Promise<string> {
+  return new SignJWT({ sub: userId, email, ...(deviceId ? { deviceId } : {}) })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime(`${SESSION_DURATION}s`)
@@ -50,7 +54,12 @@ function defaultDisplayName(email: string, requested?: string): string {
 // AllPhotos' own domain tables (albums, photos, shelves, ...) or the Google
 // Drive-linking columns on profiles (google_access_token, etc.) — only
 // display_name and plan.
-export async function signUp(email: string, password: string, displayName?: string) {
+export async function signUp(
+  email: string,
+  password: string,
+  displayName?: string,
+  deviceId?: string
+) {
   const existing = await accountsSql`SELECT id FROM users WHERE email = ${email}`
   if (existing.length > 0) throw new Error('Email already registered')
 
@@ -62,10 +71,10 @@ export async function signUp(email: string, password: string, displayName?: stri
   await accountsSql`INSERT INTO profiles (id, display_name, plan) VALUES (${id}, ${resolvedName}, 'free')`
 
   const user: AccountUser = { id, email, displayName: resolvedName, plan: 'free', avatarUrl: null }
-  return { user, token: await createToken(id, email) }
+  return { user, token: await createToken(id, email, deviceId) }
 }
 
-export async function signIn(email: string, password: string) {
+export async function signIn(email: string, password: string, deviceId?: string) {
   const rows = await accountsSql`
     SELECT u.id, u.email, u.password_hash, p.display_name, p.plan, p.avatar_url
     FROM users u
@@ -85,7 +94,7 @@ export async function signIn(email: string, password: string) {
     plan: (row.plan as string | null) ?? 'free',
     avatarUrl: (row.avatar_url as string | null) ?? null,
   }
-  return { user, token: await createToken(user.id, user.email) }
+  return { user, token: await createToken(user.id, user.email, deviceId) }
 }
 
 // Used by Google sign-in: the same shared `users`/`profiles` rows are reused
@@ -95,7 +104,8 @@ export async function signIn(email: string, password: string) {
 export async function findOrCreateUserByEmail(
   email: string,
   displayName?: string,
-  pictureUrl?: string
+  pictureUrl?: string,
+  deviceId?: string
 ) {
   const existing = await accountsSql`
     SELECT u.id, u.email, p.display_name, p.plan, p.avatar_url
@@ -117,7 +127,7 @@ export async function findOrCreateUserByEmail(
       plan: (row.plan as string | null) ?? 'free',
       avatarUrl: (pictureUrl && !row.avatar_url ? pictureUrl : row.avatar_url as string | null) ?? null,
     }
-    return { user, token: await createToken(user.id, user.email) }
+    return { user, token: await createToken(user.id, user.email, deviceId) }
   }
 
   const id = crypto.randomUUID()
@@ -140,7 +150,7 @@ export async function findOrCreateUserByEmail(
     plan: 'free',
     avatarUrl: pictureUrl ?? null,
   }
-  return { user, token: await createToken(id, email) }
+  return { user, token: await createToken(id, email, deviceId) }
 }
 
 export async function getCurrentUserFromToken(
@@ -152,7 +162,20 @@ export async function getCurrentUserFromToken(
     const { payload } = await jwtVerify(token, JWT_SECRET)
     const userId = payload.sub as string
     const email = payload.email as string
+    const deviceId = payload.deviceId as string | undefined
     if (!userId || !email) return null
+
+    // A signed, unexpired token can still be revoked early: deleting the
+    // device's row (via "end session" / "end all sessions") makes any token
+    // carrying that deviceId invalid on its very next use, without needing
+    // a separate token blacklist. Tokens issued before deviceId existed
+    // have no claim to check here, so they keep working until they expire.
+    if (deviceId) {
+      const device = await sql`
+        SELECT id FROM devices WHERE id = ${deviceId} AND user_id = ${userId}
+      `
+      if (device.length === 0) return null
+    }
 
     const rows = await accountsSql`
       SELECT u.id, u.email, p.display_name, p.plan, p.avatar_url

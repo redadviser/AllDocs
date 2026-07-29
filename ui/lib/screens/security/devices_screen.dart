@@ -6,6 +6,7 @@ import '../../common/glass_panel.dart';
 import '../../models/device_session.dart';
 import '../../services/services.dart';
 import '../../theme/app_theme.dart';
+import '../auth/auth_gate.dart';
 
 class DevicesScreen extends StatefulWidget {
   const DevicesScreen({super.key});
@@ -27,13 +28,15 @@ class _DevicesScreenState extends State<DevicesScreen> {
     setState(() => _future = AuthService.listDevices());
   }
 
-  Future<void> _revoke(DeviceSession device) async {
+  Future<void> _endSession(DeviceSession device) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         backgroundColor: AppTheme.surface,
-        title: Text(AppConstants.securityDevicesRevokeConfirmTitle.tr()),
-        content: Text(AppConstants.securityDevicesRevokeConfirmMessage.tr()),
+        title: Text(AppConstants.securityDevicesEndSessionConfirmTitle.tr()),
+        content: Text(
+          AppConstants.securityDevicesEndSessionConfirmMessage.tr(),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
@@ -42,7 +45,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(true),
             style: TextButton.styleFrom(foregroundColor: AppTheme.destructive),
-            child: Text(AppConstants.securityDevicesRevoke.tr()),
+            child: Text(AppConstants.securityDevicesEndSession.tr()),
           ),
         ],
       ),
@@ -52,13 +55,64 @@ class _DevicesScreenState extends State<DevicesScreen> {
     try {
       await AuthService.revokeDevice(device.id);
       if (!mounted) return;
-      _reload();
+      if (device.isCurrentDevice) {
+        await _signOutAndReturnToLogin();
+      } else {
+        _reload();
+      }
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppConstants.securityDevicesRevokeError.tr())),
+        SnackBar(
+          content: Text(AppConstants.securityDevicesEndSessionError.tr()),
+        ),
       );
     }
+  }
+
+  Future<void> _endAllSessions() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        title: Text(AppConstants.securityDevicesEndAllConfirmTitle.tr()),
+        content: Text(AppConstants.securityDevicesEndAllConfirmMessage.tr()),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(AppConstants.commonCancel.tr()),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            style: TextButton.styleFrom(foregroundColor: AppTheme.destructive),
+            child: Text(AppConstants.securityDevicesEndAll.tr()),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await AuthService.revokeAllDevices();
+      if (!mounted) return;
+      // Every device was signed out, including this one — the token this
+      // very request used is now invalid, so finish locally the same way.
+      await _signOutAndReturnToLogin();
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppConstants.securityDevicesEndAllError.tr())),
+      );
+    }
+  }
+
+  Future<void> _signOutAndReturnToLogin() async {
+    await AuthService.logout();
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const AuthGate()),
+      (route) => false,
+    );
   }
 
   @override
@@ -132,7 +186,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
                         for (final device in devices) ...[
                           _DeviceTile(
                             device: device,
-                            onRevoke: () => _revoke(device),
+                            onEndSession: () => _endSession(device),
                           ),
                           const SizedBox(height: 12),
                         ],
@@ -140,6 +194,31 @@ class _DevicesScreenState extends State<DevicesScreen> {
                     );
                   },
                 ),
+              ),
+              FutureBuilder<List<DeviceSession>>(
+                future: _future,
+                builder: (context, snapshot) {
+                  final devices = snapshot.data ?? const [];
+                  if (snapshot.connectionState != ConnectionState.done ||
+                      devices.isEmpty) {
+                    return const SizedBox.shrink();
+                  }
+                  return Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _endAllSessions,
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppTheme.destructive,
+                          side: const BorderSide(color: AppTheme.destructive),
+                        ),
+                        icon: const Icon(Icons.logout_rounded),
+                        label: Text(AppConstants.securityDevicesEndAll.tr()),
+                      ),
+                    ),
+                  );
+                },
               ),
             ],
           ),
@@ -181,10 +260,10 @@ class _DevicesMessage extends StatelessWidget {
 }
 
 class _DeviceTile extends StatelessWidget {
-  const _DeviceTile({required this.device, required this.onRevoke});
+  const _DeviceTile({required this.device, required this.onEndSession});
 
   final DeviceSession device;
-  final VoidCallback onRevoke;
+  final VoidCallback onEndSession;
 
   IconData get _icon => switch (device.platform) {
     'android' => Icons.android_rounded,
@@ -197,6 +276,11 @@ class _DeviceTile extends StatelessWidget {
     'ios' => AppConstants.securityDevicesPlatformIos.tr(),
     _ => AppConstants.securityDevicesPlatformOther.tr(),
   };
+
+  String get _title {
+    final name = device.name?.trim();
+    return name != null && name.isNotEmpty ? name : _platformLabel;
+  }
 
   String _formatDate(DateTime date) {
     final local = date.toLocal();
@@ -226,12 +310,16 @@ class _DeviceTile extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Text(
-                      _platformLabel,
-                      style: const TextStyle(
-                        color: AppTheme.text,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
+                    Flexible(
+                      child: Text(
+                        _title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppTheme.text,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ),
                     if (device.isCurrentDevice) ...[
@@ -270,13 +358,12 @@ class _DeviceTile extends StatelessWidget {
               ],
             ),
           ),
-          if (!device.isCurrentDevice)
-            IconButton(
-              onPressed: onRevoke,
-              icon: const Icon(Icons.delete_outline_rounded),
-              color: AppTheme.destructive,
-              tooltip: AppConstants.securityDevicesRevoke.tr(),
-            ),
+          IconButton(
+            onPressed: onEndSession,
+            icon: const Icon(Icons.logout_rounded),
+            color: AppTheme.destructive,
+            tooltip: AppConstants.securityDevicesEndSession.tr(),
+          ),
         ],
       ),
     );

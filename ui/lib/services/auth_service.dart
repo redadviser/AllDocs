@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
@@ -275,6 +276,7 @@ class AuthService {
           (row) => DeviceSession(
             id: row['id'] as String,
             platform: row['platform'] as String,
+            name: row['name']?.toString(),
             lastSeenAt: DateTime.parse(row['lastSeenAt'] as String),
             isCurrentDevice: row['id'] == thisDeviceId,
           ),
@@ -282,10 +284,10 @@ class AuthService {
         .toList();
   }
 
-  /// Signs a device out remotely by deleting its row — it stops appearing
-  /// in the list, but a session token it already holds only actually stops
-  /// working once that token expires (there's no server-side token
-  /// revocation yet, just the device bookkeeping).
+  /// Ends that device's session immediately — the backend checks the token's
+  /// deviceId claim against the devices table on every request, so deleting
+  /// this row invalidates any session token that device is holding, not just
+  /// removes it from this list.
   static Future<void> revokeDevice(String id) async {
     final token = await tokenStore.read();
     final res = await ApiHelpers.delete(
@@ -293,7 +295,21 @@ class AuthService {
       headers: ApiHelpers.headersWithToken(token),
     );
     if (res.statusCode != 200) {
-      throw Exception(ApiHelpers.errorMessage(res, 'Could not remove device'));
+      throw Exception(ApiHelpers.errorMessage(res, 'Could not end that session'));
+    }
+  }
+
+  /// Ends every device's session for this account, including the one making
+  /// this call — callers should follow this with a local [logout] since the
+  /// token used to make this very request stops working right after.
+  static Future<void> revokeAllDevices() async {
+    final token = await tokenStore.read();
+    final res = await ApiHelpers.delete(
+      '/api/devices',
+      headers: ApiHelpers.headersWithToken(token),
+    );
+    if (res.statusCode != 200) {
+      throw Exception(ApiHelpers.errorMessage(res, 'Could not end all sessions'));
     }
   }
 
@@ -383,7 +399,32 @@ class AuthService {
         : Platform.isIOS
         ? 'ios'
         : 'other';
-    return {'id': id, 'platform': platform};
+    return {'id': id, 'platform': platform, 'name': await _deviceName(platform)};
+  }
+
+  /// A human-readable label for the Security screen's device list — the
+  /// user's own device name on iOS, manufacturer+model on Android. Falls
+  /// back to a generic label rather than failing login/signup if the
+  /// platform channel misbehaves on some device.
+  static Future<String> _deviceName(String platform) async {
+    try {
+      final plugin = DeviceInfoPlugin();
+      if (platform == 'android') {
+        final info = await plugin.androidInfo;
+        final label = '${info.manufacturer} ${info.model}'.trim();
+        return label.isEmpty ? 'Android device' : label;
+      }
+      if (platform == 'ios') {
+        final info = await plugin.iosInfo;
+        final givenName = info.name.trim();
+        if (givenName.isNotEmpty) return givenName;
+        final machine = info.utsname.machine.trim();
+        return machine.isEmpty ? 'iPhone' : machine;
+      }
+    } catch (_) {
+      // Best effort — fall through to the generic label below.
+    }
+    return 'Device';
   }
 
   static String _randomId() {

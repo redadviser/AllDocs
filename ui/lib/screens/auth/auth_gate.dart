@@ -20,6 +20,7 @@ class _AuthGateState extends State<AuthGate> {
   bool _loadingSession = true;
   bool _signedIn = false;
   String _userName = _fallbackUserName;
+  String? _avatarUrl;
 
   @override
   void initState() {
@@ -30,20 +31,24 @@ class _AuthGateState extends State<AuthGate> {
   Future<void> _loadSession() async {
     final signedIn = await AuthService.isSignedIn();
     final name = await AuthService.displayName();
+    final avatarUrl = await AuthService.avatarUrl();
     if (!mounted) return;
 
     setState(() {
       _signedIn = signedIn;
       _userName = name ?? _fallbackUserName;
+      _avatarUrl = avatarUrl;
       _loadingSession = false;
     });
   }
 
   Future<void> _completeAuth(Future<String> Function() action) async {
     final name = await action();
+    final avatarUrl = await AuthService.avatarUrl();
     if (!mounted) return;
     setState(() {
       _userName = name;
+      _avatarUrl = avatarUrl;
       _signedIn = true;
     });
   }
@@ -57,6 +62,7 @@ class _AuthGateState extends State<AuthGate> {
     if (_signedIn) {
       return SecurityGate(
         userName: _userName,
+        avatarUrl: _avatarUrl,
         child: const StoragePermissionGate(child: MainNavScreen()),
       );
     }

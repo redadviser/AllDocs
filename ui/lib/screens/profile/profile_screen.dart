@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../common/app_constants.dart';
 import '../../common/glass_panel.dart';
@@ -12,6 +14,7 @@ import '../../models/models.dart';
 import '../../services/services.dart';
 import '../../theme/app_theme.dart';
 import '../security/devices_screen.dart';
+import '../support/faq_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key, required this.documentsService});
@@ -113,8 +116,98 @@ class _ProfileOverviewPage extends StatelessWidget {
         _StoragePanel(summary: profile.storageSummary),
         const SizedBox(height: 14),
         _StatsPanel(profile: profile),
+        const SizedBox(height: 14),
+        const _SupportPanel(),
       ],
     );
+  }
+}
+
+const _supportEmail = 'webmaster@eupasoft.com';
+const _privacyPolicyUrl = 'https://redadviser.com/?page_id=316';
+const _androidPackageName = 'com.eupasoft.alldocs.all_docs';
+
+class _SupportPanel extends StatelessWidget {
+  const _SupportPanel();
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassPanel(
+      child: Column(
+        children: [
+          _SettingsTile(
+            icon: Icons.help_outline_rounded,
+            title: AppConstants.profileFaq.tr(),
+            onTap: () => Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const FaqScreen())),
+          ),
+          const Divider(height: 1),
+          _SettingsTile(
+            icon: Icons.mail_outline_rounded,
+            title: AppConstants.profileContactSupport.tr(),
+            onTap: () => _contactSupport(context),
+          ),
+          const Divider(height: 1),
+          _SettingsTile(
+            icon: Icons.star_outline_rounded,
+            title: AppConstants.profileRateApp.tr(),
+            onTap: () => _rateApp(context),
+          ),
+          const Divider(height: 1),
+          _SettingsTile(
+            icon: Icons.privacy_tip_outlined,
+            title: AppConstants.profilePrivacyPolicy.tr(),
+            onTap: () => _launch(context, Uri.parse(_privacyPolicyUrl)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _contactSupport(BuildContext context) async {
+    final uri = Uri(
+      scheme: 'mailto',
+      path: _supportEmail,
+      queryParameters: {
+        'subject': AppConstants.profileContactSupportSubject.tr(),
+      },
+    );
+    await _launch(context, uri);
+  }
+
+  Future<void> _rateApp(BuildContext context) async {
+    if (Platform.isAndroid) {
+      final marketUri = Uri.parse('market://details?id=$_androidPackageName');
+      if (await canLaunchUrl(marketUri)) {
+        await launchUrl(marketUri);
+        return;
+      }
+      if (!context.mounted) return;
+      final webUri = Uri.parse(
+        'https://play.google.com/store/apps/details?id=$_androidPackageName',
+      );
+      await _launch(context, webUri);
+      return;
+    }
+
+    // No published App Store id yet on iOS — collect feedback by email
+    // instead of a broken review deep link.
+    await _contactSupport(context);
+  }
+
+  Future<void> _launch(BuildContext context, Uri uri) async {
+    var launched = false;
+    try {
+      launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {
+      launched = false;
+    }
+    if (!launched && context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(AppConstants.profileLinkOpenError.tr())));
+    }
   }
 }
 
@@ -186,6 +279,7 @@ class _ProfileTitle extends StatelessWidget {
         IconButton(
           tooltip: AppConstants.profileSettings.tr(),
           onPressed: onSettingsTap,
+          visualDensity: VisualDensity.compact,
           icon: AnimatedSwitcher(
             duration: const Duration(milliseconds: 220),
             transitionBuilder: (child, animation) {
@@ -197,7 +291,7 @@ class _ProfileTitle extends StatelessWidget {
             child: Icon(
               settingsOpen ? Icons.close_rounded : Icons.settings_outlined,
               key: ValueKey(settingsOpen),
-              size: settingsOpen ? 32 : 34,
+              size: settingsOpen ? 24 : 26,
             ),
           ),
         ),
@@ -215,8 +309,23 @@ Future<void> _pickAndSaveAvatar(DocumentsService documentsService) async {
   );
   if (picked == null) return;
 
-  await AuthService.setLocalAvatarPath(picked.path);
+  final avatarPath = await _saveAvatarPermanently(picked.path);
+  await AuthService.setLocalAvatarPath(avatarPath);
   documentsService.refreshProfile();
+}
+
+// image_picker hands back a file in the app's cache dir, which Android can
+// wipe via "Clear cache" alone (no uninstall needed) — copy it into the
+// app's persistent documents directory so the photo actually survives that.
+Future<String> _saveAvatarPermanently(String pickedPath) async {
+  final documentsDir = await getApplicationDocumentsDirectory();
+  final destination = File('${documentsDir.path}/profile_avatar');
+  await File(pickedPath).copy(destination.path);
+
+  // Same path every time, so without this a re-picked photo would keep
+  // showing the previous one from Flutter's in-memory image cache.
+  PaintingBinding.instance.imageCache.evict(FileImage(destination));
+  return destination.path;
 }
 
 class _ProfileHeader extends StatelessWidget {

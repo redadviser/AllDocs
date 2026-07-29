@@ -51,13 +51,17 @@
     "devices_empty": "Não foram encontrados dispositivos.",
     "devices_load_error": "Não foi possível carregar os teus dispositivos.",
     "devices_retry": "Tentar novamente",
-    "devices_revoke": "Remover",
-    "devices_revoke_confirm_title": "Remover este dispositivo?",
-    "devices_revoke_confirm_message": "Deixa de aparecer nesta lista. Se ainda tiver uma sessão ativa, mantém-se com sessão iniciada até essa sessão expirar.",
-    "devices_revoke_error": "Não foi possível remover esse dispositivo.",
     "devices_platform_android": "Android",
     "devices_platform_ios": "iOS",
-    "devices_platform_other": "Outro dispositivo"
+    "devices_platform_other": "Outro dispositivo",
+    "devices_end_session": "Terminar sessão",
+    "devices_end_session_confirm_title": "Terminar a sessão deste dispositivo?",
+    "devices_end_session_confirm_message": "Vai sair imediatamente e deixa de aparecer nesta lista.",
+    "devices_end_session_error": "Não foi possível terminar essa sessão.",
+    "devices_end_all": "Terminar todas as sessões",
+    "devices_end_all_confirm_title": "Terminar todas as sessões?",
+    "devices_end_all_confirm_message": "Todos os dispositivos, incluindo este, vão sair imediatamente.",
+    "devices_end_all_error": "Não foi possível terminar todas as sessões."
   },
   "common": {
     "cancel": "Cancelar",
@@ -183,7 +187,14 @@
     "backend_feature": "Contas, planos e cloud entram no backend.",
     "plan_title": "Plano {plan}",
     "plan_free_subtitle": "Atualiza para teres sincronização na cloud e mais armazenamento.",
-    "plan_active_subtitle": "Incluído na tua subscrição All."
+    "plan_active_subtitle": "Incluído na tua subscrição All.",
+    "support_title": "Suporte",
+    "faq": "FAQ",
+    "contact_support": "Contactar suporte",
+    "contact_support_subject": "AllDocs — Suporte",
+    "rate_app": "Avaliar a AllDocs",
+    "privacy_policy": "Política de privacidade",
+    "link_open_error": "Não foi possível abrir este link."
   },
   "permission": {
     "storage_title": "Permitir acesso aos ficheiros",
@@ -212,5 +223,22 @@
     "section_title": "A expirar em breve",
     "empty": "Sem documentos a expirar em breve",
     "due_label": "Expira a {date}"
+  },
+  "faq": {
+    "title": "Perguntas frequentes",
+    "q1_question": "Como funciona a digitalização de documentos?",
+    "q1_answer": "A AllDocs usa reconhecimento de texto (OCR) diretamente no teu dispositivo para digitalizar e tornar os documentos pesquisáveis. As imagens e o texto nunca saem do telemóvel durante este processo.",
+    "q2_question": "Os meus documentos ficam guardados na cloud?",
+    "q2_answer": "Por agora, os documentos ficam apenas no teu dispositivo. O sincronismo entre dispositivos está a ser desenvolvido e vai manter o mesmo princípio: o conteúdo é sempre cifrado antes de sair do telemóvel.",
+    "q3_question": "O que é a conta AllID?",
+    "q3_answer": "A AllID é a conta partilhada entre a AllDocs e a AllPhotos. Usas o mesmo email e password (ou o mesmo login Google) nas duas apps, e uma subscrição paga desbloqueia as funcionalidades premium em ambas.",
+    "q4_question": "Como funcionam os planos?",
+    "q4_answer": "O plano gratuito inclui a organização e digitalização de documentos. Um plano pago desbloqueia funcionalidades adicionais nas duas apps da família All — a gestão da subscrição vai ficar disponível brevemente.",
+    "q5_question": "Como funcionam os lembretes de validade?",
+    "q5_answer": "Quando a AllDocs deteta uma data de validade num documento (por exemplo, num cartão de identificação ou seguro), pode agendar um lembrete local antes dessa data expirar.",
+    "q6_question": "O PIN e a biometria protegem o quê?",
+    "q6_answer": "O PIN/biometria bloqueia o acesso à app no teu dispositivo. É independente da password da conta AllID — perder um não afeta o outro.",
+    "q7_question": "Como exporto ou removo os meus documentos?",
+    "q7_answer": "Podes exportar todos os documentos numa pasta à tua escolha em Definições > Exportar documentos. Para remover um documento específico, mantém premido o documento no arquivo."
   }
 }

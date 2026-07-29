@@ -51,13 +51,17 @@
     "devices_empty": "No se encontraron dispositivos.",
     "devices_load_error": "No se pudieron cargar tus dispositivos.",
     "devices_retry": "Intentar de nuevo",
-    "devices_revoke": "Eliminar",
-    "devices_revoke_confirm_title": "¿Eliminar este dispositivo?",
-    "devices_revoke_confirm_message": "Dejará de aparecer en esta lista. Si aún conserva una sesión, seguirá conectado hasta que esa sesión expire.",
-    "devices_revoke_error": "No se pudo eliminar ese dispositivo.",
     "devices_platform_android": "Android",
     "devices_platform_ios": "iOS",
-    "devices_platform_other": "Otro dispositivo"
+    "devices_platform_other": "Otro dispositivo",
+    "devices_end_session": "Terminar sesión",
+    "devices_end_session_confirm_title": "¿Terminar la sesión de este dispositivo?",
+    "devices_end_session_confirm_message": "Se cerrará la sesión de inmediato y dejará de aparecer en esta lista.",
+    "devices_end_session_error": "No se pudo terminar esa sesión.",
+    "devices_end_all": "Terminar todas las sesiones",
+    "devices_end_all_confirm_title": "¿Terminar todas las sesiones?",
+    "devices_end_all_confirm_message": "Todos los dispositivos, incluido este, cerrarán sesión de inmediato.",
+    "devices_end_all_error": "No se pudieron terminar todas las sesiones."
   },
   "common": {
     "cancel": "Cancelar",
@@ -183,7 +187,14 @@
     "backend_feature": "Cuentas, planes y nube van en el backend.",
     "plan_title": "Plan {plan}",
     "plan_free_subtitle": "Mejora tu plan para tener sincronización en la nube y más almacenamiento.",
-    "plan_active_subtitle": "Incluido en tu suscripción All."
+    "plan_active_subtitle": "Incluido en tu suscripción All.",
+    "support_title": "Soporte",
+    "faq": "Preguntas frecuentes",
+    "contact_support": "Contactar con soporte",
+    "contact_support_subject": "AllDocs — Soporte",
+    "rate_app": "Valorar AllDocs",
+    "privacy_policy": "Política de privacidad",
+    "link_open_error": "No se pudo abrir este enlace."
   },
   "permission": {
     "storage_title": "Permitir acceso a archivos",
@@ -212,5 +223,22 @@
     "section_title": "Caducan pronto",
     "empty": "No hay documentos a punto de caducar",
     "due_label": "Caduca el {date}"
+  },
+  "faq": {
+    "title": "Preguntas frecuentes",
+    "q1_question": "¿Cómo funciona el escaneo de documentos?",
+    "q1_answer": "AllDocs usa reconocimiento de texto (OCR) directamente en tu dispositivo para escanear y hacer que los documentos sean buscables. Las imágenes y el texto nunca salen de tu teléfono durante este proceso.",
+    "q2_question": "¿Mis documentos se guardan en la nube?",
+    "q2_answer": "Por ahora, tus documentos se guardan solo en tu dispositivo. La sincronización entre dispositivos se está desarrollando y seguirá el mismo principio: el contenido siempre se cifra antes de salir de tu teléfono.",
+    "q3_question": "¿Qué es la cuenta AllID?",
+    "q3_answer": "AllID es la cuenta compartida entre AllDocs y AllPhotos. Usas el mismo email y contraseña (o el mismo inicio de sesión de Google) en ambas apps, y una suscripción de pago desbloquea las funciones premium en las dos.",
+    "q4_question": "¿Cómo funcionan los planes?",
+    "q4_answer": "El plan gratuito incluye la organización y el escaneo de documentos. Un plan de pago desbloquea funciones adicionales en ambas apps de la familia All — la gestión de la suscripción estará disponible próximamente.",
+    "q5_question": "¿Cómo funcionan los recordatorios de caducidad?",
+    "q5_answer": "Cuando AllDocs detecta una fecha de caducidad en un documento (como un DNI o un seguro), puede programar un recordatorio local antes de que esa fecha expire.",
+    "q6_question": "¿Qué protegen el PIN y la biometría?",
+    "q6_answer": "El PIN/biometría bloquea el acceso a la app en tu dispositivo. Es independiente de la contraseña de tu cuenta AllID: perder uno no afecta al otro.",
+    "q7_question": "¿Cómo exporto o elimino mis documentos?",
+    "q7_answer": "Puedes exportar todos tus documentos a una carpeta a tu elección desde Ajustes > Exportar documentos. Para eliminar un documento concreto, mantén pulsado el documento en el archivo."
   }
 }

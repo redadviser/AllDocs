@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS devices (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL,
   platform TEXT NOT NULL DEFAULT 'unknown',
+  name TEXT,
   push_token TEXT,
   last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()

@@ -6,4 +6,5 @@ export const devicesRouter = Router()
 
 devicesRouter.use(requireAuth)
 devicesRouter.get('/', controller.listDevices)
+devicesRouter.delete('/', controller.revokeAllDevices)
 devicesRouter.delete('/:id', controller.revokeDevice)

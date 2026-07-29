@@ -51,13 +51,17 @@
     "devices_empty": "Aucun appareil trouvé.",
     "devices_load_error": "Impossible de charger tes appareils.",
     "devices_retry": "Réessayer",
-    "devices_revoke": "Supprimer",
-    "devices_revoke_confirm_title": "Supprimer cet appareil ?",
-    "devices_revoke_confirm_message": "Il n’apparaîtra plus dans cette liste. S’il détient encore une session, il reste connecté jusqu’à l’expiration de celle-ci.",
-    "devices_revoke_error": "Impossible de supprimer cet appareil.",
     "devices_platform_android": "Android",
     "devices_platform_ios": "iOS",
-    "devices_platform_other": "Autre appareil"
+    "devices_platform_other": "Autre appareil",
+    "devices_end_session": "Mettre fin à la session",
+    "devices_end_session_confirm_title": "Mettre fin à la session de cet appareil ?",
+    "devices_end_session_confirm_message": "Il sera déconnecté immédiatement et disparaîtra de cette liste.",
+    "devices_end_session_error": "Impossible de mettre fin à cette session.",
+    "devices_end_all": "Mettre fin à toutes les sessions",
+    "devices_end_all_confirm_title": "Mettre fin à toutes les sessions ?",
+    "devices_end_all_confirm_message": "Tous les appareils, y compris celui-ci, seront déconnectés immédiatement.",
+    "devices_end_all_error": "Impossible de mettre fin à toutes les sessions."
   },
   "common": {
     "cancel": "Annuler",
@@ -183,7 +187,14 @@
     "backend_feature": "Comptes, plans et cloud passent par le backend.",
     "plan_title": "Forfait {plan}",
     "plan_free_subtitle": "Passe à un forfait supérieur pour la synchronisation cloud et plus de stockage.",
-    "plan_active_subtitle": "Inclus dans ton abonnement All."
+    "plan_active_subtitle": "Inclus dans ton abonnement All.",
+    "support_title": "Assistance",
+    "faq": "FAQ",
+    "contact_support": "Contacter l'assistance",
+    "contact_support_subject": "AllDocs — Assistance",
+    "rate_app": "Noter AllDocs",
+    "privacy_policy": "Politique de confidentialité",
+    "link_open_error": "Impossible d'ouvrir ce lien."
   },
   "permission": {
     "storage_title": "Autoriser l’accès aux fichiers",
@@ -212,5 +223,22 @@
     "section_title": "Expire bientôt",
     "empty": "Aucun document n'expire bientôt",
     "due_label": "Expire le {date}"
+  },
+  "faq": {
+    "title": "Questions fréquentes",
+    "q1_question": "Comment fonctionne la numérisation des documents ?",
+    "q1_answer": "AllDocs utilise la reconnaissance de texte (OCR) directement sur ton appareil pour numériser et rendre les documents consultables. Les images et le texte ne quittent jamais ton téléphone pendant ce processus.",
+    "q2_question": "Mes documents sont-ils stockés dans le cloud ?",
+    "q2_answer": "Pour l'instant, tes documents sont stockés uniquement sur ton appareil. La synchronisation entre appareils est en cours de développement et suivra le même principe : le contenu est toujours chiffré avant de quitter ton téléphone.",
+    "q3_question": "Qu'est-ce que le compte AllID ?",
+    "q3_answer": "AllID est le compte partagé entre AllDocs et AllPhotos. Tu utilises le même email et le même mot de passe (ou la même connexion Google) dans les deux apps, et un abonnement payant débloque les fonctionnalités premium dans les deux.",
+    "q4_question": "Comment fonctionnent les forfaits ?",
+    "q4_answer": "Le forfait gratuit inclut l'organisation et la numérisation des documents. Un forfait payant débloque des fonctionnalités supplémentaires dans les deux apps de la famille All — la gestion de l'abonnement sera bientôt disponible.",
+    "q5_question": "Comment fonctionnent les rappels d'expiration ?",
+    "q5_answer": "Quand AllDocs détecte une date de validité sur un document (comme une carte d'identité ou une assurance), l'app peut programmer un rappel local avant l'expiration de cette date.",
+    "q6_question": "Que protègent le code PIN et la biométrie ?",
+    "q6_answer": "Le code PIN/la biométrie verrouille l'accès à l'app sur ton appareil. C'est indépendant du mot de passe de ton compte AllID — perdre l'un n'affecte pas l'autre.",
+    "q7_question": "Comment exporter ou supprimer mes documents ?",
+    "q7_answer": "Tu peux exporter tous tes documents vers un dossier de ton choix depuis Paramètres > Exporter les documents. Pour supprimer un document précis, appuie longuement dessus dans les archives."
   }
 }

@@ -51,7 +51,7 @@ class DocshelfScreen extends StatelessWidget {
                       documentsService: documentsService,
                     ),
                   ),
-                  const SliverToBoxAdapter(child: SizedBox(height: 16)),
+                  const SliverToBoxAdapter(child: SizedBox(height: 28)),
                 ],
               SliverToBoxAdapter(
                 child: _DocumentsPanel(
@@ -64,7 +64,7 @@ class DocshelfScreen extends StatelessWidget {
                   documentsService: documentsService,
                 ),
               ),
-              const SliverToBoxAdapter(child: SizedBox(height: 16)),
+              const SliverToBoxAdapter(child: SizedBox(height: 28)),
               SliverToBoxAdapter(
                 child: _DocumentsPanel(
                   title: AppConstants.docshelfFavorites.tr(),
@@ -80,7 +80,7 @@ class DocshelfScreen extends StatelessWidget {
                 ),
               ),
               if (snapshot.expiringDocuments.isNotEmpty) ...[
-                const SliverToBoxAdapter(child: SizedBox(height: 16)),
+                const SliverToBoxAdapter(child: SizedBox(height: 28)),
                 SliverToBoxAdapter(
                   child: _DocumentsPanel(
                     title: AppConstants.remindersSectionTitle.tr(),

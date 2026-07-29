@@ -58,12 +58,19 @@ class AppConstants {
   static const securityDevicesEmpty = 'security.devices_empty';
   static const securityDevicesLoadError = 'security.devices_load_error';
   static const securityDevicesRetry = 'security.devices_retry';
-  static const securityDevicesRevoke = 'security.devices_revoke';
-  static const securityDevicesRevokeConfirmTitle =
-      'security.devices_revoke_confirm_title';
-  static const securityDevicesRevokeConfirmMessage =
-      'security.devices_revoke_confirm_message';
-  static const securityDevicesRevokeError = 'security.devices_revoke_error';
+  static const securityDevicesEndSession = 'security.devices_end_session';
+  static const securityDevicesEndSessionConfirmTitle =
+      'security.devices_end_session_confirm_title';
+  static const securityDevicesEndSessionConfirmMessage =
+      'security.devices_end_session_confirm_message';
+  static const securityDevicesEndSessionError =
+      'security.devices_end_session_error';
+  static const securityDevicesEndAll = 'security.devices_end_all';
+  static const securityDevicesEndAllConfirmTitle =
+      'security.devices_end_all_confirm_title';
+  static const securityDevicesEndAllConfirmMessage =
+      'security.devices_end_all_confirm_message';
+  static const securityDevicesEndAllError = 'security.devices_end_all_error';
   static const securityDevicesPlatformAndroid =
       'security.devices_platform_android';
   static const securityDevicesPlatformIos = 'security.devices_platform_ios';
@@ -194,6 +201,29 @@ class AppConstants {
   static const profilePlanActiveSubtitle = 'profile.plan_active_subtitle';
   static const profileManagePlan = 'profile.manage_plan';
   static const profileBackendFeature = 'profile.backend_feature';
+  static const profileSupportTitle = 'profile.support_title';
+  static const profileFaq = 'profile.faq';
+  static const profileContactSupport = 'profile.contact_support';
+  static const profileContactSupportSubject = 'profile.contact_support_subject';
+  static const profileRateApp = 'profile.rate_app';
+  static const profilePrivacyPolicy = 'profile.privacy_policy';
+  static const profileLinkOpenError = 'profile.link_open_error';
+
+  static const faqTitle = 'faq.title';
+  static const faqQ1Question = 'faq.q1_question';
+  static const faqQ1Answer = 'faq.q1_answer';
+  static const faqQ2Question = 'faq.q2_question';
+  static const faqQ2Answer = 'faq.q2_answer';
+  static const faqQ3Question = 'faq.q3_question';
+  static const faqQ3Answer = 'faq.q3_answer';
+  static const faqQ4Question = 'faq.q4_question';
+  static const faqQ4Answer = 'faq.q4_answer';
+  static const faqQ5Question = 'faq.q5_question';
+  static const faqQ5Answer = 'faq.q5_answer';
+  static const faqQ6Question = 'faq.q6_question';
+  static const faqQ6Answer = 'faq.q6_answer';
+  static const faqQ7Question = 'faq.q7_question';
+  static const faqQ7Answer = 'faq.q7_answer';
 
   static const documentTypeInvoice = 'document_type.invoice';
   static const documentTypeReceipt = 'document_type.receipt';

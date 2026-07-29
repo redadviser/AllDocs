@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,9 +10,15 @@ import '../../services/services.dart';
 import '../../theme/app_theme.dart';
 
 class SecurityGate extends StatefulWidget {
-  const SecurityGate({super.key, required this.userName, required this.child});
+  const SecurityGate({
+    super.key,
+    required this.userName,
+    this.avatarUrl,
+    required this.child,
+  });
 
   final String userName;
+  final String? avatarUrl;
   final Widget child;
 
   @override
@@ -42,6 +50,7 @@ class _SecurityGateState extends State<SecurityGate> {
         title: '',
         subtitle: '',
         userName: widget.userName,
+        avatarUrl: widget.avatarUrl,
         child: const Center(child: CircularProgressIndicator()),
       );
     }
@@ -51,6 +60,7 @@ class _SecurityGateState extends State<SecurityGate> {
       return PinSetupScreen(
         greeting: greeting,
         userName: widget.userName,
+        avatarUrl: widget.avatarUrl,
         canUseBiometrics: _canUseBiometrics,
         onCreated: _createPin,
       );
@@ -59,6 +69,7 @@ class _SecurityGateState extends State<SecurityGate> {
     return PinUnlockScreen(
       greeting: greeting,
       userName: widget.userName,
+      avatarUrl: widget.avatarUrl,
       biometricEnabled: _biometricEnabled,
       canUseBiometrics: _canUseBiometrics,
       onUnlockWithPin: _unlockWithPin,
@@ -120,12 +131,14 @@ class PinSetupScreen extends StatefulWidget {
     super.key,
     required this.greeting,
     required this.userName,
+    this.avatarUrl,
     required this.canUseBiometrics,
     required this.onCreated,
   });
 
   final String greeting;
   final String userName;
+  final String? avatarUrl;
   final bool canUseBiometrics;
   final Future<void> Function(String pin, bool enableBiometrics) onCreated;
 
@@ -150,6 +163,7 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
           : AppConstants.securityCreatePinTitle.tr(),
       subtitle: AppConstants.securityCreatePinSubtitle.tr(),
       userName: widget.userName,
+      avatarUrl: widget.avatarUrl,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -252,6 +266,7 @@ class PinUnlockScreen extends StatefulWidget {
     super.key,
     required this.greeting,
     required this.userName,
+    this.avatarUrl,
     required this.biometricEnabled,
     required this.canUseBiometrics,
     required this.onUnlockWithPin,
@@ -260,6 +275,7 @@ class PinUnlockScreen extends StatefulWidget {
 
   final String greeting;
   final String userName;
+  final String? avatarUrl;
   final bool biometricEnabled;
   final bool canUseBiometrics;
   final Future<bool> Function(String pin) onUnlockWithPin;
@@ -284,6 +300,7 @@ class _PinUnlockScreenState extends State<PinUnlockScreen> {
       title: AppConstants.securityUnlockTitle.tr(),
       subtitle: AppConstants.securityUnlockSubtitle.tr(),
       userName: widget.userName,
+      avatarUrl: widget.avatarUrl,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -375,6 +392,7 @@ class _SecurityShell extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.userName,
+    this.avatarUrl,
     required this.child,
   });
 
@@ -382,6 +400,7 @@ class _SecurityShell extends StatelessWidget {
   final String title;
   final String subtitle;
   final String userName;
+  final String? avatarUrl;
   final Widget child;
 
   @override
@@ -435,7 +454,7 @@ class _SecurityShell extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 28),
-                    _SecurityAvatar(userName: userName),
+                    _SecurityAvatar(userName: userName, avatarUrl: avatarUrl),
                     const SizedBox(height: 18),
                     if (showText) ...[
                       Text(
@@ -502,12 +521,17 @@ class _SecurityShell extends StatelessWidget {
 }
 
 class _SecurityAvatar extends StatelessWidget {
-  const _SecurityAvatar({required this.userName});
+  const _SecurityAvatar({required this.userName, this.avatarUrl});
 
   final String userName;
+  final String? avatarUrl;
 
   @override
   Widget build(BuildContext context) {
+    final photoUrl = avatarUrl;
+    final isNetworkPhoto = photoUrl != null && photoUrl.startsWith('http');
+    final isLocalPhoto = photoUrl != null && !isNetworkPhoto;
+
     return Align(
       child: Stack(
         clipBehavior: Clip.none,
@@ -517,11 +541,24 @@ class _SecurityAvatar extends StatelessWidget {
             height: 92,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFF4F9DFF), Color(0xFF12306A)],
-              ),
+              gradient: photoUrl == null
+                  ? const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0xFF4F9DFF), Color(0xFF12306A)],
+                    )
+                  : null,
+              image: isNetworkPhoto
+                  ? DecorationImage(
+                      image: NetworkImage(photoUrl),
+                      fit: BoxFit.cover,
+                    )
+                  : isLocalPhoto
+                  ? DecorationImage(
+                      image: FileImage(File(photoUrl)),
+                      fit: BoxFit.cover,
+                    )
+                  : null,
               border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
               boxShadow: [
                 BoxShadow(
@@ -531,16 +568,18 @@ class _SecurityAvatar extends StatelessWidget {
                 ),
               ],
             ),
-            child: Center(
-              child: Text(
-                initialsFromName(userName),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 26,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ),
+            child: photoUrl == null
+                ? Center(
+                    child: Text(
+                      initialsFromName(userName),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 26,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  )
+                : null,
           ),
           Positioned(
             right: -2,

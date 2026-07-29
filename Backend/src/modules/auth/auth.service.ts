@@ -5,6 +5,7 @@ import { verifyGoogleIdToken } from '../../lib/google-auth'
 export interface DeviceInfo {
   id?: string
   platform?: string
+  name?: string
 }
 
 // AllDocs-specific: tracks which devices are signed into an account so the
@@ -26,11 +27,12 @@ async function registerDevice(userId: string, device?: DeviceInfo) {
 
   try {
     await sql`
-      INSERT INTO devices (id, user_id, platform, last_seen_at)
-      VALUES (${device.id}, ${userId}, ${device.platform ?? 'unknown'}, NOW())
+      INSERT INTO devices (id, user_id, platform, name, last_seen_at)
+      VALUES (${device.id}, ${userId}, ${device.platform ?? 'unknown'}, ${device.name ?? null}, NOW())
       ON CONFLICT (id) DO UPDATE
         SET user_id = EXCLUDED.user_id,
             platform = EXCLUDED.platform,
+            name = EXCLUDED.name,
             last_seen_at = NOW()
     `
   } catch (error) {
@@ -39,7 +41,7 @@ async function registerDevice(userId: string, device?: DeviceInfo) {
 }
 
 export async function login(email: string, password: string, device?: DeviceInfo) {
-  const result = await signIn(email, password)
+  const result = await signIn(email, password, device?.id)
   await registerDevice(result.user.id, device)
   return result
 }
@@ -50,14 +52,14 @@ export async function signup(
   displayName?: string,
   device?: DeviceInfo
 ) {
-  const result = await signUp(email, password, displayName)
+  const result = await signUp(email, password, displayName, device?.id)
   await registerDevice(result.user.id, device)
   return result
 }
 
 export async function loginWithGoogle(idToken: string, device?: DeviceInfo) {
   const { email, name, picture } = await verifyGoogleIdToken(idToken)
-  const result = await findOrCreateUserByEmail(email, name, picture)
+  const result = await findOrCreateUserByEmail(email, name, picture, device?.id)
   await registerDevice(result.user.id, device)
   return result
 }

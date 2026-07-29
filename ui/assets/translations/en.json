@@ -51,13 +51,17 @@
     "devices_empty": "No devices found.",
     "devices_load_error": "Could not load your devices.",
     "devices_retry": "Try again",
-    "devices_revoke": "Remove",
-    "devices_revoke_confirm_title": "Remove this device?",
-    "devices_revoke_confirm_message": "It will stop appearing in this list. If it still holds a session, it stays signed in until that session expires.",
-    "devices_revoke_error": "Could not remove that device.",
     "devices_platform_android": "Android",
     "devices_platform_ios": "iOS",
-    "devices_platform_other": "Other device"
+    "devices_platform_other": "Other device",
+    "devices_end_session": "End session",
+    "devices_end_session_confirm_title": "End this device's session?",
+    "devices_end_session_confirm_message": "It will be signed out immediately and removed from this list.",
+    "devices_end_session_error": "Could not end that session.",
+    "devices_end_all": "End all sessions",
+    "devices_end_all_confirm_title": "End all sessions?",
+    "devices_end_all_confirm_message": "Every device, including this one, will be signed out immediately.",
+    "devices_end_all_error": "Could not end all sessions."
   },
   "common": {
     "cancel": "Cancel",
@@ -183,7 +187,14 @@
     "backend_feature": "Accounts, plans and cloud belong in the backend.",
     "plan_title": "{plan} plan",
     "plan_free_subtitle": "Upgrade for cloud sync and more storage.",
-    "plan_active_subtitle": "Included with your All subscription."
+    "plan_active_subtitle": "Included with your All subscription.",
+    "support_title": "Support",
+    "faq": "FAQ",
+    "contact_support": "Contact support",
+    "contact_support_subject": "AllDocs — Support",
+    "rate_app": "Rate AllDocs",
+    "privacy_policy": "Privacy policy",
+    "link_open_error": "Could not open this link."
   },
   "permission": {
     "storage_title": "Allow file access",
@@ -212,5 +223,22 @@
     "section_title": "Expiring soon",
     "empty": "No documents expiring soon",
     "due_label": "Expires {date}"
+  },
+  "faq": {
+    "title": "Frequently asked questions",
+    "q1_question": "How does document scanning work?",
+    "q1_answer": "AllDocs uses on-device text recognition (OCR) to scan and make documents searchable. Images and recognized text never leave your phone during this process.",
+    "q2_question": "Are my documents stored in the cloud?",
+    "q2_answer": "For now, your documents are stored only on your device. Cross-device sync is being built and will follow the same principle: content is always encrypted before it leaves your phone.",
+    "q3_question": "What is the AllID account?",
+    "q3_answer": "AllID is the account shared between AllDocs and AllPhotos. You use the same email and password (or the same Google sign-in) in both apps, and a paid subscription unlocks premium features in both.",
+    "q4_question": "How do plans work?",
+    "q4_answer": "The free plan includes document organization and scanning. A paid plan unlocks extra features across both All apps — subscription management is coming soon.",
+    "q5_question": "How do expiry reminders work?",
+    "q5_answer": "When AllDocs detects a validity date on a document (like an ID card or an insurance policy), it can schedule a local reminder before that date expires.",
+    "q6_question": "What do the PIN and biometrics protect?",
+    "q6_answer": "The PIN/biometrics lock access to the app on your device. It's independent from your AllID account password — losing one doesn't affect the other.",
+    "q7_question": "How do I export or remove my documents?",
+    "q7_answer": "You can export all your documents to a folder of your choice from Settings > Export documents. To remove a specific document, long-press it in the archive."
   }
 }
