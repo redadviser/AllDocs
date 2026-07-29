@@ -413,7 +413,7 @@ class _SecurityShell extends StatelessWidget {
                           width: 38,
                           height: 38,
                           decoration: BoxDecoration(
-                            color: AppTheme.primary.withValues(alpha: 0.18),
+                            color: AppTheme.accent.withValues(alpha: 0.18),
                             borderRadius: BorderRadius.circular(13),
                             border: Border.all(color: AppTheme.border),
                           ),
@@ -525,7 +525,7 @@ class _SecurityAvatar extends StatelessWidget {
               border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
               boxShadow: [
                 BoxShadow(
-                  color: AppTheme.primary.withValues(alpha: 0.26),
+                  color: AppTheme.accent.withValues(alpha: 0.26),
                   blurRadius: 28,
                   offset: const Offset(0, 14),
                 ),
@@ -584,7 +584,7 @@ class _PinDots extends StatelessWidget {
             height: index < length ? 18 : 14,
             decoration: BoxDecoration(
               color: index < length
-                  ? (hasError ? AppTheme.destructive : AppTheme.primary)
+                  ? (hasError ? AppTheme.destructive : AppTheme.accent)
                   : Colors.transparent,
               shape: BoxShape.circle,
               border: Border.all(
@@ -595,7 +595,7 @@ class _PinDots extends StatelessWidget {
                   ? [
                       BoxShadow(
                         color:
-                            (hasError ? AppTheme.destructive : AppTheme.primary)
+                            (hasError ? AppTheme.destructive : AppTheme.accent)
                                 .withValues(alpha: 0.28),
                         blurRadius: 12,
                       ),
@@ -626,10 +626,10 @@ class _BiometricChoice extends StatelessWidget {
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: value
-              ? AppTheme.primary.withValues(alpha: 0.16)
+              ? AppTheme.accent.withValues(alpha: 0.16)
               : AppTheme.surfaceStrong.withValues(alpha: 0.48),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: value ? AppTheme.primary : AppTheme.border),
+          border: Border.all(color: value ? AppTheme.accent : AppTheme.border),
         ),
         child: Row(
           children: [

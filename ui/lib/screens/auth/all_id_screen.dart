@@ -101,9 +101,9 @@ class _AllIdScreenState extends State<AllIdScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const _AllIdHero(),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 32),
                     Container(
-                      padding: const EdgeInsets.all(18),
+                      padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
                         color: AppTheme.surface.withValues(alpha: 0.86),
                         borderRadius: BorderRadius.circular(22),
@@ -142,7 +142,7 @@ class _AllIdScreenState extends State<AllIdScreen> {
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: AppTheme.primary.withValues(alpha: 0.28),
+                color: AppTheme.accent.withValues(alpha: 0.28),
                 blurRadius: 18,
                 offset: const Offset(0, 8),
               ),
@@ -164,14 +164,14 @@ class _AllIdScreenState extends State<AllIdScreen> {
             ),
           ),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 20),
         Row(
           children: [
             Expanded(
               child: Divider(color: AppTheme.border.withValues(alpha: 0.6)),
             ),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
               child: Text(
                 AppConstants.authOrDivider.tr(),
                 style: const TextStyle(
@@ -186,7 +186,7 @@ class _AllIdScreenState extends State<AllIdScreen> {
             ),
           ],
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 20),
         OutlinedButton.icon(
           onPressed: _submitting ? null : _submitGoogle,
           icon: const _GoogleMark(),
@@ -235,7 +235,7 @@ class _AllIdScreenState extends State<AllIdScreen> {
             const SizedBox(width: 48),
           ],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 16),
         if (!isLogin) ...[
           TextField(
             controller: _displayNameController,
@@ -245,7 +245,7 @@ class _AllIdScreenState extends State<AllIdScreen> {
               prefixIcon: const Icon(Icons.badge_outlined),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
         ],
         TextField(
           controller: _emailController,
@@ -256,7 +256,7 @@ class _AllIdScreenState extends State<AllIdScreen> {
             prefixIcon: const Icon(Icons.email_outlined),
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
         TextField(
           controller: _passwordController,
           obscureText: true,
@@ -268,7 +268,7 @@ class _AllIdScreenState extends State<AllIdScreen> {
           ),
         ),
         if (isLogin) ...[
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           Align(
             alignment: Alignment.centerRight,
             child: TextButton(
@@ -281,13 +281,13 @@ class _AllIdScreenState extends State<AllIdScreen> {
             ),
           ),
         ],
-        const SizedBox(height: 8),
+        const SizedBox(height: 14),
         DecoratedBox(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: AppTheme.primary.withValues(alpha: 0.28),
+                color: AppTheme.accent.withValues(alpha: 0.28),
                 blurRadius: 18,
                 offset: const Offset(0, 8),
               ),
@@ -310,7 +310,7 @@ class _AllIdScreenState extends State<AllIdScreen> {
             ),
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 14),
         Center(
           child: TextButton(
             onPressed: _submitting ? null : _toggleMode,
@@ -368,27 +368,23 @@ class _AllIdHero extends StatelessWidget {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                AppTheme.primary.withValues(alpha: 0.28),
-                AppTheme.primary.withValues(alpha: 0.06),
+                AppTheme.accent.withValues(alpha: 0.28),
+                AppTheme.accent.withValues(alpha: 0.06),
               ],
             ),
             borderRadius: BorderRadius.circular(22),
             border: Border.all(color: AppTheme.border.withValues(alpha: 0.8)),
             boxShadow: [
               BoxShadow(
-                color: AppTheme.primary.withValues(alpha: 0.16),
+                color: AppTheme.accent.withValues(alpha: 0.16),
                 blurRadius: 22,
                 offset: const Offset(0, 10),
               ),
             ],
           ),
-          child: const Icon(
-            Icons.folder_copy_rounded,
-            color: AppTheme.primarySoft,
-            size: 38,
-          ),
+          child: Icon(Icons.folder_copy_rounded, color: AppTheme.accent, size: 38),
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: 20),
         Text(
           AppConstants.authTitle.tr(),
           textAlign: TextAlign.center,
@@ -398,7 +394,7 @@ class _AllIdHero extends StatelessWidget {
             fontWeight: FontWeight.w800,
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
         Text(
           AppConstants.authSubtitle.tr(),
           textAlign: TextAlign.center,
@@ -410,7 +406,7 @@ class _AllIdHero extends StatelessWidget {
           ),
         ),
         if (LocalModeConfig.isLocalOnly) ...[
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
             decoration: BoxDecoration(

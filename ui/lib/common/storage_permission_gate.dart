@@ -71,7 +71,7 @@ class _StoragePermissionGateState extends State<StoragePermissionGate>
                       width: 72,
                       height: 72,
                       decoration: BoxDecoration(
-                        color: AppTheme.primary.withValues(alpha: 0.18),
+                        color: AppTheme.accent.withValues(alpha: 0.18),
                         borderRadius: BorderRadius.circular(22),
                         border: Border.all(color: AppTheme.border),
                       ),

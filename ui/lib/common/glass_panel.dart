@@ -81,7 +81,7 @@ class SectionTitle extends StatelessWidget {
                     vertical: 3,
                   ),
                   decoration: BoxDecoration(
-                    color: AppTheme.primary.withValues(alpha: 0.82),
+                    color: AppTheme.accent.withValues(alpha: 0.82),
                     borderRadius: BorderRadius.circular(99),
                   ),
                   child: Text(

@@ -590,12 +590,12 @@ class _DeepDeviceSearchCard extends StatelessWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              AppTheme.primary.withValues(alpha: 0.26),
+              AppTheme.accent.withValues(alpha: 0.26),
               const Color(0xFF102F68).withValues(alpha: 0.9),
             ],
           ),
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: AppTheme.primary.withValues(alpha: 0.32)),
+          border: Border.all(color: AppTheme.accent.withValues(alpha: 0.32)),
         ),
         child: Row(
           children: [
@@ -706,10 +706,10 @@ class _TypeFilters extends StatelessWidget {
                   fontWeight: FontWeight.w700,
                 ),
                 side: BorderSide(
-                  color: selected ? AppTheme.primary : AppTheme.border,
+                  color: selected ? AppTheme.accent : AppTheme.border,
                 ),
                 backgroundColor: AppTheme.surface,
-                selectedColor: AppTheme.primary.withValues(alpha: 0.22),
+                selectedColor: AppTheme.accent.withValues(alpha: 0.22),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(22),
                 ),
@@ -976,7 +976,7 @@ class _DocumentPreview extends StatelessWidget {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: AppTheme.primary.withValues(alpha: 0.82),
+                    color: AppTheme.accent.withValues(alpha: 0.82),
                     borderRadius: BorderRadius.circular(99),
                     border: Border.all(
                       color: Colors.white.withValues(alpha: 0.16),
@@ -1573,7 +1573,7 @@ class _ArchiveActions extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
-              color: AppTheme.primary.withValues(alpha: 0.16),
+              color: AppTheme.accent.withValues(alpha: 0.16),
               borderRadius: BorderRadius.circular(99),
               border: Border.all(color: AppTheme.border),
             ),
@@ -1895,7 +1895,7 @@ class _DeviceScanHeader extends StatelessWidget {
           width: 48,
           height: 48,
           decoration: BoxDecoration(
-            color: AppTheme.primary.withValues(alpha: 0.14),
+            color: AppTheme.accent.withValues(alpha: 0.14),
             borderRadius: BorderRadius.circular(15),
             border: Border.all(color: AppTheme.border),
           ),
@@ -2014,7 +2014,7 @@ class _DeviceTypeChip extends StatelessWidget {
     required this.count,
     required this.selected,
     required this.onTap,
-    this.color = AppTheme.primary,
+    this.color,
   });
 
   final IconData icon;
@@ -2022,10 +2022,11 @@ class _DeviceTypeChip extends StatelessWidget {
   final int count;
   final bool selected;
   final VoidCallback onTap;
-  final Color color;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
+    final effectiveColor = color ?? AppTheme.accent;
     return InkWell(
       borderRadius: BorderRadius.circular(16),
       onTap: onTap,
@@ -2035,18 +2036,20 @@ class _DeviceTypeChip extends StatelessWidget {
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
           color: selected
-              ? color.withValues(alpha: 0.2)
+              ? effectiveColor.withValues(alpha: 0.2)
               : AppTheme.surfaceStrong.withValues(alpha: 0.44),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: selected ? color.withValues(alpha: 0.72) : AppTheme.border,
+            color: selected
+                ? effectiveColor.withValues(alpha: 0.72)
+                : AppTheme.border,
           ),
         ),
         child: Row(
           children: [
             Icon(
               icon,
-              color: selected ? color : AppTheme.primarySoft,
+              color: selected ? effectiveColor : AppTheme.primarySoft,
               size: 22,
             ),
             const SizedBox(width: 8),
@@ -2246,11 +2249,11 @@ class _DeviceFolderCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Row(
+            Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Icon(Icons.folder_rounded, color: AppTheme.primary, size: 30),
-                Icon(Icons.chevron_right_rounded, size: 18),
+                Icon(Icons.folder_rounded, color: AppTheme.accent, size: 30),
+                const Icon(Icons.chevron_right_rounded, size: 18),
               ],
             ),
             const Spacer(),

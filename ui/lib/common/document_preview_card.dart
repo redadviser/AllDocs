@@ -167,7 +167,7 @@ class _DocumentPreview extends StatelessWidget {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: AppTheme.primary.withValues(alpha: 0.82),
+                    color: AppTheme.accent.withValues(alpha: 0.82),
                     borderRadius: BorderRadius.circular(99),
                     border: Border.all(
                       color: Colors.white.withValues(alpha: 0.16),

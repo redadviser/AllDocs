@@ -224,8 +224,8 @@ class _ProfileHeader extends StatelessWidget {
                 bottom: 2,
                 child: Container(
                   padding: const EdgeInsets.all(8),
-                  decoration: const BoxDecoration(
-                    color: AppTheme.primary,
+                  decoration: BoxDecoration(
+                    color: AppTheme.accent,
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
@@ -269,7 +269,7 @@ class _ProfileHeader extends StatelessWidget {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: AppTheme.primary.withValues(alpha: 0.2),
+                    color: AppTheme.accent.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(99),
                   ),
                   child: Row(
@@ -315,7 +315,7 @@ class _StoragePanel extends StatelessWidget {
             width: 58,
             height: 58,
             decoration: BoxDecoration(
-              color: AppTheme.primary.withValues(alpha: 0.14),
+              color: AppTheme.accent.withValues(alpha: 0.14),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: AppTheme.border),
             ),
@@ -366,14 +366,14 @@ class _StoragePanel extends StatelessWidget {
                     value: summary.usedRatio,
                     minHeight: 9,
                     backgroundColor: AppTheme.surfaceSoft,
-                    color: AppTheme.primary,
+                    color: AppTheme.accent,
                   ),
                 ),
                 const SizedBox(height: 12),
                 Row(
                   children: [
                     _StorageLegend(
-                      color: AppTheme.primary,
+                      color: AppTheme.accent,
                       label: AppConstants.profileStorageUsed.tr(
                         namedArgs: {'used': summary.usedGb.toStringAsFixed(1)},
                       ),
@@ -551,7 +551,7 @@ class _CustomizationPanel extends StatelessWidget {
                     width: 40,
                     height: 40,
                     decoration: BoxDecoration(
-                      color: AppTheme.primary.withValues(alpha: 0.12),
+                      color: AppTheme.accent.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Icon(
@@ -634,13 +634,13 @@ class _StatCard extends StatelessWidget {
     required this.icon,
     required this.value,
     required this.label,
-    this.iconColor = AppTheme.primary,
+    this.iconColor,
   });
 
   final IconData icon;
   final String value;
   final String label;
-  final Color iconColor;
+  final Color? iconColor;
 
   @override
   Widget build(BuildContext context) {
@@ -654,7 +654,7 @@ class _StatCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: iconColor, size: 24),
+          Icon(icon, color: iconColor ?? AppTheme.accent, size: 24),
           const SizedBox(height: 12),
           Text(
             value,
@@ -914,7 +914,7 @@ class _SettingsTile extends StatelessWidget {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: AppTheme.primary.withValues(alpha: 0.12),
+                color: AppTheme.accent.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(icon, color: AppTheme.primarySoft, size: 24),
@@ -996,9 +996,9 @@ void _showLanguageSheet(BuildContext context) {
                   title: Text(option.label),
                   trailing:
                       context.locale.languageCode == option.locale.languageCode
-                      ? const Icon(
+                      ? Icon(
                           Icons.check_circle_rounded,
-                          color: AppTheme.primary,
+                          color: AppTheme.accent,
                         )
                       : null,
                   onTap: () async {
