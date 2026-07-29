@@ -20,6 +20,7 @@ export function isGoogleSignInConfigured(): boolean {
 export interface VerifiedGoogleUser {
   email: string
   name?: string
+  picture?: string
 }
 
 // Verifies the ID token's signature/issuer/audience/expiry against Google's
@@ -39,5 +40,5 @@ export async function verifyGoogleIdToken(idToken: string): Promise<VerifiedGoog
     throw new Error('Google account has no verified email')
   }
 
-  return { email: payload.email, name: payload.name }
+  return { email: payload.email, name: payload.name, picture: payload.picture }
 }

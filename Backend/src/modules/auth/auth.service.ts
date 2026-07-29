@@ -56,8 +56,8 @@ export async function signup(
 }
 
 export async function loginWithGoogle(idToken: string, device?: DeviceInfo) {
-  const { email, name } = await verifyGoogleIdToken(idToken)
-  const result = await findOrCreateUserByEmail(email, name)
+  const { email, name, picture } = await verifyGoogleIdToken(idToken)
+  const result = await findOrCreateUserByEmail(email, name, picture)
   await registerDevice(result.user.id, device)
   return result
 }

@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS profiles (
   id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
   display_name TEXT,
   plan TEXT NOT NULL DEFAULT 'free' CHECK (plan IN ('free', 'premium', 'pro')),
+  avatar_url TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

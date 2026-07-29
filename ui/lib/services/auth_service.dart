@@ -7,15 +7,22 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../models/device_session.dart';
 import 'api_helpers.dart';
 import 'google_auth_config.dart';
 import 'local_mode_config.dart';
 
 class _GoogleIdToken {
-  const _GoogleIdToken({required this.token, required this.email, this.name});
+  const _GoogleIdToken({
+    required this.token,
+    required this.email,
+    this.name,
+    this.photoUrl,
+  });
   final String token;
   final String email;
   final String? name;
+  final String? photoUrl;
 }
 
 /// Storage seam for the session token, so tests can swap in an in-memory
@@ -56,6 +63,7 @@ class AuthService {
   static const _displayNameKey = 'auth.display_name.v1';
   static const _emailKey = 'auth.email.v1';
   static const _planKey = 'auth.plan.v1';
+  static const _avatarUrlKey = 'auth.avatar_url.v1';
   static const _deviceIdKey = 'auth.device_id.v1';
 
   static Future<bool> isSignedIn() async {
@@ -83,6 +91,29 @@ class AuthService {
   static Future<String?> plan() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_planKey);
+  }
+
+  /// The signed-in user's photo — the Google account picture for Google
+  /// sign-in, or a manually uploaded one otherwise. Null until set.
+  static Future<String?> avatarUrl() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_avatarUrlKey);
+  }
+
+  /// The stable per-install device id sent with login/signup/Google
+  /// sign-in requests, so the Security screen can mark which entry in the
+  /// devices list is "this device".
+  static Future<String> deviceId() async {
+    final info = await _deviceInfo();
+    return info['id']!;
+  }
+
+  /// Manual photo upload has no blob-storage backend yet, so a picked photo
+  /// is stored as a local file path rather than uploaded — [avatarUrl]
+  /// doesn't distinguish, callers just render whichever they get.
+  static Future<void> setLocalAvatarPath(String path) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_avatarUrlKey, path);
   }
 
   static Future<String> login(String email, String password) async {
@@ -142,6 +173,7 @@ class AuthService {
       return _persistLocalSession(
         email: googleToken.email,
         displayName: googleToken.name,
+        avatarUrl: googleToken.photoUrl,
       );
     }
 
@@ -161,6 +193,7 @@ class AuthService {
       res,
       fallbackEmail: googleToken.email,
       fallbackName: googleToken.name,
+      fallbackAvatarUrl: googleToken.photoUrl,
     );
   }
 
@@ -186,6 +219,7 @@ class AuthService {
       token: idToken,
       email: account.email,
       name: account.displayName,
+      photoUrl: account.photoUrl,
     );
   }
 
@@ -216,11 +250,57 @@ class AuthService {
     await prefs.remove(_displayNameKey);
     await prefs.remove(_emailKey);
     await prefs.remove(_planKey);
+    await prefs.remove(_avatarUrlKey);
+  }
+
+  /// The signed-in devices for this account (Security screen), newest-seen
+  /// first, with the device making this call flagged via [_deviceIdKey].
+  static Future<List<DeviceSession>> listDevices() async {
+    if (LocalModeConfig.isLocalOnly) return [];
+
+    final token = await tokenStore.read();
+    final res = await ApiHelpers.get(
+      '/api/devices',
+      headers: ApiHelpers.headersWithToken(token),
+    );
+    if (res.statusCode != 200) {
+      throw Exception(ApiHelpers.errorMessage(res, 'Could not load devices'));
+    }
+
+    final thisDeviceId = (await _deviceInfo())['id'];
+    final data = jsonDecode(res.body) as Map<String, dynamic>;
+    final rows = (data['devices'] as List).cast<Map<String, dynamic>>();
+    return rows
+        .map(
+          (row) => DeviceSession(
+            id: row['id'] as String,
+            platform: row['platform'] as String,
+            lastSeenAt: DateTime.parse(row['lastSeenAt'] as String),
+            isCurrentDevice: row['id'] == thisDeviceId,
+          ),
+        )
+        .toList();
+  }
+
+  /// Signs a device out remotely by deleting its row — it stops appearing
+  /// in the list, but a session token it already holds only actually stops
+  /// working once that token expires (there's no server-side token
+  /// revocation yet, just the device bookkeeping).
+  static Future<void> revokeDevice(String id) async {
+    final token = await tokenStore.read();
+    final res = await ApiHelpers.delete(
+      '/api/devices/$id',
+      headers: ApiHelpers.headersWithToken(token),
+    );
+    if (res.statusCode != 200) {
+      throw Exception(ApiHelpers.errorMessage(res, 'Could not remove device'));
+    }
   }
 
   static Future<String> _persistLocalSession({
     required String email,
     String? displayName,
+    String? avatarUrl,
   }) async {
     final name = _resolveName(email, displayName);
     final prefs = await SharedPreferences.getInstance();
@@ -228,6 +308,9 @@ class AuthService {
     await prefs.setString(_displayNameKey, name);
     await prefs.setString(_emailKey, email);
     await prefs.setString(_planKey, 'free');
+    if (avatarUrl != null && avatarUrl.isNotEmpty) {
+      await prefs.setString(_avatarUrlKey, avatarUrl);
+    }
     return name;
   }
 
@@ -239,6 +322,7 @@ class AuthService {
     http.Response res, {
     required String fallbackEmail,
     String? fallbackName,
+    String? fallbackAvatarUrl,
   }) async {
     final setCookie = res.headers['set-cookie'] ?? '';
     final match = RegExp(r'session_token=([^;]+)').firstMatch(setCookie);
@@ -247,6 +331,7 @@ class AuthService {
     var email = fallbackEmail;
     var name = _resolveName(fallbackEmail, fallbackName);
     String? plan;
+    var avatarUrl = fallbackAvatarUrl;
 
     try {
       final data = jsonDecode(res.body) as Map<String, dynamic>;
@@ -258,6 +343,10 @@ class AuthService {
           name = serverName.trim();
         }
         plan = user['plan']?.toString();
+        final serverAvatarUrl = user['avatarUrl']?.toString();
+        if (serverAvatarUrl != null && serverAvatarUrl.isNotEmpty) {
+          avatarUrl = serverAvatarUrl;
+        }
       }
     } catch (_) {
       // Unexpected response shape; keep the locally-known email/name.
@@ -267,6 +356,9 @@ class AuthService {
     await prefs.setString(_displayNameKey, name);
     await prefs.setString(_emailKey, email);
     if (plan != null) await prefs.setString(_planKey, plan);
+    if (avatarUrl != null && avatarUrl.isNotEmpty) {
+      await prefs.setString(_avatarUrlKey, avatarUrl);
+    }
 
     return name;
   }

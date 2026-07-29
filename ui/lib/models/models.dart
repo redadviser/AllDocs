@@ -1,5 +1,6 @@
 export 'device_folder.dart';
 export 'device_folder_scan.dart';
+export 'device_session.dart';
 export 'document_album.dart';
 export 'document_category.dart';
 export 'document_export_result.dart';

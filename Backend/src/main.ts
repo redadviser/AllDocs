@@ -3,6 +3,7 @@ import cookieParser from 'cookie-parser'
 import cors from 'cors'
 import express from 'express'
 import { authRouter } from './modules/auth/auth.routes'
+import { devicesRouter } from './modules/devices/devices.routes'
 
 const app = express()
 
@@ -24,6 +25,7 @@ app.get('/health', (_req, res) => {
 })
 
 app.use('/api/auth', authRouter)
+app.use('/api/devices', devicesRouter)
 
 app.use((_req, res) => {
   res.status(404).json({ error: 'Not found' })

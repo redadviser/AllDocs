@@ -27,12 +27,14 @@ class DocumentsService {
     final name = await AuthService.displayName();
     final email = await AuthService.email();
     final plan = await AuthService.plan();
+    final avatarUrl = await AuthService.avatarUrl();
 
     return snapshot.copyWith(
       profile: snapshot.profile.copyWith(
         name: name,
         email: email,
         planName: plan == null ? null : _planLabel(plan),
+        avatarUrl: avatarUrl,
       ),
     );
   }
@@ -141,6 +143,11 @@ class DocumentsService {
   Future<DocumentExportResult> exportDocuments({String? dialogTitle}) {
     return _store.exportDocuments(dialogTitle: dialogTitle);
   }
+
+  /// Re-reads the signed-in profile fields (name/email/plan/avatar) into the
+  /// next snapshot — used after something outside the local store changes,
+  /// like picking a new profile photo.
+  void refreshProfile() => _notifyChanged();
 
   void dispose() {
     for (final watcher in _folderWatchers.values) {

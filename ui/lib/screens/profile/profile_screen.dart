@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../common/app_constants.dart';
 import '../../common/glass_panel.dart';
@@ -8,6 +11,7 @@ import '../../common/user_initials.dart';
 import '../../models/models.dart';
 import '../../services/services.dart';
 import '../../theme/app_theme.dart';
+import '../security/devices_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key, required this.documentsService});
@@ -56,7 +60,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   physics: const BouncingScrollPhysics(),
                   onPageChanged: (page) => setState(() => _settingsPage = page),
                   children: [
-                    _ProfileOverviewPage(profile: profile),
+                    _ProfileOverviewPage(
+                      profile: profile,
+                      documentsService: widget.documentsService,
+                    ),
                     _ProfileSettingsPage(
                       profile: profile,
                       snapshot: snapshot,
@@ -84,9 +91,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
 }
 
 class _ProfileOverviewPage extends StatelessWidget {
-  const _ProfileOverviewPage({required this.profile});
+  const _ProfileOverviewPage({
+    required this.profile,
+    required this.documentsService,
+  });
 
   final UserProfile profile;
+  final DocumentsService documentsService;
 
   @override
   Widget build(BuildContext context) {
@@ -94,7 +105,10 @@ class _ProfileOverviewPage extends StatelessWidget {
       key: const PageStorageKey('profile_overview'),
       physics: const BouncingScrollPhysics(),
       children: [
-        _ProfileHeader(profile: profile),
+        _ProfileHeader(
+          profile: profile,
+          onEditPhoto: () => _pickAndSaveAvatar(documentsService),
+        ),
         const SizedBox(height: 14),
         _StoragePanel(summary: profile.storageSummary),
         const SizedBox(height: 14),
@@ -121,7 +135,10 @@ class _ProfileSettingsPage extends StatelessWidget {
       key: const PageStorageKey('profile_settings'),
       physics: const BouncingScrollPhysics(),
       children: [
-        _ProfileHeader(profile: profile),
+        _ProfileHeader(
+          profile: profile,
+          onEditPhoto: () => _pickAndSaveAvatar(documentsService),
+        ),
         const SizedBox(height: 14),
         const _CustomizationPanel(),
         const SizedBox(height: 14),
@@ -132,9 +149,12 @@ class _ProfileSettingsPage extends StatelessWidget {
           iconColor: const Color(0xFF37C66A),
           title: AppConstants.profileSecurity.tr(),
           subtitle: AppConstants.profileSecuritySubtitle.tr(),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const DevicesScreen()),
+          ),
         ),
         const SizedBox(height: 14),
-        const _PremiumPanel(),
+        _PremiumPanel(profile: profile),
       ],
     );
   }
@@ -186,13 +206,31 @@ class _ProfileTitle extends StatelessWidget {
   }
 }
 
+Future<void> _pickAndSaveAvatar(DocumentsService documentsService) async {
+  final picked = await ImagePicker().pickImage(
+    source: ImageSource.gallery,
+    maxWidth: 800,
+    maxHeight: 800,
+    imageQuality: 85,
+  );
+  if (picked == null) return;
+
+  await AuthService.setLocalAvatarPath(picked.path);
+  documentsService.refreshProfile();
+}
+
 class _ProfileHeader extends StatelessWidget {
-  const _ProfileHeader({required this.profile});
+  const _ProfileHeader({required this.profile, required this.onEditPhoto});
 
   final UserProfile profile;
+  final VoidCallback onEditPhoto;
 
   @override
   Widget build(BuildContext context) {
+    final avatarUrl = profile.avatarUrl;
+    final isNetworkAvatar = avatarUrl != null && avatarUrl.startsWith('http');
+    final isLocalAvatar = avatarUrl != null && !isNetworkAvatar;
+
     return GlassPanel(
       padding: const EdgeInsets.all(22),
       child: Row(
@@ -202,36 +240,54 @@ class _ProfileHeader extends StatelessWidget {
               Container(
                 width: 96,
                 height: 96,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    colors: [Color(0xFF3F8DFF), Color(0xFF102D63)],
-                  ),
+                  gradient: avatarUrl == null
+                      ? const LinearGradient(
+                          colors: [Color(0xFF3F8DFF), Color(0xFF102D63)],
+                        )
+                      : null,
+                  image: isNetworkAvatar
+                      ? DecorationImage(
+                          image: NetworkImage(avatarUrl),
+                          fit: BoxFit.cover,
+                        )
+                      : isLocalAvatar
+                      ? DecorationImage(
+                          image: FileImage(File(avatarUrl)),
+                          fit: BoxFit.cover,
+                        )
+                      : null,
                 ),
-                child: Center(
-                  child: Text(
-                    initialsFromName(profile.name),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ),
+                child: avatarUrl == null
+                    ? Center(
+                        child: Text(
+                          initialsFromName(profile.name),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 24,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      )
+                    : null,
               ),
               Positioned(
                 right: 0,
                 bottom: 2,
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppTheme.accent,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.photo_camera_rounded,
-                    color: Colors.white,
-                    size: 20,
+                child: GestureDetector(
+                  onTap: onEditPhoto,
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppTheme.accent,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.photo_camera_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
                   ),
                 ),
               ),
@@ -1020,56 +1076,68 @@ class _ProfileWideAction extends StatelessWidget {
     required this.iconColor,
     required this.title,
     required this.subtitle,
+    this.onTap,
   });
 
   final IconData icon;
   final Color iconColor;
   final String title;
   final String subtitle;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return GlassPanel(
-      child: Row(
-        children: [
-          Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-              color: iconColor.withValues(alpha: 0.18),
-              borderRadius: BorderRadius.circular(14),
+    return InkWell(
+      borderRadius: BorderRadius.circular(18),
+      onTap: onTap,
+      child: GlassPanel(
+        child: Row(
+          children: [
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                color: iconColor.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(icon, color: iconColor, size: 28),
             ),
-            child: Icon(icon, color: iconColor, size: 28),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: AppTheme.text,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: AppTheme.text,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: const TextStyle(color: AppTheme.mutedText),
-                ),
-              ],
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(color: AppTheme.mutedText),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+            if (onTap != null)
+              const Icon(Icons.chevron_right_rounded, color: AppTheme.mutedText),
+          ],
+        ),
       ),
     );
   }
 }
 
 class _PremiumPanel extends StatelessWidget {
-  const _PremiumPanel();
+  const _PremiumPanel({required this.profile});
+
+  final UserProfile profile;
+
+  bool get _isFree => profile.planName.toLowerCase() == 'free';
 
   @override
   Widget build(BuildContext context) {
@@ -1097,7 +1165,9 @@ class _PremiumPanel extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  AppConstants.profilePremiumPlan.tr(),
+                  AppConstants.profilePlanTitle.tr(
+                    namedArgs: {'plan': profile.planName},
+                  ),
                   style: const TextStyle(
                     color: AppTheme.text,
                     fontSize: 15,
@@ -1106,7 +1176,9 @@ class _PremiumPanel extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  AppConstants.profilePremiumRenewal.tr(),
+                  _isFree
+                      ? AppConstants.profilePlanFreeSubtitle.tr()
+                      : AppConstants.profilePlanActiveSubtitle.tr(),
                   style: const TextStyle(color: AppTheme.mutedText),
                 ),
               ],

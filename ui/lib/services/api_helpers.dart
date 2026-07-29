@@ -38,6 +38,18 @@ class ApiHelpers {
     );
   }
 
+  static Future<http.Response> delete(
+    String path, {
+    Map<String, String>? headers,
+  }) {
+    return _guardRequest(
+      () => http
+          .delete(Uri.parse('${ApiBaseUrl.baseUrl}$path'), headers: headers)
+          .timeout(ApiBaseUrl.requestTimeout),
+      path,
+    );
+  }
+
   static Future<T> _guardRequest<T>(Future<T> Function() run, String path) async {
     try {
       return await run();

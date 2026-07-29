@@ -51,6 +51,24 @@ class AppConstants {
   static const securityInvalidPin = 'security.invalid_pin';
   static const securityBiometricReason = 'security.biometric_reason';
   static const securityBiometricUnavailable = 'security.biometric_unavailable';
+  static const securityDevicesTitle = 'security.devices_title';
+  static const securityDevicesSubtitle = 'security.devices_subtitle';
+  static const securityDevicesCurrent = 'security.devices_current';
+  static const securityDevicesLastSeen = 'security.devices_last_seen';
+  static const securityDevicesEmpty = 'security.devices_empty';
+  static const securityDevicesLoadError = 'security.devices_load_error';
+  static const securityDevicesRetry = 'security.devices_retry';
+  static const securityDevicesRevoke = 'security.devices_revoke';
+  static const securityDevicesRevokeConfirmTitle =
+      'security.devices_revoke_confirm_title';
+  static const securityDevicesRevokeConfirmMessage =
+      'security.devices_revoke_confirm_message';
+  static const securityDevicesRevokeError = 'security.devices_revoke_error';
+  static const securityDevicesPlatformAndroid =
+      'security.devices_platform_android';
+  static const securityDevicesPlatformIos = 'security.devices_platform_ios';
+  static const securityDevicesPlatformOther =
+      'security.devices_platform_other';
 
   static const commonCancel = 'common.cancel';
   static const commonCreate = 'common.create';
@@ -171,8 +189,9 @@ class AppConstants {
   static const profileFrench = 'profile.french';
   static const profileSecurity = 'profile.security';
   static const profileSecuritySubtitle = 'profile.security_subtitle';
-  static const profilePremiumPlan = 'profile.premium_plan';
-  static const profilePremiumRenewal = 'profile.premium_renewal';
+  static const profilePlanTitle = 'profile.plan_title';
+  static const profilePlanFreeSubtitle = 'profile.plan_free_subtitle';
+  static const profilePlanActiveSubtitle = 'profile.plan_active_subtitle';
   static const profileManagePlan = 'profile.manage_plan';
   static const profileBackendFeature = 'profile.backend_feature';
 

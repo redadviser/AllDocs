@@ -43,7 +43,21 @@
     "pin_mismatch": "The PINs do not match.",
     "invalid_pin": "Incorrect PIN.",
     "biometric_reason": "Unlock AllDocs",
-    "biometric_unavailable": "Could not authenticate with biometrics."
+    "biometric_unavailable": "Could not authenticate with biometrics.",
+    "devices_title": "Devices",
+    "devices_subtitle": "Devices signed in to your AllID account.",
+    "devices_current": "This device",
+    "devices_last_seen": "Last seen {date}",
+    "devices_empty": "No devices found.",
+    "devices_load_error": "Could not load your devices.",
+    "devices_retry": "Try again",
+    "devices_revoke": "Remove",
+    "devices_revoke_confirm_title": "Remove this device?",
+    "devices_revoke_confirm_message": "It will stop appearing in this list. If it still holds a session, it stays signed in until that session expires.",
+    "devices_revoke_error": "Could not remove that device.",
+    "devices_platform_android": "Android",
+    "devices_platform_ios": "iOS",
+    "devices_platform_other": "Other device"
   },
   "common": {
     "cancel": "Cancel",
@@ -165,10 +179,11 @@
     "french": "French",
     "security": "Security",
     "security_subtitle": "Manage password, sessions and devices",
-    "premium_plan": "Premium Plan",
-    "premium_renewal": "Renews on 22/06/2024",
     "manage_plan": "Manage plan",
-    "backend_feature": "Accounts, plans and cloud belong in the backend."
+    "backend_feature": "Accounts, plans and cloud belong in the backend.",
+    "plan_title": "{plan} plan",
+    "plan_free_subtitle": "Upgrade for cloud sync and more storage.",
+    "plan_active_subtitle": "Included with your All subscription."
   },
   "permission": {
     "storage_title": "Allow file access",

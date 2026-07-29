@@ -43,7 +43,21 @@
     "pin_mismatch": "Les PIN ne correspondent pas.",
     "invalid_pin": "PIN incorrect.",
     "biometric_reason": "Déverrouiller AllDocs",
-    "biometric_unavailable": "Authentification biométrique impossible."
+    "biometric_unavailable": "Authentification biométrique impossible.",
+    "devices_title": "Appareils",
+    "devices_subtitle": "Appareils connectés à ton compte AllID.",
+    "devices_current": "Cet appareil",
+    "devices_last_seen": "Vu le {date}",
+    "devices_empty": "Aucun appareil trouvé.",
+    "devices_load_error": "Impossible de charger tes appareils.",
+    "devices_retry": "Réessayer",
+    "devices_revoke": "Supprimer",
+    "devices_revoke_confirm_title": "Supprimer cet appareil ?",
+    "devices_revoke_confirm_message": "Il n’apparaîtra plus dans cette liste. S’il détient encore une session, il reste connecté jusqu’à l’expiration de celle-ci.",
+    "devices_revoke_error": "Impossible de supprimer cet appareil.",
+    "devices_platform_android": "Android",
+    "devices_platform_ios": "iOS",
+    "devices_platform_other": "Autre appareil"
   },
   "common": {
     "cancel": "Annuler",
@@ -165,10 +179,11 @@
     "french": "Français",
     "security": "Sécurité",
     "security_subtitle": "Gère mot de passe, sessions et appareils",
-    "premium_plan": "Plan Premium",
-    "premium_renewal": "Renouvellement le 22/06/2024",
     "manage_plan": "Gérer le plan",
-    "backend_feature": "Comptes, plans et cloud passent par le backend."
+    "backend_feature": "Comptes, plans et cloud passent par le backend.",
+    "plan_title": "Forfait {plan}",
+    "plan_free_subtitle": "Passe à un forfait supérieur pour la synchronisation cloud et plus de stockage.",
+    "plan_active_subtitle": "Inclus dans ton abonnement All."
   },
   "permission": {
     "storage_title": "Autoriser l’accès aux fichiers",

@@ -43,7 +43,21 @@
     "pin_mismatch": "Los PIN no coinciden.",
     "invalid_pin": "PIN incorrecto.",
     "biometric_reason": "Desbloquear AllDocs",
-    "biometric_unavailable": "No se pudo autenticar con biometría."
+    "biometric_unavailable": "No se pudo autenticar con biometría.",
+    "devices_title": "Dispositivos",
+    "devices_subtitle": "Dispositivos con sesión iniciada en tu cuenta AllID.",
+    "devices_current": "Este dispositivo",
+    "devices_last_seen": "Visto el {date}",
+    "devices_empty": "No se encontraron dispositivos.",
+    "devices_load_error": "No se pudieron cargar tus dispositivos.",
+    "devices_retry": "Intentar de nuevo",
+    "devices_revoke": "Eliminar",
+    "devices_revoke_confirm_title": "¿Eliminar este dispositivo?",
+    "devices_revoke_confirm_message": "Dejará de aparecer en esta lista. Si aún conserva una sesión, seguirá conectado hasta que esa sesión expire.",
+    "devices_revoke_error": "No se pudo eliminar ese dispositivo.",
+    "devices_platform_android": "Android",
+    "devices_platform_ios": "iOS",
+    "devices_platform_other": "Otro dispositivo"
   },
   "common": {
     "cancel": "Cancelar",
@@ -165,10 +179,11 @@
     "french": "Francés",
     "security": "Seguridad",
     "security_subtitle": "Gestiona contraseña, sesiones y dispositivos",
-    "premium_plan": "Plan Premium",
-    "premium_renewal": "Renovación el 22/06/2024",
     "manage_plan": "Gestionar plan",
-    "backend_feature": "Cuentas, planes y nube van en el backend."
+    "backend_feature": "Cuentas, planes y nube van en el backend.",
+    "plan_title": "Plan {plan}",
+    "plan_free_subtitle": "Mejora tu plan para tener sincronización en la nube y más almacenamiento.",
+    "plan_active_subtitle": "Incluido en tu suscripción All."
   },
   "permission": {
     "storage_title": "Permitir acceso a archivos",

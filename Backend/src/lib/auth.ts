@@ -21,6 +21,7 @@ export interface AccountUser {
   email: string
   displayName: string | null
   plan: string
+  avatarUrl: string | null
 }
 
 export async function hashPassword(password: string): Promise<string> {
@@ -60,13 +61,13 @@ export async function signUp(email: string, password: string, displayName?: stri
   await accountsSql`INSERT INTO users (id, email, password_hash) VALUES (${id}, ${email}, ${passwordHash})`
   await accountsSql`INSERT INTO profiles (id, display_name, plan) VALUES (${id}, ${resolvedName}, 'free')`
 
-  const user: AccountUser = { id, email, displayName: resolvedName, plan: 'free' }
+  const user: AccountUser = { id, email, displayName: resolvedName, plan: 'free', avatarUrl: null }
   return { user, token: await createToken(id, email) }
 }
 
 export async function signIn(email: string, password: string) {
   const rows = await accountsSql`
-    SELECT u.id, u.email, u.password_hash, p.display_name, p.plan
+    SELECT u.id, u.email, u.password_hash, p.display_name, p.plan, p.avatar_url
     FROM users u
     LEFT JOIN profiles p ON p.id = u.id
     WHERE u.email = ${email}
@@ -82,6 +83,7 @@ export async function signIn(email: string, password: string) {
     email: row.email as string,
     displayName: (row.display_name as string | null) ?? null,
     plan: (row.plan as string | null) ?? 'free',
+    avatarUrl: (row.avatar_url as string | null) ?? null,
   }
   return { user, token: await createToken(user.id, user.email) }
 }
@@ -90,20 +92,30 @@ export async function signIn(email: string, password: string) {
 // whenever the email matches, so a Google account and a password account
 // with the same email resolve to one identity — sign in with either, on
 // either app.
-export async function findOrCreateUserByEmail(email: string, displayName?: string) {
+export async function findOrCreateUserByEmail(
+  email: string,
+  displayName?: string,
+  pictureUrl?: string
+) {
   const existing = await accountsSql`
-    SELECT u.id, u.email, p.display_name, p.plan
+    SELECT u.id, u.email, p.display_name, p.plan, p.avatar_url
     FROM users u
     LEFT JOIN profiles p ON p.id = u.id
     WHERE u.email = ${email}
   `
   if (existing.length > 0) {
     const row = existing[0]
+    // Don't overwrite a photo the user may already have set — only fill it
+    // in the first time Google gives us one and profiles.avatar_url is empty.
+    if (pictureUrl && !row.avatar_url) {
+      await accountsSql`UPDATE profiles SET avatar_url = ${pictureUrl} WHERE id = ${row.id}`
+    }
     const user: AccountUser = {
       id: row.id as string,
       email: row.email as string,
       displayName: (row.display_name as string | null) ?? null,
       plan: (row.plan as string | null) ?? 'free',
+      avatarUrl: (pictureUrl && !row.avatar_url ? pictureUrl : row.avatar_url as string | null) ?? null,
     }
     return { user, token: await createToken(user.id, user.email) }
   }
@@ -116,9 +128,18 @@ export async function findOrCreateUserByEmail(email: string, displayName?: strin
   const resolvedName = defaultDisplayName(email, displayName)
 
   await accountsSql`INSERT INTO users (id, email, password_hash) VALUES (${id}, ${email}, ${passwordHash})`
-  await accountsSql`INSERT INTO profiles (id, display_name, plan) VALUES (${id}, ${resolvedName}, 'free')`
+  await accountsSql`
+    INSERT INTO profiles (id, display_name, plan, avatar_url)
+    VALUES (${id}, ${resolvedName}, 'free', ${pictureUrl ?? null})
+  `
 
-  const user: AccountUser = { id, email, displayName: resolvedName, plan: 'free' }
+  const user: AccountUser = {
+    id,
+    email,
+    displayName: resolvedName,
+    plan: 'free',
+    avatarUrl: pictureUrl ?? null,
+  }
   return { user, token: await createToken(id, email) }
 }
 
@@ -134,7 +155,7 @@ export async function getCurrentUserFromToken(
     if (!userId || !email) return null
 
     const rows = await accountsSql`
-      SELECT u.id, u.email, p.display_name, p.plan
+      SELECT u.id, u.email, p.display_name, p.plan, p.avatar_url
       FROM users u
       LEFT JOIN profiles p ON p.id = u.id
       WHERE u.id = ${userId}
@@ -147,6 +168,7 @@ export async function getCurrentUserFromToken(
       email: row.email as string,
       displayName: (row.display_name as string | null) ?? null,
       plan: (row.plan as string | null) ?? 'free',
+      avatarUrl: (row.avatar_url as string | null) ?? null,
     }
   } catch {
     return null
