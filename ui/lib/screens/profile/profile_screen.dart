@@ -13,6 +13,7 @@ import '../../common/user_initials.dart';
 import '../../models/models.dart';
 import '../../services/services.dart';
 import '../../theme/app_theme.dart';
+import '../auth/auth_gate.dart';
 import '../security/devices_screen.dart';
 import '../support/faq_screen.dart';
 
@@ -248,7 +249,63 @@ class _ProfileSettingsPage extends StatelessWidget {
         ),
         const SizedBox(height: 14),
         _PremiumPanel(profile: profile),
+        const SizedBox(height: 14),
+        const _LogoutButton(),
       ],
+    );
+  }
+}
+
+class _LogoutButton extends StatelessWidget {
+  const _LogoutButton();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: () => _confirmAndLogout(context),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppTheme.destructive,
+          side: const BorderSide(color: AppTheme.destructive),
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
+        icon: const Icon(Icons.logout_rounded),
+        label: Text(AppConstants.profileLogout.tr()),
+      ),
+    );
+  }
+
+  Future<void> _confirmAndLogout(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        title: Text(AppConstants.profileLogoutConfirmTitle.tr()),
+        content: Text(AppConstants.profileLogoutConfirmMessage.tr()),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(AppConstants.commonCancel.tr()),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            style: TextButton.styleFrom(foregroundColor: AppTheme.destructive),
+            child: Text(AppConstants.profileLogout.tr()),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    await AuthService.logout();
+    if (!context.mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const AuthGate()),
+      (route) => false,
     );
   }
 }

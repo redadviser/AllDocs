@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
+import 'package:android_id/android_id.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -387,19 +388,48 @@ class AuthService {
   }
 
   static Future<Map<String, String>> _deviceInfo() async {
+    final platform = Platform.isAndroid
+        ? 'android'
+        : Platform.isIOS
+        ? 'ios'
+        : 'other';
+    final id = await _stableDeviceId(platform);
+    return {'id': id, 'platform': platform, 'name': await _deviceName(platform)};
+  }
+
+  /// A per-device id that survives reinstalling just this app, not a random
+  /// one saved in SharedPreferences — that used to get wiped by uninstall,
+  /// so signing in again after reinstalling without logging out first
+  /// registered a second "Android"/"iOS" row in the Security screen for
+  /// what was really the same physical device. Android's ANDROID_ID and
+  /// iOS's identifierForVendor are both scoped to this app (or vendor) but
+  /// stable across that specific case. Falls back to the old random,
+  /// prefs-persisted id if the platform API is unavailable.
+  static Future<String> _stableDeviceId(String platform) async {
+    try {
+      if (platform == 'android') {
+        final androidId = await const AndroidId().getId();
+        if (androidId != null && androidId.isNotEmpty) {
+          return 'android-$androidId';
+        }
+      } else if (platform == 'ios') {
+        final info = await DeviceInfoPlugin().iosInfo;
+        final vendorId = info.identifierForVendor;
+        if (vendorId != null && vendorId.isNotEmpty) {
+          return 'ios-$vendorId';
+        }
+      }
+    } catch (_) {
+      // Fall through to the persisted random id below.
+    }
+
     final prefs = await SharedPreferences.getInstance();
     var id = prefs.getString(_deviceIdKey);
     if (id == null) {
       id = _randomId();
       await prefs.setString(_deviceIdKey, id);
     }
-
-    final platform = Platform.isAndroid
-        ? 'android'
-        : Platform.isIOS
-        ? 'ios'
-        : 'other';
-    return {'id': id, 'platform': platform, 'name': await _deviceName(platform)};
+    return id;
   }
 
   /// A human-readable label for the Security screen's device list — the

@@ -297,7 +297,7 @@ class _PinUnlockScreenState extends State<PinUnlockScreen> {
   Widget build(BuildContext context) {
     return _SecurityShell(
       greeting: widget.greeting,
-      title: AppConstants.securityUnlockTitle.tr(),
+      title: '',
       subtitle: AppConstants.securityUnlockSubtitle.tr(),
       userName: widget.userName,
       avatarUrl: widget.avatarUrl,
@@ -432,14 +432,15 @@ class _SecurityShell extends StatelessWidget {
                           width: 38,
                           height: 38,
                           decoration: BoxDecoration(
-                            color: AppTheme.accent.withValues(alpha: 0.18),
                             borderRadius: BorderRadius.circular(13),
                             border: Border.all(color: AppTheme.border),
                           ),
-                          child: const Icon(
-                            Icons.folder_copy_rounded,
-                            color: AppTheme.primarySoft,
-                            size: 21,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(13),
+                            child: Image.asset(
+                              'assets/images/docs_icon.png',
+                              fit: BoxFit.cover,
+                            ),
                           ),
                         ),
                         const SizedBox(width: 10),
@@ -457,36 +458,50 @@ class _SecurityShell extends StatelessWidget {
                     _SecurityAvatar(userName: userName, avatarUrl: avatarUrl),
                     const SizedBox(height: 18),
                     if (showText) ...[
-                      Text(
-                        greeting,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: AppTheme.primarySoft,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w800,
+                      if (title.isEmpty)
+                        Text(
+                          greeting,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: AppTheme.text,
+                            fontSize: 27,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        )
+                      else ...[
+                        Text(
+                          greeting,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: AppTheme.primarySoft,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        title,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: AppTheme.text,
-                          fontSize: 27,
-                          fontWeight: FontWeight.w900,
+                        const SizedBox(height: 8),
+                        Text(
+                          title,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: AppTheme.text,
+                            fontSize: 27,
+                            fontWeight: FontWeight.w900,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        subtitle,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: AppTheme.mutedText,
-                          fontSize: 13,
-                          height: 1.35,
-                          fontWeight: FontWeight.w600,
+                      ],
+                      if (subtitle.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          subtitle,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: AppTheme.mutedText,
+                            fontSize: 13,
+                            height: 1.35,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
-                      ),
+                      ],
                       const SizedBox(height: 24),
                     ],
                     Container(

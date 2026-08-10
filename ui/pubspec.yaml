@@ -56,14 +56,15 @@ dependencies:
   timezone: ^0.9.4
   url_launcher: ^6.3.1
   device_info_plus: ^11.3.0
+  android_id: ^0.5.2+1
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_launcher_icons: ^0.13.1
+  flutter_launcher_icons: ^0.13.0
   flutter_lints: ^6.0.0
 
-flutter_icons:
+flutter_launcher_icons:
   android: true
   ios: true
   image_path: "assets/images/docs_icon.png"
@@ -81,6 +82,7 @@ flutter:
 
   assets:
     - assets/translations/
+    - assets/images/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

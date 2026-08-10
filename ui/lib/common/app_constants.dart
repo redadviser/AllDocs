@@ -38,7 +38,6 @@ class AppConstants {
   static const securityGreetingEvening = 'security.greeting_evening';
   static const securityCreatePinTitle = 'security.create_pin_title';
   static const securityCreatePinSubtitle = 'security.create_pin_subtitle';
-  static const securityUnlockTitle = 'security.unlock_title';
   static const securityUnlockSubtitle = 'security.unlock_subtitle';
   static const securityPin = 'security.pin';
   static const securityConfirmPin = 'security.confirm_pin';
@@ -146,6 +145,8 @@ class AppConstants {
   static const archiveDeviceFolderWhatsapp = 'archive.device_folder_whatsapp';
   static const archiveDeviceFolderScans = 'archive.device_folder_scans';
   static const archiveDeviceFolderDrive = 'archive.device_folder_drive';
+  static const archiveDeviceFolderScreenshots =
+      'archive.device_folder_screenshots';
   static const archiveDeviceFolderCount = 'archive.device_folder_count';
   static const archiveSearchDevice = 'archive.search_device';
   static const archiveSearchDeviceSubtitle = 'archive.search_device_subtitle';
@@ -208,6 +209,9 @@ class AppConstants {
   static const profileRateApp = 'profile.rate_app';
   static const profilePrivacyPolicy = 'profile.privacy_policy';
   static const profileLinkOpenError = 'profile.link_open_error';
+  static const profileLogout = 'profile.logout';
+  static const profileLogoutConfirmTitle = 'profile.logout_confirm_title';
+  static const profileLogoutConfirmMessage = 'profile.logout_confirm_message';
 
   static const faqTitle = 'faq.title';
   static const faqQ1Question = 'faq.q1_question';

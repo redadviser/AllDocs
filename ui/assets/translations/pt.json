@@ -31,7 +31,6 @@
     "greeting_evening": "Boa noite, {name}",
     "create_pin_title": "Cria o teu PIN",
     "create_pin_subtitle": "Este código protege a entrada local na AllDocs.",
-    "unlock_title": "Desbloquear AllDocs",
     "unlock_subtitle": "Usa o PIN ou a biometria do dispositivo.",
     "pin": "PIN",
     "confirm_pin": "Confirmar PIN",
@@ -147,7 +146,8 @@
     "no_filter_results": "Sem documentos deste tipo.",
     "document_imported": "Documento importado.",
     "import_failed": "Não foi possível importar.",
-    "feature_soon": "Cloud, contas e planos entram no backend."
+    "feature_soon": "Cloud, contas e planos entram no backend.",
+    "device_folder_screenshots": "Screenshots"
   },
   "profile": {
     "title": "Perfil",
@@ -194,7 +194,10 @@
     "contact_support_subject": "AllDocs — Suporte",
     "rate_app": "Avaliar a AllDocs",
     "privacy_policy": "Política de privacidade",
-    "link_open_error": "Não foi possível abrir este link."
+    "link_open_error": "Não foi possível abrir este link.",
+    "logout": "Sair",
+    "logout_confirm_title": "Sair da AllDocs?",
+    "logout_confirm_message": "Vais precisar do teu email e password da AllID (ou da conta Google) para entrares novamente neste dispositivo."
   },
   "permission": {
     "storage_title": "Permitir acesso aos ficheiros",

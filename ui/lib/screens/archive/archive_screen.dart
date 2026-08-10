@@ -50,14 +50,13 @@ class _ArchiveScreenState extends State<ArchiveScreen> {
             slivers: [
               SliverToBoxAdapter(
                 child: _ArchiveTitle(
-                  onAdd: () => widget.documentsService.importDocuments(),
+                  onAdd: () => _importDocuments(context),
                 ),
               ),
               const SliverToBoxAdapter(child: SizedBox(height: 18)),
               SliverToBoxAdapter(
                 child: _AddDocumentPanel(
-                  onSelectFiles: () =>
-                      widget.documentsService.importDocuments(),
+                  onSelectFiles: () => _importDocuments(context),
                   onScanDocument: () => _scanDocument(context),
                   onUnavailable: () => _showSoon(context),
                 ),
@@ -194,6 +193,21 @@ class _ArchiveScreenState extends State<ArchiveScreen> {
           ),
         );
       },
+    );
+  }
+
+  Future<void> _importDocuments(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final imported = await widget.documentsService.importDocuments();
+    if (!context.mounted || imported == 0) return;
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          AppConstants.archiveImportedCount.tr(
+            namedArgs: {'count': '$imported'},
+          ),
+        ),
+      ),
     );
   }
 
@@ -675,6 +689,11 @@ class _TypeFilters extends StatelessWidget {
       _FilterSpec(Icons.description_rounded, 'Word', DocumentType.word),
       _FilterSpec(Icons.table_chart_rounded, 'Excel', DocumentType.excel),
       _FilterSpec(
+        Icons.slideshow_rounded,
+        'PowerPoint',
+        DocumentType.presentation,
+      ),
+      _FilterSpec(
         Icons.image_rounded,
         AppConstants.archiveImage,
         DocumentType.image,
@@ -856,6 +875,8 @@ class _UnorganizedDocumentCard extends StatelessWidget {
         return Icons.description_rounded;
       case DocumentType.excel:
         return Icons.table_chart_rounded;
+      case DocumentType.presentation:
+        return Icons.slideshow_rounded;
       case DocumentType.image:
         return Icons.image_rounded;
     }
@@ -869,6 +890,8 @@ class _UnorganizedDocumentCard extends StatelessWidget {
         return const Color(0xFF5C8DFF);
       case DocumentType.excel:
         return const Color(0xFF4CC58A);
+      case DocumentType.presentation:
+        return const Color(0xFFFFA53D);
       case DocumentType.image:
         return const Color(0xFF9B6DFF);
     }
@@ -882,6 +905,8 @@ class _UnorganizedDocumentCard extends StatelessWidget {
         return 'DOC';
       case DocumentType.excel:
         return 'XLS';
+      case DocumentType.presentation:
+        return 'PPT';
       case DocumentType.image:
         return AppConstants.archiveImage.tr().toUpperCase();
     }
@@ -1860,6 +1885,7 @@ class _DeviceScanSheetState extends State<_DeviceScanSheet> {
       DocumentType.pdf,
       DocumentType.word,
       DocumentType.excel,
+      DocumentType.presentation,
       DocumentType.image,
     ];
 
@@ -1990,6 +2016,7 @@ class _DeviceTypeSummary extends StatelessWidget {
               DocumentType.pdf,
               DocumentType.word,
               DocumentType.excel,
+              DocumentType.presentation,
               DocumentType.image,
             ])
               _DeviceTypeChip(
@@ -2292,6 +2319,7 @@ String _deviceFolderTitle(DeviceFolder folder) {
     'whatsapp' => AppConstants.archiveDeviceFolderWhatsapp.tr(),
     'scans' => AppConstants.archiveDeviceFolderScans.tr(),
     'drive' => AppConstants.archiveDeviceFolderDrive.tr(),
+    'screenshots' => AppConstants.archiveDeviceFolderScreenshots.tr(),
     _ => folder.title,
   };
 }
@@ -2304,6 +2332,8 @@ IconData _documentIconFor(DocumentType type) {
       return Icons.description_rounded;
     case DocumentType.excel:
       return Icons.table_chart_rounded;
+    case DocumentType.presentation:
+      return Icons.slideshow_rounded;
     case DocumentType.image:
       return Icons.image_rounded;
   }
@@ -2317,6 +2347,8 @@ Color _documentColorFor(DocumentType type) {
       return const Color(0xFF5C8DFF);
     case DocumentType.excel:
       return const Color(0xFF4CC58A);
+    case DocumentType.presentation:
+      return const Color(0xFFFFA53D);
     case DocumentType.image:
       return const Color(0xFF9B6DFF);
   }
@@ -2330,6 +2362,8 @@ String _documentExtensionFor(DocumentType type) {
       return 'DOC';
     case DocumentType.excel:
       return 'XLS';
+    case DocumentType.presentation:
+      return 'PPT';
     case DocumentType.image:
       return AppConstants.archiveImage.tr().toUpperCase();
   }
@@ -2340,6 +2374,7 @@ String _documentTypeLabel(DocumentType type) {
     DocumentType.pdf => 'PDF',
     DocumentType.word => 'Word',
     DocumentType.excel => 'Excel',
+    DocumentType.presentation => 'PowerPoint',
     DocumentType.image => AppConstants.archiveImage.tr(),
   };
 }

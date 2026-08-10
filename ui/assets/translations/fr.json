@@ -31,7 +31,6 @@
     "greeting_evening": "Bonsoir, {name}",
     "create_pin_title": "Crée ton PIN",
     "create_pin_subtitle": "Ce code protège l’accès local à AllDocs.",
-    "unlock_title": "Déverrouiller AllDocs",
     "unlock_subtitle": "Utilise ton PIN ou la biométrie de l’appareil.",
     "pin": "PIN",
     "confirm_pin": "Confirmer le PIN",
@@ -147,7 +146,8 @@
     "no_filter_results": "Aucun document de ce type.",
     "document_imported": "Document importé.",
     "import_failed": "Importation impossible.",
-    "feature_soon": "Cloud, comptes et plans passent par le backend."
+    "feature_soon": "Cloud, comptes et plans passent par le backend.",
+    "device_folder_screenshots": "Captures d'écran"
   },
   "profile": {
     "title": "Profil",
@@ -194,7 +194,10 @@
     "contact_support_subject": "AllDocs — Assistance",
     "rate_app": "Noter AllDocs",
     "privacy_policy": "Politique de confidentialité",
-    "link_open_error": "Impossible d'ouvrir ce lien."
+    "link_open_error": "Impossible d'ouvrir ce lien.",
+    "logout": "Se déconnecter",
+    "logout_confirm_title": "Se déconnecter d'AllDocs ?",
+    "logout_confirm_message": "Tu auras besoin de ton email et mot de passe AllID (ou de ton compte Google) pour te reconnecter sur cet appareil."
   },
   "permission": {
     "storage_title": "Autoriser l’accès aux fichiers",

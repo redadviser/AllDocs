@@ -364,14 +364,6 @@ class _AllIdHero extends StatelessWidget {
           width: 80,
           height: 80,
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                AppTheme.accent.withValues(alpha: 0.28),
-                AppTheme.accent.withValues(alpha: 0.06),
-              ],
-            ),
             borderRadius: BorderRadius.circular(22),
             border: Border.all(color: AppTheme.border.withValues(alpha: 0.8)),
             boxShadow: [
@@ -382,7 +374,10 @@ class _AllIdHero extends StatelessWidget {
               ),
             ],
           ),
-          child: Icon(Icons.folder_copy_rounded, color: AppTheme.accent, size: 38),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(22),
+            child: Image.asset('assets/images/docs_icon.png', fit: BoxFit.cover),
+          ),
         ),
         const SizedBox(height: 20),
         Text(

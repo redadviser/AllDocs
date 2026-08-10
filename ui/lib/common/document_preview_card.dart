@@ -418,6 +418,7 @@ IconData _documentIcon(DocumentType type) {
     DocumentType.pdf => Icons.picture_as_pdf_rounded,
     DocumentType.word => Icons.description_rounded,
     DocumentType.excel => Icons.table_chart_rounded,
+    DocumentType.presentation => Icons.slideshow_rounded,
     DocumentType.image => Icons.image_rounded,
   };
 }
@@ -427,6 +428,7 @@ Color _documentColor(DocumentType type) {
     DocumentType.pdf => const Color(0xFFFF6868),
     DocumentType.word => const Color(0xFF5C8DFF),
     DocumentType.excel => const Color(0xFF4CC58A),
+    DocumentType.presentation => const Color(0xFFFFA53D),
     DocumentType.image => const Color(0xFF9B6DFF),
   };
 }
@@ -436,6 +438,7 @@ String _documentExtension(DocumentType type) {
     DocumentType.pdf => 'PDF',
     DocumentType.word => 'DOC',
     DocumentType.excel => 'XLS',
+    DocumentType.presentation => 'PPT',
     DocumentType.image => AppConstants.archiveImage.tr().toUpperCase(),
   };
 }

@@ -11,6 +11,7 @@ import 'package:path_provider/path_provider.dart';
 import '../models/models.dart';
 import 'document_scanner_service.dart';
 import 'expiry_reminder_service.dart';
+import 'secure_zip_extractor.dart';
 
 final _expiryReminderService = ExpiryReminderService();
 
@@ -21,25 +22,42 @@ class LocalDocumentsStore {
   static Directory? _fallbackDirectory;
   static const _stateFileName = 'alldocs_state.json';
   static const _documentsFolderName = 'documents';
-  static const _supportedExtensions = [
+  // AllDocs organizes documents, not photos — that's AllPhotos' job. Images
+  // are only accepted from the dedicated Screenshots folder below (people
+  // do sometimes need to keep a screenshot, e.g. a QR code or confirmation
+  // screen, alongside their documents), never from manual import or the
+  // other device folders.
+  static const _documentExtensions = [
     'pdf',
     'doc',
     'docx',
     'xls',
     'xlsx',
-    'jpg',
-    'jpeg',
-    'png',
-    'heic',
-    'webp',
+    'ppt',
+    'pptx',
+    'txt',
+    'rtf',
+    'csv',
+    'odt',
+    'ods',
+    'odp',
   ];
+  static const _imageExtensions = ['jpg', 'jpeg', 'png', 'heic', 'webp'];
+  static const _screenshotsFolderId = 'screenshots';
   static const _deviceFolderSpecs = [
     DeviceFolder(id: 'downloads', title: 'Downloads', itemCount: 0),
     DeviceFolder(id: 'documents', title: 'Documentos', itemCount: 0),
     DeviceFolder(id: 'whatsapp', title: 'WhatsApp', itemCount: 0),
     DeviceFolder(id: 'scans', title: 'Scans', itemCount: 0),
     DeviceFolder(id: 'drive', title: 'Drive', itemCount: 0),
+    DeviceFolder(id: _screenshotsFolderId, title: 'Screenshots', itemCount: 0),
   ];
+
+  static List<String> _allowedExtensionsFor(String folderId) {
+    return folderId == _screenshotsFolderId
+        ? const [..._documentExtensions, ..._imageExtensions]
+        : _documentExtensions;
+  }
 
   Future<DocumentsSnapshot> loadSnapshot() async {
     final state = await _readState();
@@ -50,7 +68,7 @@ class LocalDocumentsStore {
     final result = await FilePicker.pickFiles(
       allowMultiple: true,
       type: FileType.custom,
-      allowedExtensions: _supportedExtensions,
+      allowedExtensions: [..._documentExtensions, 'zip'],
       withData: true,
     );
     if (result == null || result.files.isEmpty) return 0;
@@ -63,6 +81,37 @@ class LocalDocumentsStore {
       final originalName = picked.name.trim().isEmpty
           ? 'documento_${DateTime.now().millisecondsSinceEpoch}.pdf'
           : picked.name.trim();
+
+      // A common user downloading a .zip often doesn't realize it needs
+      // extracting first — pull out whatever supported documents are
+      // inside instead of importing the zip itself as an opaque "document".
+      if (originalName.toLowerCase().endsWith('.zip') && picked.bytes != null) {
+        final entries = const SecureZipExtractor().extract(
+          picked.bytes!,
+          allowedExtensions: _documentExtensions,
+        );
+        for (final entry in entries) {
+          final id = _newId('doc');
+          final storedPath = await _copyPickedFile(
+            id: id,
+            originalName: entry.fileName,
+            pickedPath: null,
+            bytes: entry.bytes,
+          );
+          final importedDocument = await _documentFromStoredFile(
+            id: id,
+            fileName: entry.fileName,
+            storedPath: storedPath,
+            albumId: albumId,
+          );
+          documents.add(importedDocument.toJson());
+
+          if (albumId != null) _addDocumentToAlbum(state, albumId, id);
+          imported++;
+        }
+        continue;
+      }
+
       final id = _newId('doc');
       final storedPath = await _copyPickedFile(
         id: id,
@@ -202,6 +251,7 @@ class LocalDocumentsStore {
       roots,
       limit: 1800,
       preferDocuments: true,
+      allowedExtensions: _documentExtensions,
     );
     documents.sort(_newestFirst);
 
@@ -870,7 +920,10 @@ class LocalDocumentsStore {
         final directory = Directory(path);
         if (await directory.exists()) {
           linkedPath = path;
-          itemCount = await _countSupportedFiles(directory);
+          itemCount = await _countSupportedFiles(
+            directory,
+            allowedExtensions: _allowedExtensionsFor(spec.id),
+          );
         } else {
           paths.remove(spec.id);
           changed = true;
@@ -882,7 +935,10 @@ class LocalDocumentsStore {
         if (defaultPath != null) {
           linkedPath = defaultPath;
           paths[spec.id] = defaultPath;
-          itemCount = await _countSupportedFiles(Directory(defaultPath));
+          itemCount = await _countSupportedFiles(
+            Directory(defaultPath),
+            allowedExtensions: _allowedExtensionsFor(spec.id),
+          );
           changed = true;
         }
       }
@@ -929,6 +985,11 @@ class LocalDocumentsStore {
         '$root/Scans',
       ],
       'drive' => const ['$root/Drive'],
+      _screenshotsFolderId => const [
+        '$root/Pictures/Screenshots',
+        '$root/DCIM/Screenshots',
+        '$root/Screenshots',
+      ],
       _ => const [],
     };
   }
@@ -941,7 +1002,11 @@ class LocalDocumentsStore {
     final directory = Directory(path);
     if (!await directory.exists()) return null;
 
-    final documents = await _scanDirectories([directory], limit: 500);
+    final documents = await _scanDirectories(
+      [directory],
+      limit: 500,
+      allowedExtensions: _allowedExtensionsFor(folderId),
+    );
 
     documents.sort(_newestFirst);
     return DeviceFolderScan(
@@ -954,10 +1019,17 @@ class LocalDocumentsStore {
     );
   }
 
-  Future<int> _countSupportedFiles(Directory directory) async {
+  Future<int> _countSupportedFiles(
+    Directory directory, {
+    required List<String> allowedExtensions,
+  }) async {
     try {
       return Isolate.run(() {
-        return _countSupportedFilesInPath(directory.path, limit: 250);
+        return _countSupportedFilesInPath(
+          directory.path,
+          limit: 250,
+          allowedExtensions: allowedExtensions,
+        );
       });
     } catch (_) {
       return 0;
@@ -968,6 +1040,7 @@ class LocalDocumentsStore {
     List<Directory> roots, {
     required int limit,
     bool preferDocuments = false,
+    required List<String> allowedExtensions,
   }) async {
     final rootPaths = roots.map((directory) => directory.path).toList();
     final jsonDocuments = await Isolate.run(() {
@@ -975,6 +1048,7 @@ class LocalDocumentsStore {
         rootPaths: rootPaths,
         limit: limit,
         preferDocuments: preferDocuments,
+        allowedExtensions: allowedExtensions,
       );
     });
 
@@ -1064,6 +1138,7 @@ List<Map<String, Object?>> _scanDirectoryPaths({
   required List<String> rootPaths,
   required int limit,
   required bool preferDocuments,
+  required List<String> allowedExtensions,
 }) {
   final documents = <Map<String, Object?>>[];
   final seenFiles = <String>{};
@@ -1124,7 +1199,7 @@ List<Map<String, Object?>> _scanDirectoryPaths({
       if (!seenFiles.add(path)) continue;
 
       final fileName = _scanFileNameFromPath(path);
-      if (!_scanIsSupportedFile(fileName)) continue;
+      if (!_scanIsSupportedFile(fileName, allowedExtensions)) continue;
       final type = documentTypeFromFileName(fileName).name;
       final cap = typeCaps[type];
       if (cap != null && (typeCounts[type] ?? 0) >= cap) continue;
@@ -1155,7 +1230,11 @@ List<Map<String, Object?>> _scanDirectoryPaths({
   return documents;
 }
 
-int _countSupportedFilesInPath(String rootPath, {required int limit}) {
+int _countSupportedFilesInPath(
+  String rootPath, {
+  required int limit,
+  required List<String> allowedExtensions,
+}) {
   var count = 0;
   var scannedDirectories = 0;
   final queue = <Directory>[Directory(rootPath)];
@@ -1177,7 +1256,12 @@ int _countSupportedFilesInPath(String rootPath, {required int limit}) {
 
     for (final child in children) {
       if (child is File) {
-        if (!_scanIsSupportedFile(_scanFileNameFromPath(child.path))) continue;
+        if (!_scanIsSupportedFile(
+          _scanFileNameFromPath(child.path),
+          allowedExtensions,
+        )) {
+          continue;
+        }
         count++;
         if (count >= limit) break;
       } else if (child is Directory) {
@@ -1239,11 +1323,9 @@ bool _scanShouldSkipDirectory(String path) {
       normalized.contains('/code_cache/');
 }
 
-bool _scanIsSupportedFile(String fileName) {
+bool _scanIsSupportedFile(String fileName, List<String> allowedExtensions) {
   final lower = fileName.toLowerCase();
-  return LocalDocumentsStore._supportedExtensions.any(
-    (ext) => lower.endsWith('.$ext'),
-  );
+  return allowedExtensions.any((ext) => lower.endsWith('.$ext'));
 }
 
 String _scanFileNameFromPath(String path) {
