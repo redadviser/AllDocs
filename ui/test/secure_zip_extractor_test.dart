@@ -133,5 +133,20 @@ void main() {
 
       expect(entries, isEmpty);
     });
+
+    test('extractInBackground runs on an isolate and returns the same result', () async {
+      final zip = _buildZip([
+        ('report.pdf', _text('pdf bytes')),
+        ('photo.jpg', _text('image bytes')),
+      ]);
+
+      final entries = await const SecureZipExtractor().extractInBackground(
+        zip,
+        allowedExtensions: _documentExtensions,
+      );
+
+      expect(entries.map((e) => e.fileName), ['report.pdf']);
+      expect(utf8.decode(entries.single.bytes), 'pdf bytes');
+    });
   });
 }

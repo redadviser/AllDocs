@@ -147,7 +147,17 @@
     "document_imported": "Document imported.",
     "import_failed": "Could not import.",
     "feature_soon": "Cloud, accounts and plans belong in the backend.",
-    "device_folder_screenshots": "Screenshots"
+    "device_folder_screenshots": "Screenshots",
+    "delete_document_title": "Delete document?",
+    "delete_document_message": "\"{name}\" will be permanently deleted. This can't be undone.",
+    "delete_document_done": "Document deleted.",
+    "extracting_zip": "Extracting documents…",
+    "zip_empty": "No supported documents were found in that zip.",
+    "zip_preview_title": "{count} documents found",
+    "zip_preview_subtitle": "Choose which ones to add to AllDocs.",
+    "zip_preview_select_all": "Select all",
+    "zip_preview_select_none": "Clear selection",
+    "zip_preview_import": "Import ({count})"
   },
   "profile": {
     "title": "Profile",

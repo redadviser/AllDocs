@@ -18,8 +18,30 @@ final _expiryReminderService = ExpiryReminderService();
 class LocalDocumentsStore {
   const LocalDocumentsStore();
 
-  static Directory? debugDirectory;
+  static Directory? _debugDirectory;
+
+  // A setter (not a plain field) so tests swapping in a fresh sandbox
+  // directory per-case also drop the in-memory state cache below — without
+  // this, a later test would read the previous test's cached state instead
+  // of its own directory's file.
+  static Directory? get debugDirectory => _debugDirectory;
+  static set debugDirectory(Directory? value) {
+    _debugDirectory = value;
+    _cachedState = null;
+  }
+
   static Directory? _fallbackDirectory;
+
+  // Every mutation (favoriting, importing, moving a document, ...) used to
+  // re-read and fully re-parse the whole state JSON from disk — and since
+  // all three tabs stay mounted (IndexedStack) and share one
+  // DocumentsService, a single change fired that reload three times over.
+  // As the document list grows this JSON blob grows with it (OCR text is
+  // stored per document), so that repeated parsing was a real, scaling
+  // source of jank. Caching the parsed state in memory turns every read
+  // after the first into a plain map lookup; only genuine writes still
+  // touch disk.
+  static Map<String, dynamic>? _cachedState;
   static const _stateFileName = 'alldocs_state.json';
   static const _documentsFolderName = 'documents';
   // AllDocs organizes documents, not photos — that's AllPhotos' job. Images
@@ -64,53 +86,34 @@ class LocalDocumentsStore {
     return _snapshotFromState(state);
   }
 
-  Future<int> importDocuments({String? albumId}) async {
+  /// Just the system file picker — importing is a separate step so the UI
+  /// can detect a .zip among the picked files and route it through the
+  /// extract-preview-select flow (see [extractZipPreview]) instead of
+  /// silently importing it whole.
+  Future<List<PlatformFile>> pickFilesForImport() async {
     final result = await FilePicker.pickFiles(
       allowMultiple: true,
       type: FileType.custom,
       allowedExtensions: [..._documentExtensions, 'zip'],
       withData: true,
     );
-    if (result == null || result.files.isEmpty) return 0;
+    return result?.files ?? const [];
+  }
+
+  Future<int> importPickedFiles(
+    List<PlatformFile> files, {
+    String? albumId,
+  }) async {
+    if (files.isEmpty) return 0;
 
     final state = await _readState();
     final documents = _documentsRaw(state);
     var imported = 0;
 
-    for (final picked in result.files) {
+    for (final picked in files) {
       final originalName = picked.name.trim().isEmpty
           ? 'documento_${DateTime.now().millisecondsSinceEpoch}.pdf'
           : picked.name.trim();
-
-      // A common user downloading a .zip often doesn't realize it needs
-      // extracting first — pull out whatever supported documents are
-      // inside instead of importing the zip itself as an opaque "document".
-      if (originalName.toLowerCase().endsWith('.zip') && picked.bytes != null) {
-        final entries = const SecureZipExtractor().extract(
-          picked.bytes!,
-          allowedExtensions: _documentExtensions,
-        );
-        for (final entry in entries) {
-          final id = _newId('doc');
-          final storedPath = await _copyPickedFile(
-            id: id,
-            originalName: entry.fileName,
-            pickedPath: null,
-            bytes: entry.bytes,
-          );
-          final importedDocument = await _documentFromStoredFile(
-            id: id,
-            fileName: entry.fileName,
-            storedPath: storedPath,
-            albumId: albumId,
-          );
-          documents.add(importedDocument.toJson());
-
-          if (albumId != null) _addDocumentToAlbum(state, albumId, id);
-          imported++;
-        }
-        continue;
-      }
 
       final id = _newId('doc');
       final storedPath = await _copyPickedFile(
@@ -122,6 +125,61 @@ class LocalDocumentsStore {
       final importedDocument = await _documentFromStoredFile(
         id: id,
         fileName: originalName,
+        storedPath: storedPath,
+        albumId: albumId,
+      );
+      documents.add(importedDocument.toJson());
+
+      if (albumId != null) _addDocumentToAlbum(state, albumId, id);
+      imported++;
+    }
+
+    await _writeState(state);
+    return imported;
+  }
+
+  /// Lists the supported documents inside a .zip without importing anything
+  /// yet — the UI shows these to the user (how many, which ones) so they
+  /// pick what actually lands in AllDocs via [importExtractedZipEntries].
+  /// Decoding/decompressing runs on a background isolate so a large zip
+  /// doesn't freeze the UI thread while it's processed.
+  Future<List<ExtractedZipEntry>> extractZipPreview(Uint8List zipBytes) {
+    return const SecureZipExtractor().extractInBackground(
+      zipBytes,
+      allowedExtensions: _documentExtensions,
+    );
+  }
+
+  /// Same as [extractZipPreview], reading the zip from a file already on
+  /// disk — used for a zip found via "search the whole device" scanning,
+  /// where there's a [localPath] instead of in-memory bytes.
+  Future<List<ExtractedZipEntry>> extractZipPreviewFromPath(String path) async {
+    final file = File(path);
+    if (!await file.exists()) return const [];
+    return extractZipPreview(await file.readAsBytes());
+  }
+
+  Future<int> importExtractedZipEntries(
+    List<ExtractedZipEntry> entries, {
+    String? albumId,
+  }) async {
+    if (entries.isEmpty) return 0;
+
+    final state = await _readState();
+    final documents = _documentsRaw(state);
+    var imported = 0;
+
+    for (final entry in entries) {
+      final id = _newId('doc');
+      final storedPath = await _copyPickedFile(
+        id: id,
+        originalName: entry.fileName,
+        pickedPath: null,
+        bytes: entry.bytes,
+      );
+      final importedDocument = await _documentFromStoredFile(
+        id: id,
+        fileName: entry.fileName,
         storedPath: storedPath,
         albumId: albumId,
       );
@@ -247,11 +305,17 @@ class LocalDocumentsStore {
 
     if (roots.isEmpty) return null;
 
+    // Unlike the per-folder scans, "search the whole device" also surfaces
+    // .zip files — a common user downloading one often doesn't realize it
+    // needs extracting, and this is the one place broad enough to run into
+    // a forgotten zip anywhere on the device. Importing one still extracts
+    // its contents instead of storing the zip itself (see importDocuments
+    // and importScannedDocuments).
     final documents = await _scanDirectories(
       roots,
       limit: 1800,
       preferDocuments: true,
-      allowedExtensions: _documentExtensions,
+      allowedExtensions: [..._documentExtensions, 'zip'],
     );
     documents.sort(_newestFirst);
 
@@ -263,6 +327,10 @@ class LocalDocumentsStore {
     );
   }
 
+  /// Imports documents found via device-folder scanning. A .zip among
+  /// [scannedDocuments] is skipped here — the UI routes those through
+  /// [extractZipPreviewFromPath]/[importExtractedZipEntries] instead, so the
+  /// user sees what's inside before anything is added.
   Future<int> importScannedDocuments(
     List<DocumentFile> scannedDocuments, {
     String? albumId,
@@ -274,6 +342,8 @@ class LocalDocumentsStore {
     var imported = 0;
 
     for (final scanned in scannedDocuments) {
+      if (scanned.fileName.toLowerCase().endsWith('.zip')) continue;
+
       final sourcePath = scanned.localPath;
       if (sourcePath == null || sourcePath.isEmpty) continue;
       final source = File(sourcePath);
@@ -519,6 +589,9 @@ class LocalDocumentsStore {
   }
 
   Future<Map<String, dynamic>> _readState() async {
+    final cached = _cachedState;
+    if (cached != null) return cached;
+
     final file = await _stateFile();
     if (!await file.exists()) {
       final initial = _initialState();
@@ -527,10 +600,16 @@ class LocalDocumentsStore {
     }
 
     try {
-      final decoded = jsonDecode(await file.readAsString());
+      // Parsing runs off the UI thread — with enough accumulated documents
+      // (each carrying its own OCR text) this file stops being "small JSON",
+      // and this is only the cold path anyway: every read after this one is
+      // served straight from _cachedState.
+      final raw = await file.readAsString();
+      final decoded = await Isolate.run(() => jsonDecode(raw));
       if (decoded is Map<String, dynamic>) {
         final migrated = _migrateState(decoded);
         if (migrated) await _writeState(decoded);
+        _cachedState = decoded;
         return decoded;
       }
     } catch (_) {
@@ -543,10 +622,14 @@ class LocalDocumentsStore {
   }
 
   Future<void> _writeState(Map<String, dynamic> state) async {
+    _cachedState = state;
     final file = await _stateFile();
     await file.parent.create(recursive: true);
-    const encoder = JsonEncoder.withIndent('  ');
-    await file.writeAsString(encoder.convert(state));
+    // Encoding also runs off the UI thread, and compact rather than
+    // indented — nothing reads this file by hand, and both save real time
+    // once it's carrying a large document history.
+    final encoded = await Isolate.run(() => jsonEncode(state));
+    await file.writeAsString(encoded);
   }
 
   Future<File> _stateFile() async {
@@ -656,23 +739,33 @@ class LocalDocumentsStore {
             .toList()
           ..sort((a, b) => a.position.compareTo(b.position));
 
+    // One pass to count documents per album, instead of the album loop
+    // below re-scanning the full document list once per album — that was
+    // O(albums × documents), and both grow as the archive fills up.
+    final albumDocumentCounts = <String, int>{};
+    for (final document in documents) {
+      final albumId = document.albumId;
+      if (albumId == null || albumId.isEmpty) continue;
+      albumDocumentCounts[albumId] = (albumDocumentCounts[albumId] ?? 0) + 1;
+    }
+
     final categories = <DocumentCategory>[
       for (final shelf in shelves)
         for (final album in shelf.albums)
           DocumentCategory(
             id: album.id,
             title: album.name,
-            count: documents.where((doc) => doc.albumId == album.id).length,
+            count: albumDocumentCounts[album.id] ?? 0,
             colorValue: album.colorValue,
             iconName: album.iconName,
           ),
     ];
 
     final recentDocuments = documents.take(5).toList();
-    final favoriteDocuments = documents
+    final favoriteDocumentsAll = documents
         .where((document) => document.isFavorite)
-        .take(5)
         .toList();
+    final favoriteDocuments = favoriteDocumentsAll.take(5).toList();
     final unorganizedDocuments = documents
         .where((document) => document.albumId == null || document.albumId == '')
         .toList();
@@ -707,9 +800,7 @@ class LocalDocumentsStore {
         planName: 'Free',
         documentsCount: documents.length,
         categoriesCount: categories.length,
-        favoritesCount: documents
-            .where((document) => document.isFavorite)
-            .length,
+        favoritesCount: favoriteDocumentsAll.length,
         storageSummary: StorageSummary(
           usedGb: usedBytes / 1024 / 1024 / 1024,
           totalGb: 10,
@@ -1146,7 +1237,14 @@ List<Map<String, Object?>> _scanDirectoryPaths({
   final queue = [for (final path in rootPaths) Directory(path)];
   final typeCounts = <String, int>{};
   final typeCaps = preferDocuments
-      ? const {'pdf': 800, 'word': 500, 'excel': 500, 'image': 250}
+      ? const {
+          'pdf': 800,
+          'word': 500,
+          'excel': 500,
+          'presentation': 300,
+          'archive': 150,
+          'image': 250,
+        }
       : const <String, int>{};
   final directoryLimit = preferDocuments ? 9000 : 2400;
   var scannedDirectories = 0;

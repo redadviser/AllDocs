@@ -147,7 +147,17 @@
     "document_imported": "Document importé.",
     "import_failed": "Importation impossible.",
     "feature_soon": "Cloud, comptes et plans passent par le backend.",
-    "device_folder_screenshots": "Captures d'écran"
+    "device_folder_screenshots": "Captures d'écran",
+    "delete_document_title": "Supprimer le document ?",
+    "delete_document_message": "« {name} » sera supprimé définitivement. Cette action est irréversible.",
+    "delete_document_done": "Document supprimé.",
+    "extracting_zip": "Extraction des documents…",
+    "zip_empty": "Aucun document pris en charge n'a été trouvé dans ce zip.",
+    "zip_preview_title": "{count} documents trouvés",
+    "zip_preview_subtitle": "Choisis ceux à ajouter à AllDocs.",
+    "zip_preview_select_all": "Tout sélectionner",
+    "zip_preview_select_none": "Effacer la sélection",
+    "zip_preview_import": "Importer ({count})"
   },
   "profile": {
     "title": "Profil",

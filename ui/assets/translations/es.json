@@ -147,7 +147,17 @@
     "document_imported": "Documento importado.",
     "import_failed": "No se pudo importar.",
     "feature_soon": "Nube, cuentas y planes van en el backend.",
-    "device_folder_screenshots": "Capturas de pantalla"
+    "device_folder_screenshots": "Capturas de pantalla",
+    "delete_document_title": "¿Eliminar documento?",
+    "delete_document_message": "\"{name}\" se eliminará permanentemente. Esta acción no se puede deshacer.",
+    "delete_document_done": "Documento eliminado.",
+    "extracting_zip": "Extrayendo documentos…",
+    "zip_empty": "No se encontraron documentos compatibles en ese zip.",
+    "zip_preview_title": "{count} documentos encontrados",
+    "zip_preview_subtitle": "Elige cuáles quieres añadir a AllDocs.",
+    "zip_preview_select_all": "Seleccionar todo",
+    "zip_preview_select_none": "Borrar selección",
+    "zip_preview_import": "Importar ({count})"
   },
   "profile": {
     "title": "Perfil",

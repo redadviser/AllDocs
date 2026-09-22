@@ -9,6 +9,7 @@ import 'package:pdfx/pdfx.dart';
 import 'package:xml/xml.dart' as xml;
 
 import '../../common/app_constants.dart';
+import '../../common/document_import_flow.dart';
 import '../../common/document_tile.dart';
 import '../../common/glass_panel.dart';
 import '../../common/snapshot_builder.dart';
@@ -55,6 +56,43 @@ class _ArchiveScreenState extends State<ArchiveScreen> {
               ),
               const SliverToBoxAdapter(child: SizedBox(height: 18)),
               SliverToBoxAdapter(
+                child: GlassPanel(
+                  child: Column(
+                    children: [
+                      SectionTitle(
+                        icon: Icons.folder_outlined,
+                        title: AppConstants.archiveDeviceFolders.tr(),
+                      ),
+                      const SizedBox(height: 12),
+                      _DeepDeviceSearchCard(
+                        loading: _deepSearchInProgress,
+                        onTap: () => _searchAllDeviceDocuments(context),
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        height: 108,
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: snapshot.deviceFolders.length,
+                          separatorBuilder: (context, index) =>
+                              const SizedBox(width: 12),
+                          itemBuilder: (context, index) {
+                            return _DeviceFolderCard(
+                              folder: snapshot.deviceFolders[index],
+                              onTap: () => _openDeviceFolder(
+                                context,
+                                snapshot.deviceFolders[index],
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 16)),
+              SliverToBoxAdapter(
                 child: _AddDocumentPanel(
                   onSelectFiles: () => _importDocuments(context),
                   onScanDocument: () => _scanDocument(context),
@@ -97,43 +135,6 @@ class _ArchiveScreenState extends State<ArchiveScreen> {
                           snapshot: snapshot,
                           documentsService: widget.documentsService,
                         ),
-                    ],
-                  ),
-                ),
-              ),
-              const SliverToBoxAdapter(child: SizedBox(height: 16)),
-              SliverToBoxAdapter(
-                child: GlassPanel(
-                  child: Column(
-                    children: [
-                      SectionTitle(
-                        icon: Icons.folder_outlined,
-                        title: AppConstants.archiveDeviceFolders.tr(),
-                      ),
-                      const SizedBox(height: 12),
-                      _DeepDeviceSearchCard(
-                        loading: _deepSearchInProgress,
-                        onTap: () => _searchAllDeviceDocuments(context),
-                      ),
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        height: 108,
-                        child: ListView.separated(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: snapshot.deviceFolders.length,
-                          separatorBuilder: (context, index) =>
-                              const SizedBox(width: 12),
-                          itemBuilder: (context, index) {
-                            return _DeviceFolderCard(
-                              folder: snapshot.deviceFolders[index],
-                              onTap: () => _openDeviceFolder(
-                                context,
-                                snapshot.deviceFolders[index],
-                              ),
-                            );
-                          },
-                        ),
-                      ),
                     ],
                   ),
                 ),
@@ -198,7 +199,10 @@ class _ArchiveScreenState extends State<ArchiveScreen> {
 
   Future<void> _importDocuments(BuildContext context) async {
     final messenger = ScaffoldMessenger.of(context);
-    final imported = await widget.documentsService.importDocuments();
+    final imported = await pickAndImportDocuments(
+      context,
+      widget.documentsService,
+    );
     if (!context.mounted || imported == 0) return;
     messenger.showSnackBar(
       SnackBar(
@@ -877,6 +881,8 @@ class _UnorganizedDocumentCard extends StatelessWidget {
         return Icons.table_chart_rounded;
       case DocumentType.presentation:
         return Icons.slideshow_rounded;
+      case DocumentType.archive:
+        return Icons.folder_zip_rounded;
       case DocumentType.image:
         return Icons.image_rounded;
     }
@@ -892,6 +898,8 @@ class _UnorganizedDocumentCard extends StatelessWidget {
         return const Color(0xFF4CC58A);
       case DocumentType.presentation:
         return const Color(0xFFFFA53D);
+      case DocumentType.archive:
+        return const Color(0xFF9AA0AC);
       case DocumentType.image:
         return const Color(0xFF9B6DFF);
     }
@@ -907,6 +915,8 @@ class _UnorganizedDocumentCard extends StatelessWidget {
         return 'XLS';
       case DocumentType.presentation:
         return 'PPT';
+      case DocumentType.archive:
+        return 'ZIP';
       case DocumentType.image:
         return AppConstants.archiveImage.tr().toUpperCase();
     }
@@ -1586,6 +1596,25 @@ class _ArchiveActions extends StatelessWidget {
               ),
             ),
           ),
+          const SizedBox(width: 6),
+          SizedBox(
+            width: 36,
+            height: 36,
+            child: IconButton(
+              tooltip: AppConstants.commonDelete.tr(),
+              padding: EdgeInsets.zero,
+              style: IconButton.styleFrom(
+                foregroundColor: AppTheme.destructive,
+                backgroundColor: AppTheme.surface.withValues(alpha: 0.54),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  side: const BorderSide(color: AppTheme.border),
+                ),
+              ),
+              onPressed: () => _confirmDelete(context),
+              icon: const Icon(Icons.delete_outline_rounded, size: 20),
+            ),
+          ),
         ],
       );
     }
@@ -1633,7 +1662,46 @@ class _ArchiveActions extends StatelessWidget {
           ),
           color: AppTheme.primarySoft,
         ),
+        IconButton(
+          tooltip: AppConstants.commonDelete.tr(),
+          onPressed: () => _confirmDelete(context),
+          icon: const Icon(Icons.delete_outline_rounded),
+          color: AppTheme.destructive,
+        ),
       ],
+    );
+  }
+
+  Future<void> _confirmDelete(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        title: Text(AppConstants.archiveDeleteDocumentTitle.tr()),
+        content: Text(
+          AppConstants.archiveDeleteDocumentMessage.tr(
+            namedArgs: {'name': document.title},
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(AppConstants.commonCancel.tr()),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            style: TextButton.styleFrom(foregroundColor: AppTheme.destructive),
+            child: Text(AppConstants.commonDelete.tr()),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    await documentsService.deleteDocument(document.id);
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(AppConstants.archiveDeleteDocumentDone.tr())),
     );
   }
 
@@ -1859,9 +1927,23 @@ class _DeviceScanSheetState extends State<_DeviceScanSheet> {
 
   Future<void> _importAll() async {
     setState(() => _importingAll = true);
-    final imported = await widget.documentsService.importScannedDocuments(
+
+    final zipDocuments = widget.scan.documents
+        .where((document) => document.type == DocumentType.archive)
+        .toList();
+    var imported = await widget.documentsService.importScannedDocuments(
       widget.scan.documents,
     );
+    for (final zipDocument in zipDocuments) {
+      final path = zipDocument.localPath;
+      if (path == null || !mounted) continue;
+      imported += await extractPreviewAndImportZipFromPath(
+        context,
+        widget.documentsService,
+        path: path,
+      );
+    }
+
     if (!mounted) return;
     setState(() {
       _importingAll = false;
@@ -1886,6 +1968,7 @@ class _DeviceScanSheetState extends State<_DeviceScanSheet> {
       DocumentType.word,
       DocumentType.excel,
       DocumentType.presentation,
+      DocumentType.archive,
       DocumentType.image,
     ];
 
@@ -2017,6 +2100,7 @@ class _DeviceTypeSummary extends StatelessWidget {
               DocumentType.word,
               DocumentType.excel,
               DocumentType.presentation,
+              DocumentType.archive,
               DocumentType.image,
             ])
               _DeviceTypeChip(
@@ -2236,9 +2320,21 @@ class _DeviceScanDocumentCardState extends State<_DeviceScanDocumentCard> {
 
   Future<void> _import() async {
     setState(() => _importing = true);
-    final imported = await widget.documentsService.importScannedDocuments([
-      widget.document,
-    ]);
+
+    int imported;
+    final path = widget.document.localPath;
+    if (widget.document.type == DocumentType.archive && path != null) {
+      imported = await extractPreviewAndImportZipFromPath(
+        context,
+        widget.documentsService,
+        path: path,
+      );
+    } else {
+      imported = await widget.documentsService.importScannedDocuments([
+        widget.document,
+      ]);
+    }
+
     if (!mounted) return;
     setState(() => _importing = false);
     if (imported > 0) widget.onImported();
@@ -2334,6 +2430,8 @@ IconData _documentIconFor(DocumentType type) {
       return Icons.table_chart_rounded;
     case DocumentType.presentation:
       return Icons.slideshow_rounded;
+    case DocumentType.archive:
+      return Icons.folder_zip_rounded;
     case DocumentType.image:
       return Icons.image_rounded;
   }
@@ -2349,6 +2447,8 @@ Color _documentColorFor(DocumentType type) {
       return const Color(0xFF4CC58A);
     case DocumentType.presentation:
       return const Color(0xFFFFA53D);
+    case DocumentType.archive:
+      return const Color(0xFF9AA0AC);
     case DocumentType.image:
       return const Color(0xFF9B6DFF);
   }
@@ -2364,6 +2464,8 @@ String _documentExtensionFor(DocumentType type) {
       return 'XLS';
     case DocumentType.presentation:
       return 'PPT';
+    case DocumentType.archive:
+      return 'ZIP';
     case DocumentType.image:
       return AppConstants.archiveImage.tr().toUpperCase();
   }
@@ -2375,6 +2477,7 @@ String _documentTypeLabel(DocumentType type) {
     DocumentType.word => 'Word',
     DocumentType.excel => 'Excel',
     DocumentType.presentation => 'PowerPoint',
+    DocumentType.archive => 'ZIP',
     DocumentType.image => AppConstants.archiveImage.tr(),
   };
 }

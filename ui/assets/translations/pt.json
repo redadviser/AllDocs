@@ -147,7 +147,17 @@
     "document_imported": "Documento importado.",
     "import_failed": "Não foi possível importar.",
     "feature_soon": "Cloud, contas e planos entram no backend.",
-    "device_folder_screenshots": "Screenshots"
+    "device_folder_screenshots": "Screenshots",
+    "delete_document_title": "Eliminar documento?",
+    "delete_document_message": "\"{name}\" será eliminado permanentemente. Esta ação não pode ser revertida.",
+    "delete_document_done": "Documento eliminado.",
+    "extracting_zip": "A extrair documentos…",
+    "zip_empty": "Não foram encontrados documentos suportados nesse zip.",
+    "zip_preview_title": "{count} documentos encontrados",
+    "zip_preview_subtitle": "Escolhe quais queres adicionar à AllDocs.",
+    "zip_preview_select_all": "Selecionar tudo",
+    "zip_preview_select_none": "Limpar seleção",
+    "zip_preview_import": "Importar ({count})"
   },
   "profile": {
     "title": "Perfil",

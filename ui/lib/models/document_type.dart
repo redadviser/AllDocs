@@ -1,10 +1,11 @@
-enum DocumentType { pdf, word, excel, presentation, image }
+enum DocumentType { pdf, word, excel, presentation, archive, image }
 
 DocumentType documentTypeFromName(String? raw) {
   return switch (raw) {
     'word' => DocumentType.word,
     'excel' => DocumentType.excel,
     'presentation' => DocumentType.presentation,
+    'archive' => DocumentType.archive,
     'image' => DocumentType.image,
     _ => DocumentType.pdf,
   };
@@ -29,6 +30,12 @@ DocumentType documentTypeFromFileName(String fileName) {
       lower.endsWith('.pptx') ||
       lower.endsWith('.odp')) {
     return DocumentType.presentation;
+  }
+  // Only ever seen transiently in "search the whole device" scan results —
+  // never persisted, since importing a zip extracts its contents instead
+  // of storing the zip itself. See SecureZipExtractor.
+  if (lower.endsWith('.zip')) {
+    return DocumentType.archive;
   }
   if (lower.endsWith('.jpg') ||
       lower.endsWith('.jpeg') ||

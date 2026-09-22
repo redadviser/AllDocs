@@ -1,3 +1,4 @@
+import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
@@ -52,6 +53,19 @@ class SecureZipExtractor {
   const SecureZipExtractor({this.limits = const ZipExtractionLimits()});
 
   final ZipExtractionLimits limits;
+
+  /// Same as [extract], but decoding/decompression — genuine CPU work for
+  /// anything but a tiny zip — runs on a background isolate instead of
+  /// blocking the UI thread. Always prefer this from UI code; [extract]
+  /// itself stays synchronous so it's trivial to unit test directly.
+  Future<List<ExtractedZipEntry>> extractInBackground(
+    Uint8List zipBytes, {
+    required List<String> allowedExtensions,
+  }) {
+    return Isolate.run(
+      () => extract(zipBytes, allowedExtensions: allowedExtensions),
+    );
+  }
 
   List<ExtractedZipEntry> extract(
     Uint8List zipBytes, {

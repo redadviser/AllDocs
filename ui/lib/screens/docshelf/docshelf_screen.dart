@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
 import '../../common/app_constants.dart';
+import '../../common/document_import_flow.dart';
 import '../../common/document_preview_card.dart';
 import '../../common/document_tile.dart';
 import '../../common/glass_panel.dart';
@@ -321,8 +322,11 @@ class _ShelfPanel extends StatelessWidget {
                                 .tr(),
                             actionLabel: AppConstants.commonImport.tr(),
                             onAction: () async {
-                              final imported = await documentsService
-                                  .importDocuments(albumId: album.id);
+                              final imported = await pickAndImportDocuments(
+                                context,
+                                documentsService,
+                                albumId: album.id,
+                              );
                               if (context.mounted && imported > 0) {
                                 Navigator.of(context).pop();
                               }

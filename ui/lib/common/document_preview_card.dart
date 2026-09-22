@@ -419,6 +419,7 @@ IconData _documentIcon(DocumentType type) {
     DocumentType.word => Icons.description_rounded,
     DocumentType.excel => Icons.table_chart_rounded,
     DocumentType.presentation => Icons.slideshow_rounded,
+    DocumentType.archive => Icons.folder_zip_rounded,
     DocumentType.image => Icons.image_rounded,
   };
 }
@@ -429,6 +430,7 @@ Color _documentColor(DocumentType type) {
     DocumentType.word => const Color(0xFF5C8DFF),
     DocumentType.excel => const Color(0xFF4CC58A),
     DocumentType.presentation => const Color(0xFFFFA53D),
+    DocumentType.archive => const Color(0xFF9AA0AC),
     DocumentType.image => const Color(0xFF9B6DFF),
   };
 }
@@ -439,6 +441,7 @@ String _documentExtension(DocumentType type) {
     DocumentType.word => 'DOC',
     DocumentType.excel => 'XLS',
     DocumentType.presentation => 'PPT',
+    DocumentType.archive => 'ZIP',
     DocumentType.image => AppConstants.archiveImage.tr().toUpperCase(),
   };
 }

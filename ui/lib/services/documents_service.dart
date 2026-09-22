@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 
 import '../models/models.dart';
 import 'auth_service.dart';
 import 'local_documents_store.dart';
+import 'secure_zip_extractor.dart';
 
 class DocumentsService {
   DocumentsService.local() : _store = const LocalDocumentsStore();
@@ -44,8 +46,35 @@ class DocumentsService {
     return plan[0].toUpperCase() + plan.substring(1);
   }
 
-  Future<int> importDocuments({String? albumId}) async {
-    final imported = await _store.importDocuments(albumId: albumId);
+  Future<List<PlatformFile>> pickFilesForImport() {
+    return _store.pickFilesForImport();
+  }
+
+  Future<int> importPickedFiles(
+    List<PlatformFile> files, {
+    String? albumId,
+  }) async {
+    final imported = await _store.importPickedFiles(files, albumId: albumId);
+    if (imported > 0) _notifyChanged();
+    return imported;
+  }
+
+  Future<List<ExtractedZipEntry>> extractZipPreview(Uint8List zipBytes) {
+    return _store.extractZipPreview(zipBytes);
+  }
+
+  Future<List<ExtractedZipEntry>> extractZipPreviewFromPath(String path) {
+    return _store.extractZipPreviewFromPath(path);
+  }
+
+  Future<int> importExtractedZipEntries(
+    List<ExtractedZipEntry> entries, {
+    String? albumId,
+  }) async {
+    final imported = await _store.importExtractedZipEntries(
+      entries,
+      albumId: albumId,
+    );
     if (imported > 0) _notifyChanged();
     return imported;
   }

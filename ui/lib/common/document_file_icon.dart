@@ -63,6 +63,7 @@ String documentTypeLabel(DocumentType type) {
     DocumentType.word => 'DOCX',
     DocumentType.excel => 'XLSX',
     DocumentType.presentation => 'PPTX',
+    DocumentType.archive => 'ZIP',
     DocumentType.image => 'JPG',
   };
 }
@@ -73,6 +74,7 @@ Color _colorFor(DocumentType type) {
     DocumentType.word => const Color(0xFF2D7BD8),
     DocumentType.excel => const Color(0xFF2F9A43),
     DocumentType.presentation => const Color(0xFFD98A2E),
+    DocumentType.archive => const Color(0xFF8A8F98),
     DocumentType.image => const Color(0xFF7E45D8),
   };
 }
@@ -83,6 +85,7 @@ IconData _iconFor(DocumentType type) {
     DocumentType.word => Icons.description_rounded,
     DocumentType.excel => Icons.table_chart_rounded,
     DocumentType.presentation => Icons.slideshow_rounded,
+    DocumentType.archive => Icons.folder_zip_rounded,
     DocumentType.image => Icons.image_rounded,
   };
 }

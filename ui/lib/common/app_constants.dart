@@ -137,6 +137,18 @@ class AppConstants {
   static const archiveArchive = 'archive.archive';
   static const archiveArchiveIn = 'archive.archive_in';
   static const archiveNoAlbums = 'archive.no_albums';
+  static const archiveDeleteDocumentTitle = 'archive.delete_document_title';
+  static const archiveDeleteDocumentMessage =
+      'archive.delete_document_message';
+  static const archiveDeleteDocumentDone = 'archive.delete_document_done';
+  static const archiveExtractingZip = 'archive.extracting_zip';
+  static const archiveZipEmpty = 'archive.zip_empty';
+  static const archiveZipPreviewTitle = 'archive.zip_preview_title';
+  static const archiveZipPreviewSubtitle = 'archive.zip_preview_subtitle';
+  static const archiveZipPreviewSelectAll = 'archive.zip_preview_select_all';
+  static const archiveZipPreviewSelectNone =
+      'archive.zip_preview_select_none';
+  static const archiveZipPreviewImport = 'archive.zip_preview_import';
   static const archiveUnorganizedEmpty = 'archive.unorganized_empty';
   static const archiveOpenFolder = 'archive.open_folder';
   static const archiveSelectFolder = 'archive.select_folder';
