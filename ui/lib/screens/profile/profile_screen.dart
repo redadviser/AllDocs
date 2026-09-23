@@ -245,7 +245,7 @@ class _BackupPanel extends StatelessWidget {
 
 const _supportEmail = 'webmaster@eupasoft.com';
 const _privacyPolicyUrl = 'https://redadviser.com/?page_id=316';
-const _androidPackageName = 'com.eupasoft.alldocs.all_docs';
+const _androidPackageName = 'com.alldocs.app';
 
 class _SupportPanel extends StatelessWidget {
   const _SupportPanel();

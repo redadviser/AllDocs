@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.eupasoft.alldocs.all_docs"
+    namespace = "com.alldocs.app"
     compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
@@ -23,7 +23,7 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.eupasoft.alldocs.all_docs"
+        applicationId = "com.alldocs.app"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
@@ -32,7 +32,7 @@ android {
         versionName = flutter.versionName
         // OAuth redirect scheme for OneDrive/Dropbox sign-in (flutter_appauth).
         // Must match CloudConfig.redirectUri on the Dart side.
-        manifestPlaceholders["appAuthRedirectScheme"] = "com.eupasoft.alldocs"
+        manifestPlaceholders["appAuthRedirectScheme"] = "com.alldocs.app"
     }
 
     buildTypes {

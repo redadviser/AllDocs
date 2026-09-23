@@ -207,7 +207,7 @@ Two things stay build-time:
   `ui/cloud_keys.example.json`) wins over the backend's value, e.g. to test
   other registrations.
 
-OAuth redirect for OneDrive and Dropbox: `com.eupasoft.alldocs:/oauth2redirect`
+OAuth redirect for OneDrive and Dropbox: `com.alldocs.app:/oauth2redirect`
 (`CloudConfig.redirectUri`, already wired in `build.gradle.kts` and
 `Info.plist`).
 
@@ -217,9 +217,9 @@ OAuth redirect for OneDrive and Dropbox: `com.eupasoft.alldocs:/oauth2redirect`
    `drive.readonly` is a *restricted* scope — fine for test users while the
    app is in "Testing", but publishing needs Google's verification.
 3. Credentials: a **Web** client (→ `GOOGLE_SIGNIN_WEB_CLIENT_ID`), an
-   **Android** client for `com.eupasoft.alldocs.all_docs` with the SHA-1 of
+   **Android** client for `com.alldocs.app` with the SHA-1 of
    every signing key (debug, upload, Play app signing), and an **iOS**
-   client for `com.eupasoft.alldocs.allDocs` (→ `GOOGLE_SIGNIN_IOS_CLIENT_ID`;
+   client for `com.alldocs.app` (→ `GOOGLE_SIGNIN_IOS_CLIENT_ID`;
    the Android client id → `GOOGLE_SIGNIN_ANDROID_CLIENT_ID`).
 4. iOS: put the iOS client's *reversed* id
    (`com.googleusercontent.apps.<...>`) in

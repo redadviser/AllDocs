@@ -12,7 +12,7 @@ class CloudConfig {
   /// Must match `appAuthRedirectScheme` in android/app/build.gradle.kts (and
   /// CFBundleURLSchemes on iOS), and be registered as a redirect URI in the
   /// Microsoft and Dropbox app consoles.
-  static const redirectUri = 'com.eupasoft.alldocs:/oauth2redirect';
+  static const redirectUri = 'com.alldocs.app:/oauth2redirect';
 
   /// Microsoft Entra (Azure AD) app registration → "Application (client)
   /// ID". Platform: "Mobile and desktop", redirect URI = [redirectUri].

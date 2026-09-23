@@ -1,4 +1,4 @@
-package com.eupasoft.alldocs.all_docs
+package com.alldocs.app
 
 import android.view.WindowManager
 import io.flutter.embedding.android.FlutterFragmentActivity

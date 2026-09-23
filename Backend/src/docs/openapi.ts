@@ -44,7 +44,7 @@ export const openApiSpec = {
       '  callback URL on the backend.',
       '- *Google Drive, OneDrive, Dropbox*: authorized on the phone (PKCE);',
       '  the OAuth redirect is the app\'s own scheme',
-      '  `com.eupasoft.alldocs:/oauth2redirect`, and the tokens stay in the',
+      '  `com.alldocs.app:/oauth2redirect`, and the tokens stay in the',
       '  phone\'s keystore. The backend only hands out the public client ids',
       '  (`GET /api/config/cloud`) and never sees users\' cloud tokens.',
     ].join('\n'),

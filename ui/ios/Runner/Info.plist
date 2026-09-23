@@ -78,7 +78,7 @@
 		<dict>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>com.eupasoft.alldocs</string>
+				<string>com.alldocs.app</string>
 			</array>
 		</dict>
 		<dict>
