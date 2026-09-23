@@ -194,4 +194,15 @@ class OneDriveProvider extends OAuthCloudProvider {
     );
     return items.where((item) => !item.isFolder).toList();
   }
+
+  @override
+  Future<void> deleteBackup(CloudItem backup) async {
+    await send(
+      (token) => request(
+        'DELETE',
+        Uri.parse('$_graph/me/drive/items/${backup.id}'),
+        token,
+      ),
+    );
+  }
 }

@@ -183,3 +183,69 @@ add a native dependency from an unverified author without the ability to
 test on real iOS hardware in the session that evaluated it. Revisit as part
 of the roadmap's Phase 6 (hardening) before a paid iOS launch, testing
 candidates on a real device/simulator first.
+
+## Cloud integrations (Google Drive, OneDrive, Dropbox)
+
+Each provider needs an app registration of our own. The ids live in the
+**backend's `.env`** (`GOOGLE_SIGNIN_WEB_CLIENT_ID`,
+`GOOGLE_SIGNIN_IOS_CLIENT_ID`, `GOOGLE_SIGNIN_ANDROID_CLIENT_ID`,
+`ONEDRIVE_CLIENT_ID`, `DROPBOX_APP_KEY`) and reach the app through the public
+`GET /api/config/cloud` (they're public PKCE client ids, not secrets). The
+app (`CloudKeys`) fetches them at startup and caches them for offline use, so
+adding or rotating a key needs no new build. A provider without its id shows
+as "Coming soon" on the Connections page.
+
+Users' cloud tokens never go through the backend: they're issued to the
+phone and kept in its keystore (`CloudTokenStore`).
+
+Two things stay build-time:
+- iOS: the reversed Google iOS client id must be a URL scheme — copy
+  `ui/ios/Flutter/CloudKeys.xcconfig.example` to `CloudKeys.xcconfig`
+  (git-ignored) and fill it in.
+- Optional dev override: a `--dart-define` of the same name (or
+  `--dart-define-from-file=cloud_keys.json`, see
+  `ui/cloud_keys.example.json`) wins over the backend's value, e.g. to test
+  other registrations.
+
+OAuth redirect for OneDrive and Dropbox: `com.eupasoft.alldocs:/oauth2redirect`
+(`CloudConfig.redirectUri`, already wired in `build.gradle.kts` and
+`Info.plist`).
+
+**Google Drive** (Google Cloud console, same project as "Sign in with Google"):
+1. Enable the Google Drive API.
+2. OAuth consent screen: add the scopes `drive.readonly` and `drive.appdata`.
+   `drive.readonly` is a *restricted* scope — fine for test users while the
+   app is in "Testing", but publishing needs Google's verification.
+3. Credentials: a **Web** client (→ `GOOGLE_SIGNIN_WEB_CLIENT_ID`), an
+   **Android** client for `com.eupasoft.alldocs.all_docs` with the SHA-1 of
+   every signing key (debug, upload, Play app signing), and an **iOS**
+   client for `com.eupasoft.alldocs.allDocs` (→ `GOOGLE_SIGNIN_IOS_CLIENT_ID`;
+   the Android client id → `GOOGLE_SIGNIN_ANDROID_CLIENT_ID`).
+4. iOS: put the iOS client's *reversed* id
+   (`com.googleusercontent.apps.<...>`) in
+   `ui/ios/Flutter/CloudKeys.xcconfig` — `Info.plist` already registers it
+   as a URL scheme.
+
+Backups go to Drive's hidden app-data folder (not visible in the Drive UI).
+
+**OneDrive** (Microsoft Entra admin center → App registrations):
+1. New registration, "Accounts in any organizational directory and personal
+   Microsoft accounts".
+2. Authentication → add platform "Mobile and desktop applications" with the
+   redirect URI above; allow public client flows.
+3. API permissions (Microsoft Graph, delegated): `Files.ReadWrite`,
+   `User.Read`, `offline_access`.
+4. The Application (client) id → `ONEDRIVE_CLIENT_ID`.
+
+Backups go to `Apps/AllDocs` (the app folder) in the user's OneDrive.
+
+**Dropbox** (dropbox.com/developers/apps):
+1. Create app → Scoped access → Full Dropbox (browsing/import needs it).
+2. Permissions: `account_info.read`, `files.metadata.read`,
+   `files.content.read`, `files.content.write`.
+3. OAuth 2 redirect URIs: the redirect URI above.
+4. App key → `DROPBOX_APP_KEY` (PKCE, no secret in the app). Until the app
+   is approved for production only the developer + up to 500 users can link.
+
+Backups go to `/AllDocs Backups`. Every provider keeps the latest 3 backups
+(`BackupService.keptCloudBackups`); older ones are deleted after each upload.

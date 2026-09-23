@@ -110,6 +110,7 @@ abstract class CloudProvider {
 
   Future<CloudItem> uploadBackup(String fileName, File file);
   Future<List<CloudItem>> listBackups();
+  Future<void> deleteBackup(CloudItem backup);
 }
 
 /// Tokens live in the platform keystore (flutter_secure_storage), never in

@@ -44,3 +44,7 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Cloud OAuth ids (see cloud_keys.example.json / CloudKeys.xcconfig.example)
+/cloud_keys.json
+/ios/Flutter/CloudKeys.xcconfig

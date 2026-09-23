@@ -1,0 +1,4 @@
+// Copy to CloudKeys.xcconfig (git-ignored) and fill in.
+// Reversed iOS client id from Google Cloud, e.g.
+// com.googleusercontent.apps.1234567890-abcdef
+GOOGLE_REVERSED_CLIENT_ID = com.googleusercontent.apps.REPLACE_ME

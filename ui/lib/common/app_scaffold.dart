@@ -102,13 +102,13 @@ class _MainNavScreenState extends State<MainNavScreen> {
         final screens = [
           GalleryScreen(
             documentsService: _documentsService,
-            onOpenProfile: _openProfile,
+            onOpenArchive: _openArchive,
             onOpenAlbums: () => _selectPage(1),
             onOpenAlbum: _openAlbum,
             onOpenCloud: _openCloud,
           ),
           AlbumsScreen(documentsService: _documentsService),
-          ArchiveScreen(documentsService: _documentsService),
+          ProfileScreen(documentsService: _documentsService),
         ];
 
         return Scaffold(
@@ -143,12 +143,12 @@ class _MainNavScreenState extends State<MainNavScreen> {
                 label: AppConstants.navAlbums.tr(),
               ),
               NavigationDestination(
-                icon: const Icon(Icons.inventory_2_outlined),
+                icon: const Icon(Icons.person_outline_rounded),
                 selectedIcon: Icon(
-                  Icons.inventory_2_rounded,
+                  Icons.person_rounded,
                   color: AppTheme.accent,
                 ),
-                label: AppConstants.navArchive.tr(),
+                label: AppConstants.navProfile.tr(),
               ),
             ],
           ),
@@ -162,13 +162,13 @@ class _MainNavScreenState extends State<MainNavScreen> {
     setState(() => _selectedIndex = index);
   }
 
-  void _openProfile() {
+  void _openArchive() {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => Scaffold(
           backgroundColor: AppTheme.background,
           body: SafeArea(
-            child: ProfileScreen(
+            child: ArchiveScreen(
               documentsService: _documentsService,
               showBackButton: true,
             ),

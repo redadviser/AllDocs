@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../common/app_constants.dart';
+import '../../common/backup_flow.dart';
 import '../../common/glass_panel.dart';
 import '../../common/snapshot_builder.dart';
 import '../../common/user_initials.dart';
@@ -123,6 +124,8 @@ class _ProfileOverviewPage extends StatelessWidget {
           onEditPhoto: () => _pickAndSaveAvatar(documentsService),
         ),
         const SizedBox(height: 14),
+        _BackupPanel(documentsService: documentsService),
+        const SizedBox(height: 14),
         _StoragePanel(summary: profile.storageSummary),
         const SizedBox(height: 14),
         _ProfileWideAction(
@@ -137,6 +140,105 @@ class _ProfileOverviewPage extends StatelessWidget {
         const SizedBox(height: 14),
         const _SupportPanel(),
       ],
+    );
+  }
+}
+
+/// Backup at one tap: shows when/where the last one went; "Back up now"
+/// asks where to (phone or any cloud) and does it.
+class _BackupPanel extends StatelessWidget {
+  const _BackupPanel({required this.documentsService});
+
+  final DocumentsService documentsService;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: Listenable.merge([
+        AppSettings.lastBackupAt,
+        AppSettings.backupProvider,
+      ]),
+      builder: (context, _) {
+        final last = AppSettings.lastBackupAt.value;
+        final providerId = AppSettings.backupProvider.value;
+        final destination = providerId == null
+            ? AppConstants.backupThisDevice.tr()
+            : documentsService.cloud.providerNamed(providerId)?.displayName ??
+                  AppConstants.backupThisDevice.tr();
+        return GlassPanel(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 46,
+                    height: 46,
+                    decoration: BoxDecoration(
+                      color: AppTheme.accent.withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(
+                      Icons.backup_outlined,
+                      color: AppTheme.accent,
+                      size: 26,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          AppConstants.backupTitle.tr(),
+                          style: const TextStyle(
+                            color: AppTheme.text,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          last == null
+                              ? AppConstants.backupStatusNever.tr()
+                              : AppConstants.backupStatus.tr(
+                                  namedArgs: {
+                                    'date': DateFormat.yMMMd().add_Hm().format(
+                                      last,
+                                    ),
+                                    'destination': destination,
+                                  },
+                                ),
+                          style: const TextStyle(color: AppTheme.mutedText),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: () =>
+                          showBackupSheet(context, documentsService),
+                      icon: const Icon(Icons.backup_outlined),
+                      label: Text(AppConstants.backupNow.tr()),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  OutlinedButton(
+                    onPressed: () =>
+                        openConnectionsPage(context, documentsService),
+                    child: Text(AppConstants.backupOptions.tr()),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

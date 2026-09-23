@@ -39,6 +39,10 @@ class BackupService {
   static const _documentsPrefix = 'documents/';
   static const autoBackupInterval = Duration(hours: 24);
 
+  /// Backups kept per cloud account; older ones are deleted after a new
+  /// one uploads, so a daily auto-backup doesn't fill the account.
+  static const keptCloudBackups = 3;
+
   String backupFileName(DateTime now) {
     String two(int value) => value.toString().padLeft(2, '0');
     return 'AllDocs_backup_${now.year}${two(now.month)}${two(now.day)}_'
@@ -110,10 +114,26 @@ class BackupService {
     try {
       final item = await provider.uploadBackup(_baseName(file.path), file);
       await AppSettings.setLastBackupAt(DateTime.now());
+      await _pruneCloudBackups(provider);
       return item;
     } finally {
       if (await file.exists()) await file.delete();
     }
+  }
+
+  /// Best-effort: a failed cleanup must not turn a good backup into an
+  /// error.
+  Future<void> _pruneCloudBackups(CloudProvider provider) async {
+    try {
+      final backups =
+          (await provider.listBackups())
+              .where((item) => item.name.startsWith('AllDocs_backup_'))
+              .toList()
+            ..sort((a, b) => b.name.compareTo(a.name));
+      for (final old in backups.skip(keptCloudBackups)) {
+        await provider.deleteBackup(old);
+      }
+    } catch (_) {}
   }
 
   /// Lets the user pick a folder and writes the backup zip there.

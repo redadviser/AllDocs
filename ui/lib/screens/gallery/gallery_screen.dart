@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'dart:async';
 
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
@@ -13,24 +13,24 @@ import '../../common/document_file_icon.dart';
 import '../../common/document_import_flow.dart';
 import '../../common/document_preview_card.dart';
 import '../../common/snapshot_builder.dart';
-import '../../common/user_initials.dart';
 import '../../models/models.dart';
 import '../../services/services.dart';
 import '../../theme/app_theme.dart';
+import '../albums/album_detail_screen.dart';
 import '../viewer/document_viewer_screen.dart';
 
 class GalleryScreen extends StatefulWidget {
   const GalleryScreen({
     super.key,
     required this.documentsService,
-    required this.onOpenProfile,
+    required this.onOpenArchive,
     required this.onOpenAlbums,
     required this.onOpenAlbum,
     required this.onOpenCloud,
   });
 
   final DocumentsService documentsService;
-  final VoidCallback onOpenProfile;
+  final VoidCallback onOpenArchive;
   final VoidCallback onOpenAlbums;
   final void Function(DocumentAlbum album) onOpenAlbum;
   final void Function(CloudProviderId? provider) onOpenCloud;
@@ -46,12 +46,17 @@ class _GalleryScreenState extends State<GalleryScreen> {
   DocumentType? _gridType;
   final Set<String> _selected = {};
   bool _searchingDevice = false;
+  Timer? _recentExpiry;
+
+  /// How many recent documents the gallery shows before "View all".
+  static const _recentPreviewCount = 3;
 
   DocumentsService get _service => widget.documentsService;
   bool get _selecting => _selected.isNotEmpty;
 
   @override
   void dispose() {
+    _recentExpiry?.cancel();
     _searchController.dispose();
     _searchFocus.dispose();
     super.dispose();
@@ -131,7 +136,10 @@ class _GalleryScreenState extends State<GalleryScreen> {
                         )
                       : _Header(
                           profile: snapshot.profile,
-                          onOpenProfile: widget.onOpenProfile,
+                          archivedCount:
+                              snapshot.archivedDocuments.length +
+                              snapshot.trashDocuments.length,
+                          onOpenArchive: widget.onOpenArchive,
                         ),
                 ),
               ),
@@ -188,10 +196,14 @@ class _GalleryScreenState extends State<GalleryScreen> {
   // Home ------------------------------------------------------------------
 
   List<Widget> _buildHome(DocumentsSnapshot snapshot) {
-    final documents = snapshot.documents;
+    // Documents that went into an album live there now; the gallery only
+    // keeps what still needs organizing.
+    final documents = snapshot.unorganizedDocuments;
     final gridDocuments = _gridType == null
         ? documents
         : documents.where((d) => d.type == _gridType).toList();
+    final recents = snapshot.recentAt(DateTime.now());
+    _scheduleRecentExpiry(recents);
 
     return [
       SliverPadding(
@@ -222,7 +234,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
           ),
         ),
       ),
-      if (documents.isEmpty)
+      if (snapshot.documents.isEmpty)
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(20, 48, 20, 0),
           sliver: SliverToBoxAdapter(child: _EmptyGallery()),
@@ -242,22 +254,29 @@ class _GalleryScreenState extends State<GalleryScreen> {
             ),
           ),
         ],
-        _sectionHeader(AppConstants.docshelfRecent.tr()),
-        SliverToBoxAdapter(
-          child: SizedBox(
-            height: 196,
-            child: ListView.separated(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              scrollDirection: Axis.horizontal,
-              itemCount: snapshot.recentDocuments.length,
-              separatorBuilder: (context, index) => const SizedBox(width: 12),
-              itemBuilder: (context, index) {
-                final document = snapshot.recentDocuments[index];
-                return SizedBox(width: 124, child: _card(document));
-              },
+        if (recents.isNotEmpty) ...[
+          _sectionHeader(
+            AppConstants.docshelfRecent.tr(),
+            action: recents.length > _recentPreviewCount
+                ? AppConstants.commonViewAll.tr()
+                : null,
+            onAction: _openAllRecents,
+          ),
+          SliverToBoxAdapter(
+            child: SizedBox(
+              height: 196,
+              child: ListView.separated(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                scrollDirection: Axis.horizontal,
+                itemCount: recents.length.clamp(0, _recentPreviewCount),
+                separatorBuilder: (context, index) => const SizedBox(width: 12),
+                itemBuilder: (context, index) {
+                  return SizedBox(width: 124, child: _card(recents[index]));
+                },
+              ),
             ),
           ),
-        ),
+        ],
         if (snapshot.albums.isNotEmpty) ...[
           _sectionHeader(
             AppConstants.galleryAlbums.tr(),
@@ -320,9 +339,49 @@ class _GalleryScreenState extends State<GalleryScreen> {
           ),
         ),
         const SliverToBoxAdapter(child: SizedBox(height: 12)),
-        _grid(gridDocuments),
+        if (documents.isEmpty)
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+            sliver: SliverToBoxAdapter(
+              child: Text(
+                AppConstants.galleryAllOrganized.tr(),
+                style: const TextStyle(color: AppTheme.mutedText, fontSize: 13),
+              ),
+            ),
+          )
+        else
+          _grid(gridDocuments),
       ],
     ];
+  }
+
+  /// Rebuilds when the oldest recent document ages out of the "Recent" row,
+  /// so it disappears on time even if nothing else changes.
+  void _scheduleRecentExpiry(List<DocumentFile> recents) {
+    _recentExpiry?.cancel();
+    final oldest = recents.lastOrNull?.importedAt;
+    if (oldest == null) return;
+    final delay = oldest
+        .add(DocumentsSnapshot.recentWindow)
+        .difference(DateTime.now());
+    _recentExpiry = Timer(
+      delay.isNegative ? Duration.zero : delay + const Duration(seconds: 1),
+      () {
+        if (mounted) setState(() {});
+      },
+    );
+  }
+
+  void _openAllRecents() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => AlbumDetailScreen(
+          documentsService: _service,
+          title: AppConstants.docshelfRecent.tr(),
+          select: (snapshot) => snapshot.recentAt(DateTime.now()),
+        ),
+      ),
+    );
   }
 
   // Search ----------------------------------------------------------------
@@ -538,10 +597,15 @@ class _GalleryScreenState extends State<GalleryScreen> {
 }
 
 class _Header extends StatelessWidget {
-  const _Header({required this.profile, required this.onOpenProfile});
+  const _Header({
+    required this.profile,
+    required this.archivedCount,
+    required this.onOpenArchive,
+  });
 
   final UserProfile profile;
-  final VoidCallback onOpenProfile;
+  final int archivedCount;
+  final VoidCallback onOpenArchive;
 
   @override
   Widget build(BuildContext context) {
@@ -574,32 +638,22 @@ class _Header extends StatelessWidget {
             ],
           ),
         ),
-        InkWell(
-          customBorder: const CircleBorder(),
-          onTap: onOpenProfile,
-          child: CircleAvatar(
-            radius: 21,
+        IconButton.filledTonal(
+          tooltip: AppConstants.archiveTitle.tr(),
+          onPressed: onOpenArchive,
+          style: IconButton.styleFrom(
             backgroundColor: AppTheme.surfaceStrong,
-            foregroundImage: _avatarImage(profile.avatarUrl),
-            child: Text(
-              initialsFromName(profile.name),
-              style: const TextStyle(
-                color: AppTheme.text,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+            foregroundColor: AppTheme.text,
+          ),
+          icon: Badge(
+            isLabelVisible: archivedCount > 0,
+            label: Text('$archivedCount'),
+            child: const Icon(Icons.inventory_2_outlined),
           ),
         ),
       ],
     );
   }
-}
-
-ImageProvider? _avatarImage(String? avatarUrl) {
-  if (avatarUrl == null || avatarUrl.isEmpty) return null;
-  if (avatarUrl.startsWith('http')) return NetworkImage(avatarUrl);
-  final file = File(avatarUrl);
-  return file.existsSync() ? FileImage(file) : null;
 }
 
 class _SelectionBar extends StatelessWidget {

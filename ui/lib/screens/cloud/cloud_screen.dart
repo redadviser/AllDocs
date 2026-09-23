@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../common/app_constants.dart';
 import '../../common/album_dialog.dart';
+import '../../common/backup_flow.dart';
 import '../../common/document_actions.dart';
 import '../../common/document_import_flow.dart';
 import '../../services/services.dart';
@@ -111,24 +112,9 @@ class CloudScreenState extends State<CloudScreen> {
   }
 
   Future<bool> _connect(CloudProvider provider) async {
-    try {
-      await SecurityLockService.withoutAutoLock(provider.connect);
-      await _refreshStatus();
-      if (mounted) {
-        showSnack(
-          context,
-          AppConstants.cloudConnected.tr(
-            namedArgs: {'provider': provider.displayName},
-          ),
-        );
-      }
-      return true;
-    } on CloudNotConfiguredException {
-      if (mounted) showSnack(context, AppConstants.cloudNotConfigured.tr());
-    } catch (_) {
-      if (mounted) showSnack(context, AppConstants.cloudConnectFailed.tr());
-    }
-    return false;
+    final ok = await connectCloudProvider(context, provider);
+    await _refreshStatus();
+    return ok;
   }
 
   Future<void> _disconnect(CloudProvider provider) async {
@@ -289,11 +275,13 @@ class CloudScreenState extends State<CloudScreen> {
         _SectionTitle(AppConstants.backupTitle.tr()),
         const SizedBox(height: 8),
         _BackupCard(
-          connected: connected,
+          providers: _cloud.providers,
+          status: _status,
           busy: _backingUp,
+          onSelectDestination: _selectBackupDestination,
           onBackupNow: _backupNow,
           onSaveToDevice: _saveToDevice,
-          onRestore: () => _restore(connected),
+          onRestore: _restore,
         ),
       ],
     );
@@ -328,21 +316,41 @@ class CloudScreenState extends State<CloudScreen> {
     }
   }
 
-  Future<void> _backupNow() async {
+  /// Picking a cloud that isn't connected yet connects it first; null means
+  /// "this phone".
+  Future<void> _selectBackupDestination(CloudProvider? provider) async {
+    if (provider == null) {
+      await AppSettings.setBackupProvider(null);
+      return;
+    }
+    if (!provider.isConfigured) {
+      showSnack(context, AppConstants.cloudNotConfigured.tr());
+      return;
+    }
+    if (_status[provider.id]?.connected != true && !await _connect(provider)) {
+      return;
+    }
+    await AppSettings.setBackupProvider(provider.id.name);
+  }
+
+  CloudProvider? get _backupProvider {
     final providerId = AppSettings.backupProvider.value;
     final provider = providerId == null
         ? null
         : _cloud.providerNamed(providerId);
-    if (provider == null) {
-      await _saveToDevice();
-      return;
+    if (provider == null || _status[provider.id]?.connected != true) {
+      return null;
     }
+    return provider;
+  }
+
+  Future<void> _backupNow() async {
+    final provider = _backupProvider;
     setState(() => _backingUp = true);
     try {
-      await widget.documentsService.backup.backupToCloud(provider);
-      if (mounted) showSnack(context, AppConstants.backupDone.tr());
-    } catch (_) {
-      if (mounted) showSnack(context, AppConstants.backupFailed.tr());
+      provider == null
+          ? await saveBackupToDevice(context, widget.documentsService)
+          : await backupToCloud(context, widget.documentsService, provider);
     } finally {
       if (mounted) setState(() => _backingUp = false);
     }
@@ -351,25 +359,17 @@ class CloudScreenState extends State<CloudScreen> {
   Future<void> _saveToDevice() async {
     setState(() => _backingUp = true);
     try {
-      final path = await SecurityLockService.withoutAutoLock(
-        () => widget.documentsService.backup.saveBackupToDevice(
-          dialogTitle: AppConstants.backupPickFolder.tr(),
-        ),
-      );
-      if (path != null && mounted) {
-        showSnack(
-          context,
-          AppConstants.backupSavedTo.tr(namedArgs: {'path': path}),
-        );
-      }
-    } catch (_) {
-      if (mounted) showSnack(context, AppConstants.backupFailed.tr());
+      await saveBackupToDevice(context, widget.documentsService);
     } finally {
       if (mounted) setState(() => _backingUp = false);
     }
   }
 
-  Future<void> _restore(List<CloudProvider> connected) async {
+  Future<void> _restore() async {
+    // Every configured cloud is offered, not just connected ones: after a
+    // reinstall nothing is connected yet, and that's exactly when a restore
+    // is needed.
+    final clouds = _cloud.providers.where((p) => p.isConfigured).toList();
     final source = await showModalBottomSheet<Object>(
       context: context,
       showDragHandle: true,
@@ -382,10 +382,20 @@ class CloudScreenState extends State<CloudScreen> {
               title: Text(AppConstants.backupFromDevice.tr()),
               onTap: () => Navigator.of(context).pop('device'),
             ),
-            for (final provider in connected)
+            for (final provider in clouds)
               ListTile(
-                leading: const Icon(Icons.cloud_outlined),
+                leading: Icon(cloudProviderIcon(provider.id)),
                 title: Text(provider.displayName),
+                subtitle: Text(
+                  _status[provider.id]?.connected == true
+                      ? (_status[provider.id]?.account ??
+                            AppConstants.cloudConnectedShort.tr())
+                      : AppConstants.cloudTapToConnect.tr(),
+                  style: const TextStyle(
+                    color: AppTheme.mutedText,
+                    fontSize: 12.5,
+                  ),
+                ),
                 onTap: () => Navigator.of(context).pop(provider),
               ),
           ],
@@ -393,6 +403,12 @@ class CloudScreenState extends State<CloudScreen> {
       ),
     );
     if (source == null || !mounted) return;
+    if (source is CloudProvider &&
+        _status[source.id]?.connected != true &&
+        !await _connect(source)) {
+      return;
+    }
+    if (!mounted) return;
 
     Future<BackupInfo?> Function()? restore;
     if (source == 'device') {
@@ -400,7 +416,13 @@ class CloudScreenState extends State<CloudScreen> {
         widget.documentsService.backup.pickAndRestoreFromDevice,
       );
     } else if (source is CloudProvider) {
-      final backups = await source.listBackups();
+      final List<CloudItem> backups;
+      try {
+        backups = await source.listBackups();
+      } catch (_) {
+        if (mounted) showSnack(context, AppConstants.cloudRequestFailed.tr());
+        return;
+      }
       if (!mounted) return;
       if (backups.isEmpty) {
         showSnack(context, AppConstants.backupNoneFound.tr());
@@ -496,10 +518,7 @@ class _ProviderTile extends StatelessWidget {
 
     return ListTile(
       contentPadding: const EdgeInsets.fromLTRB(16, 4, 8, 4),
-      leading: CircleAvatar(
-        backgroundColor: _color(provider.id).withValues(alpha: 0.14),
-        child: Icon(_icon(provider.id), color: _color(provider.id), size: 22),
-      ),
+      leading: _ProviderAvatar(provider.id),
       title: Text(provider.displayName),
       subtitle: Text(
         subtitle,
@@ -528,31 +547,42 @@ class _ProviderTile extends StatelessWidget {
             ),
     );
   }
+}
 
-  IconData _icon(CloudProviderId id) => switch (id) {
-    CloudProviderId.oneDrive => Icons.cloud_outlined,
-    CloudProviderId.googleDrive => Icons.add_to_drive_outlined,
-    CloudProviderId.dropbox => Icons.cloud_queue_outlined,
-  };
+Color _providerColor(CloudProviderId id) => switch (id) {
+  CloudProviderId.oneDrive => const Color(0xFF4A90D9),
+  CloudProviderId.googleDrive => const Color(0xFF5DB37E),
+  CloudProviderId.dropbox => const Color(0xFF5B7FE0),
+};
 
-  Color _color(CloudProviderId id) => switch (id) {
-    CloudProviderId.oneDrive => const Color(0xFF4A90D9),
-    CloudProviderId.googleDrive => const Color(0xFF5DB37E),
-    CloudProviderId.dropbox => const Color(0xFF5B7FE0),
-  };
+class _ProviderAvatar extends StatelessWidget {
+  const _ProviderAvatar(this.id);
+  final CloudProviderId id;
+
+  @override
+  Widget build(BuildContext context) {
+    return CircleAvatar(
+      backgroundColor: _providerColor(id).withValues(alpha: 0.14),
+      child: Icon(cloudProviderIcon(id), color: _providerColor(id), size: 22),
+    );
+  }
 }
 
 class _BackupCard extends StatelessWidget {
   const _BackupCard({
-    required this.connected,
+    required this.providers,
+    required this.status,
     required this.busy,
+    required this.onSelectDestination,
     required this.onBackupNow,
     required this.onSaveToDevice,
     required this.onRestore,
   });
 
-  final List<CloudProvider> connected;
+  final List<CloudProvider> providers;
+  final Map<CloudProviderId, _ProviderStatus> status;
   final bool busy;
+  final ValueChanged<CloudProvider?> onSelectDestination;
   final VoidCallback onBackupNow;
   final VoidCallback onSaveToDevice;
   final VoidCallback onRestore;
@@ -566,8 +596,14 @@ class _BackupCard extends StatelessWidget {
         AppSettings.lastBackupAt,
       ]),
       builder: (context, _) {
-        final selected = connected
-            .where((p) => p.id.name == AppSettings.backupProvider.value)
+        // A saved destination whose account was disconnected falls back to
+        // this phone.
+        final selected = providers
+            .where(
+              (p) =>
+                  p.id.name == AppSettings.backupProvider.value &&
+                  status[p.id]?.connected == true,
+            )
             .firstOrNull;
         final last = AppSettings.lastBackupAt.value;
         return _Card(
@@ -579,26 +615,48 @@ class _BackupCard extends StatelessWidget {
                 style: const TextStyle(color: AppTheme.mutedText, fontSize: 13),
               ),
             ),
-            ListTile(
-              leading: const Icon(Icons.cloud_upload_outlined),
-              title: Text(AppConstants.backupDestination.tr()),
-              trailing: DropdownButton<String?>(
-                value: selected?.id.name,
-                underline: const SizedBox.shrink(),
-                items: [
-                  DropdownMenuItem<String?>(
-                    value: null,
-                    child: Text(AppConstants.backupThisDevice.tr()),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  AppConstants.backupDestination.tr(),
+                  style: const TextStyle(
+                    color: AppTheme.text,
+                    fontWeight: FontWeight.w600,
                   ),
-                  for (final provider in connected)
-                    DropdownMenuItem<String?>(
-                      value: provider.id.name,
-                      child: Text(provider.displayName),
-                    ),
-                ],
-                onChanged: AppSettings.setBackupProvider,
+                ),
               ),
             ),
+            _DestinationTile(
+              leading: const CircleAvatar(
+                backgroundColor: AppTheme.surfaceStrong,
+                child: Icon(
+                  Icons.phone_android_outlined,
+                  color: AppTheme.text,
+                  size: 22,
+                ),
+              ),
+              title: AppConstants.backupThisDevice.tr(),
+              selected: selected == null,
+              onTap: busy ? null : () => onSelectDestination(null),
+            ),
+            for (final provider in providers)
+              _DestinationTile(
+                leading: _ProviderAvatar(provider.id),
+                title: provider.displayName,
+                subtitle: !provider.isConfigured
+                    ? AppConstants.cloudNotConfiguredShort.tr()
+                    : status[provider.id]?.connected == true
+                    ? (status[provider.id]?.account ??
+                          AppConstants.cloudConnectedShort.tr())
+                    : AppConstants.cloudTapToConnect.tr(),
+                selected: selected?.id == provider.id,
+                onTap: busy || !provider.isConfigured
+                    ? null
+                    : () => onSelectDestination(provider),
+              ),
+            const Divider(indent: 16, endIndent: 16),
             SwitchListTile(
               secondary: const Icon(Icons.schedule_outlined),
               title: Text(AppConstants.backupAuto.tr()),
@@ -639,7 +697,14 @@ class _BackupCard extends StatelessWidget {
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           : const Icon(Icons.backup_outlined),
-                      label: Text(AppConstants.backupNow.tr()),
+                      label: Text(
+                        selected == null
+                            ? AppConstants.backupNow.tr()
+                            : AppConstants.backupNowTo.tr(
+                                namedArgs: {'provider': selected.displayName},
+                              ),
+                        textAlign: TextAlign.center,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -671,6 +736,44 @@ class _BackupCard extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+class _DestinationTile extends StatelessWidget {
+  const _DestinationTile({
+    required this.leading,
+    required this.title,
+    required this.selected,
+    required this.onTap,
+    this.subtitle,
+  });
+
+  final Widget leading;
+  final String title;
+  final String? subtitle;
+  final bool selected;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: leading,
+      title: Text(title),
+      subtitle: subtitle == null
+          ? null
+          : Text(
+              subtitle!,
+              style: const TextStyle(color: AppTheme.mutedText, fontSize: 12.5),
+            ),
+      enabled: onTap != null || selected,
+      onTap: onTap,
+      trailing: Icon(
+        selected
+            ? Icons.radio_button_checked_rounded
+            : Icons.radio_button_unchecked_rounded,
+        color: selected ? AppTheme.accent : AppTheme.mutedText,
+      ),
     );
   }
 }

@@ -70,14 +70,21 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-	<!-- OAuth redirect for OneDrive/Dropbox sign-in (flutter_appauth);
-	     must match CloudConfig.redirectUri. -->
+	<!-- OAuth redirects: OneDrive/Dropbox sign-in (flutter_appauth, must
+	     match CloudConfig.redirectUri) and Google Sign-In / Drive (the
+	     reversed iOS client id, set in Flutter/CloudKeys.xcconfig). -->
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>com.eupasoft.alldocs</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>$(GOOGLE_REVERSED_CLIENT_ID)</string>
 			</array>
 		</dict>
 	</array>

@@ -239,14 +239,31 @@ class GoogleDriveProvider extends CloudProvider {
     if (location == null) {
       throw const CloudRequestException(500, 'No upload location');
     }
-    final bytes = await file.readAsBytes();
-    final response = await _send(
-      (token) => http.Request('PUT', Uri.parse(location))
+    // Streamed from disk: a backup carries every document, too big to hold
+    // in memory at once.
+    final response = await _send((token) {
+      final request = http.StreamedRequest('PUT', Uri.parse(location))
         ..headers['Authorization'] = 'Bearer $token'
         ..headers['Content-Type'] = 'application/zip'
-        ..bodyBytes = bytes,
-    );
+        ..contentLength = length;
+      file.openRead().listen(
+        request.sink.add,
+        onError: request.sink.addError,
+        onDone: request.sink.close,
+        cancelOnError: true,
+      );
+      return request;
+    });
     return _item(Map<String, dynamic>.from(jsonDecode(response.body) as Map));
+  }
+
+  @override
+  Future<void> deleteBackup(CloudItem backup) async {
+    await _send(
+      (token) =>
+          http.Request('DELETE', Uri.parse('$_api/files/${backup.id}'))
+            ..headers['Authorization'] = 'Bearer $token',
+    );
   }
 
   @override

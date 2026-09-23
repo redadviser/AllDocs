@@ -233,4 +233,9 @@ class DropboxProvider extends OAuthCloudProvider {
       rethrow;
     }
   }
+
+  @override
+  Future<void> deleteBackup(CloudItem backup) async {
+    await _rpc('/files/delete_v2', {'path': backup.id});
+  }
 }

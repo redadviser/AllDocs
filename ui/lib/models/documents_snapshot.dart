@@ -51,6 +51,18 @@ class DocumentsSnapshot {
   /// start one), e.g. "looks like an invoice → Invoices".
   final List<AlbumSuggestion> suggestions;
 
+  /// How long a newly added document stays in the gallery's "Recent" row.
+  static const recentWindow = Duration(hours: 1);
+
+  /// Documents added to the gallery (not in any album) within
+  /// [recentWindow] before [now], newest first.
+  List<DocumentFile> recentAt(DateTime now) {
+    final cutoff = now.subtract(recentWindow);
+    return unorganizedDocuments
+        .where((document) => document.importedAt?.isAfter(cutoff) ?? false)
+        .toList();
+  }
+
   /// Every album across all shelves, in shelf order.
   List<DocumentAlbum> get albums => [
     for (final shelf in shelves) ...shelf.albums,

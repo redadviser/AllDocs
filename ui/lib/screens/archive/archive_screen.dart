@@ -15,9 +15,16 @@ import '../viewer/document_viewer_screen.dart';
 /// reversible) and the recycle bin (files are only removed from disk on
 /// "Delete permanently" or after [LocalDocumentsStore.trashRetention]).
 class ArchiveScreen extends StatefulWidget {
-  const ArchiveScreen({super.key, required this.documentsService});
+  const ArchiveScreen({
+    super.key,
+    required this.documentsService,
+    this.showBackButton = false,
+  });
 
   final DocumentsService documentsService;
+
+  /// True when opened as its own page (from the gallery header).
+  final bool showBackButton;
 
   @override
   State<ArchiveScreen> createState() => _ArchiveScreenState();
@@ -43,13 +50,22 @@ class _ArchiveScreenState extends State<ArchiveScreen> {
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
               sliver: SliverToBoxAdapter(
-                child: Text(
-                  AppConstants.archiveTitle.tr(),
-                  style: const TextStyle(
-                    color: AppTheme.text,
-                    fontSize: 24,
-                    fontWeight: FontWeight.w700,
-                  ),
+                child: Row(
+                  children: [
+                    if (widget.showBackButton)
+                      Transform.translate(
+                        offset: const Offset(-12, 0),
+                        child: const BackButton(),
+                      ),
+                    Text(
+                      AppConstants.archiveTitle.tr(),
+                      style: const TextStyle(
+                        color: AppTheme.text,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),

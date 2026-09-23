@@ -17,6 +17,7 @@ import 'document_text_extractor.dart';
 import 'document_text_indexer.dart';
 import 'expiry_reminder_service.dart';
 import 'secure_zip_extractor.dart';
+import 'storage_permission_service.dart';
 
 final _expiryReminderService = ExpiryReminderService();
 
@@ -1296,6 +1297,17 @@ class LocalDocumentsStore {
 
   Future<Directory> _appDirectory() async {
     if (debugDirectory != null) return debugDirectory!;
+    final persistent = _persistentDirectory;
+    if (persistent != null) return persistent;
+    if (Platform.isAndroid) {
+      final adopted = await (_adoptingPersistent ??= _adoptPersistentLibrary());
+      _adoptingPersistent = null;
+      if (adopted != null) return adopted;
+    }
+    return _internalDirectory();
+  }
+
+  Future<Directory> _internalDirectory() async {
     try {
       return await getApplicationDocumentsDirectory();
     } catch (_) {
@@ -1303,6 +1315,142 @@ class LocalDocumentsStore {
         'alldocs_local_store_',
       );
       return _fallbackDirectory!;
+    }
+  }
+
+  // The app's private folder is wiped when AllDocs is uninstalled, taking
+  // every document and album with it. On Android (where AllDocs already
+  // holds all-files access) the library lives in a hidden folder on shared
+  // storage instead, so reinstalling finds it again. `.nomedia` keeps the
+  // stored photos out of the phone's gallery apps.
+  static const persistentLibraryPath = '/storage/emulated/0/Documents/.AllDocs';
+  static Directory? _persistentDirectory;
+  static Future<Directory?>? _adoptingPersistent;
+
+  /// Switches to the persistent library once storage access is granted,
+  /// merging in anything saved in the private folder before that (older
+  /// versions, or a fresh install used before granting access).
+  Future<Directory?> _adoptPersistentLibrary() async {
+    try {
+      if (!await const StoragePermissionService().hasAllFilesAccess()) {
+        return null;
+      }
+      final library = Directory(persistentLibraryPath);
+      final libraryDocuments = Directory(
+        '${library.path}/$documentsFolderName',
+      );
+      await libraryDocuments.create(recursive: true);
+      final noMedia = File('${library.path}/.nomedia');
+      if (!await noMedia.exists()) await noMedia.create();
+
+      final libraryState = await _readStateFile(
+        File('${library.path}/$stateFileName'),
+      );
+      final internal = await _internalDirectory();
+      final internalStateFile = File('${internal.path}/$stateFileName');
+      final internalState = await _readStateFile(internalStateFile);
+
+      final state = libraryState ?? internalState ?? _initialState();
+      if (internalState != null && libraryState != null) {
+        _mergeStateInto(libraryState, internalState);
+      }
+      if (internalState != null) {
+        await _moveStoredFiles(state, libraryDocuments);
+      }
+      _relinkStoredFiles(state, libraryDocuments);
+
+      _persistentDirectory = library;
+      await _writeState(state);
+      if (await internalStateFile.exists()) await internalStateFile.delete();
+      return library;
+    } catch (_) {
+      // Storage not reachable (unmounted, permission revoked mid-way...):
+      // keep using the private folder rather than failing the load.
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> _readStateFile(File file) async {
+    if (!await file.exists()) return null;
+    try {
+      final decoded = jsonDecode(await file.readAsString());
+      if (decoded is! Map<String, dynamic>) return null;
+      _migrateState(decoded);
+      return decoded;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Adds [other]'s documents and albums that [state] doesn't have yet.
+  void _mergeStateInto(Map<String, dynamic> state, Map<String, dynamic> other) {
+    final documents = _documentsRaw(state);
+    final ids = {for (final raw in _documentsList(state)) raw['id']};
+    final checksums = {
+      for (final raw in _documentsList(state))
+        if (raw['checksum'] != null) raw['checksum'],
+    };
+    for (final raw in _documentsList(other)) {
+      if (ids.contains(raw['id'])) continue;
+      if (raw['checksum'] != null && checksums.contains(raw['checksum'])) {
+        continue;
+      }
+      documents.add(raw);
+    }
+
+    for (final shelf in _shelvesList(other)) {
+      final target = _findShelf(state, shelf['id']?.toString() ?? '');
+      if (target == null) {
+        _shelvesRaw(state).add(shelf);
+        continue;
+      }
+      for (final album in _albumsList(shelf)) {
+        final existing = _findAlbum(state, album['id']?.toString() ?? '');
+        if (existing == null) {
+          _albumsRaw(target).add(album);
+          continue;
+        }
+        existing['document_ids'] = {
+          ...(existing['document_ids'] as List<dynamic>? ?? []),
+          ...(album['document_ids'] as List<dynamic>? ?? []),
+        }.toList();
+      }
+      _reindexAlbums(target);
+    }
+    _reindexShelves(state);
+  }
+
+  /// Copies files still outside [target] into it (the private folder and
+  /// shared storage are different filesystems, so no plain rename).
+  Future<void> _moveStoredFiles(
+    Map<String, dynamic> state,
+    Directory target,
+  ) async {
+    for (final raw in _documentsList(state)) {
+      final path = raw['local_path']?.toString();
+      if (path == null || path.isEmpty || path.startsWith(target.path)) {
+        continue;
+      }
+      final source = File(path);
+      if (!await source.exists()) continue;
+      final destination = '${target.path}/${_fileNameFromPath(path)}';
+      if (!await File(destination).exists()) await source.copy(destination);
+      raw['local_path'] = destination;
+      try {
+        await source.delete();
+      } catch (_) {}
+    }
+  }
+
+  /// Points documents whose stored path no longer exists at the same file
+  /// name inside [documentsDir] (e.g. a path saved by an older install).
+  void _relinkStoredFiles(Map<String, dynamic> state, Directory documentsDir) {
+    for (final raw in _documentsList(state)) {
+      final path = raw['local_path']?.toString();
+      if (path == null || path.isEmpty || File(path).existsSync()) continue;
+      final candidate =
+          '${documentsDir.path}/${_fileNameFromPath(path.replaceAll('\\', '/'))}';
+      if (File(candidate).existsSync()) raw['local_path'] = candidate;
     }
   }
 
@@ -1426,13 +1574,20 @@ class LocalDocumentsStore {
           ),
     ];
 
-    final recentDocuments = documents.take(5).toList();
     final favoriteDocumentsAll = documents
         .where((document) => document.isFavorite)
         .toList();
     final favoriteDocuments = favoriteDocumentsAll.take(5).toList();
     final unorganizedDocuments = documents
         .where((document) => document.albumIds.isEmpty)
+        .toList();
+    final recentCutoff = DateTime.now().subtract(
+      DocumentsSnapshot.recentWindow,
+    );
+    final recentDocuments = unorganizedDocuments
+        .where(
+          (document) => document.importedAt?.isAfter(recentCutoff) ?? false,
+        )
         .toList();
     final recentImports = documents.take(4).toList();
     final expiringDocuments =
@@ -2201,6 +2356,9 @@ int _scanFileTypePriority(String path) {
 bool _scanShouldSkipDirectory(String path) {
   final normalized = path.replaceAll('\\', '/').toLowerCase();
   return normalized.contains('/android/obb') ||
+      // AllDocs' own library (see LocalDocumentsStore.persistentLibraryPath).
+      normalized.endsWith('/.alldocs') ||
+      normalized.contains('/.alldocs/') ||
       normalized.endsWith('/.thumbnails') ||
       normalized.contains('/.thumbnails/') ||
       normalized.endsWith('/cache') ||

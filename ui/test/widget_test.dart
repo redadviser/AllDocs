@@ -66,7 +66,10 @@ void main() {
 
     expect(find.text('Galeria'), findsWidgets);
     expect(find.text('Álbuns'), findsWidgets);
-    expect(find.text('Arquivo'), findsWidgets);
+    expect(find.text('Perfil'), findsWidgets);
+    // The archive moved from the nav bar to the gallery header.
+    await _settleRealAsync(tester);
+    expect(find.byTooltip('Arquivo'), findsOneWidget);
 
     // Creating a shelf used to crash when the name dialog closed
     // ("_dependents.isEmpty is not true").

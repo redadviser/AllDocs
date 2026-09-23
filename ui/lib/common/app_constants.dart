@@ -276,6 +276,7 @@ class AppConstants {
   static const gallerySuggestions = 'gallery.suggestions';
   static const galleryAlbums = 'gallery.albums';
   static const galleryAllDocuments = 'gallery.all_documents';
+  static const galleryAllOrganized = 'gallery.all_organized';
   static const galleryImages = 'gallery.images';
   static const galleryResults = 'gallery.results';
   static const galleryAlsoArchived = 'gallery.also_archived';
@@ -384,6 +385,7 @@ class AppConstants {
   static const cloudConnected = 'cloud.connected';
   static const cloudConnectedShort = 'cloud.connected_short';
   static const cloudNotConnected = 'cloud.not_connected';
+  static const cloudTapToConnect = 'cloud.tap_to_connect';
   static const cloudNotConfigured = 'cloud.not_configured';
   static const cloudNotConfiguredShort = 'cloud.not_configured_short';
   static const cloudConnectFailed = 'cloud.connect_failed';
@@ -416,6 +418,12 @@ class AppConstants {
   static const backupLast = 'backup.last';
   static const backupNever = 'backup.never';
   static const backupNow = 'backup.now';
+  static const backupSheetTitle = 'backup.sheet_title';
+  static const backupRunning = 'backup.running';
+  static const backupStatus = 'backup.status';
+  static const backupStatusNever = 'backup.status_never';
+  static const backupOptions = 'backup.options';
+  static const backupNowTo = 'backup.now_to';
   static const backupSaveDevice = 'backup.save_device';
   static const backupRestore = 'backup.restore';
   static const backupRestoreTitle = 'backup.restore_title';
@@ -423,6 +431,7 @@ class AppConstants {
   static const backupFromDevice = 'backup.from_device';
   static const backupPickFolder = 'backup.pick_folder';
   static const backupDone = 'backup.done';
+  static const backupDoneTo = 'backup.done_to';
   static const backupSavedTo = 'backup.saved_to';
   static const backupFailed = 'backup.failed';
   static const backupNoneFound = 'backup.none_found';

@@ -209,6 +209,7 @@ class AuthService {
     final googleSignIn = GoogleSignIn.instance;
     if (!_googleSignInInitialized) {
       await googleSignIn.initialize(
+        clientId: GoogleAuthConfig.iosClientId,
         serverClientId: GoogleAuthConfig.serverClientId,
       );
       _googleSignInInitialized = true;
