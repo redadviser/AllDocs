@@ -143,7 +143,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
                         style: const TextStyle(
                           color: AppTheme.text,
                           fontSize: 20,
-                          fontWeight: FontWeight.w900,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ),
@@ -318,7 +318,7 @@ class _DeviceTile extends StatelessWidget {
                         style: const TextStyle(
                           color: AppTheme.text,
                           fontSize: 15,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
@@ -338,7 +338,7 @@ class _DeviceTile extends StatelessWidget {
                           style: const TextStyle(
                             color: AppTheme.success,
                             fontSize: 11,
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ),

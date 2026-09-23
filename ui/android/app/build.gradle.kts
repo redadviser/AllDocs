@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "com.eupasoft.alldocs.all_docs"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -30,6 +30,9 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        // OAuth redirect scheme for OneDrive/Dropbox sign-in (flutter_appauth).
+        // Must match CloudConfig.redirectUri on the Dart side.
+        manifestPlaceholders["appAuthRedirectScheme"] = "com.eupasoft.alldocs"
     }
 
     buildTypes {

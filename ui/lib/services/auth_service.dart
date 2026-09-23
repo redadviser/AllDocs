@@ -163,7 +163,11 @@ class AuthService {
       throw Exception(ApiHelpers.errorMessage(res, 'Sign up failed'));
     }
 
-    return _persistSession(res, fallbackEmail: email, fallbackName: displayName);
+    return _persistSession(
+      res,
+      fallbackEmail: email,
+      fallbackName: displayName,
+    );
   }
 
   static bool _googleSignInInitialized = false;
@@ -199,7 +203,9 @@ class AuthService {
     );
   }
 
-  static Future<_GoogleIdToken> _obtainGoogleIdToken() async {
+  /// GoogleSignIn may only be initialized once per app run; sign-in and the
+  /// Google Drive integration both go through this.
+  static Future<GoogleSignIn> googleSignIn() async {
     final googleSignIn = GoogleSignIn.instance;
     if (!_googleSignInInitialized) {
       await googleSignIn.initialize(
@@ -207,6 +213,11 @@ class AuthService {
       );
       _googleSignInInitialized = true;
     }
+    return googleSignIn;
+  }
+
+  static Future<_GoogleIdToken> _obtainGoogleIdToken() async {
+    final googleSignIn = await AuthService.googleSignIn();
 
     if (!googleSignIn.supportsAuthenticate()) {
       throw Exception('Google sign-in is not supported on this device');
@@ -296,7 +307,9 @@ class AuthService {
       headers: ApiHelpers.headersWithToken(token),
     );
     if (res.statusCode != 200) {
-      throw Exception(ApiHelpers.errorMessage(res, 'Could not end that session'));
+      throw Exception(
+        ApiHelpers.errorMessage(res, 'Could not end that session'),
+      );
     }
   }
 
@@ -310,7 +323,9 @@ class AuthService {
       headers: ApiHelpers.headersWithToken(token),
     );
     if (res.statusCode != 200) {
-      throw Exception(ApiHelpers.errorMessage(res, 'Could not end all sessions'));
+      throw Exception(
+        ApiHelpers.errorMessage(res, 'Could not end all sessions'),
+      );
     }
   }
 
@@ -394,7 +409,11 @@ class AuthService {
         ? 'ios'
         : 'other';
     final id = await _stableDeviceId(platform);
-    return {'id': id, 'platform': platform, 'name': await _deviceName(platform)};
+    return {
+      'id': id,
+      'platform': platform,
+      'name': await _deviceName(platform),
+    };
   }
 
   /// A per-device id that survives reinstalling just this app, not a random

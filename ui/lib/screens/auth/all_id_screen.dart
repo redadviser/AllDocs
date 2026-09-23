@@ -195,7 +195,10 @@ class _AllIdScreenState extends State<AllIdScreen> {
             minimumSize: const Size.fromHeight(50),
             foregroundColor: AppTheme.text,
             side: BorderSide(color: AppTheme.border.withValues(alpha: 0.9)),
-            textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+            textStyle: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+            ),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
@@ -228,7 +231,7 @@ class _AllIdScreenState extends State<AllIdScreen> {
                 style: const TextStyle(
                   color: AppTheme.text,
                   fontSize: 16,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
@@ -339,13 +342,16 @@ class _GoogleMark extends StatelessWidget {
       width: 20,
       height: 20,
       alignment: Alignment.center,
-      decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        shape: BoxShape.circle,
+      ),
       child: const Text(
         'G',
         style: TextStyle(
           color: Color(0xFF4285F4),
           fontSize: 13,
-          fontWeight: FontWeight.w900,
+          fontWeight: FontWeight.w700,
           height: 1,
         ),
       ),
@@ -376,7 +382,10 @@ class _AllIdHero extends StatelessWidget {
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(22),
-            child: Image.asset('assets/images/docs_icon.png', fit: BoxFit.cover),
+            child: Image.asset(
+              'assets/images/docs_icon.png',
+              fit: BoxFit.cover,
+            ),
           ),
         ),
         const SizedBox(height: 20),
@@ -386,7 +395,7 @@ class _AllIdHero extends StatelessWidget {
           style: const TextStyle(
             color: AppTheme.text,
             fontSize: 27,
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w600,
           ),
         ),
         const SizedBox(height: 10),
@@ -425,7 +434,7 @@ class _AllIdHero extends StatelessWidget {
                   style: const TextStyle(
                     color: AppTheme.success,
                     fontSize: 12,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ],

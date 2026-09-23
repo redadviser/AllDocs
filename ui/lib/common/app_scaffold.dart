@@ -1,9 +1,19 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 
 import 'app_constants.dart';
+import 'document_import_flow.dart';
+import '../models/models.dart';
+import '../screens/albums/album_detail_screen.dart';
+import '../screens/albums/albums_screen.dart';
 import '../screens/archive/archive_screen.dart';
-import '../screens/docshelf/docshelf_screen.dart';
+import '../screens/auth/security_gate.dart';
+import '../screens/cloud/cloud_screen.dart';
+import '../screens/gallery/gallery_screen.dart';
 import '../screens/profile/profile_screen.dart';
 import '../services/services.dart';
 import '../theme/app_theme.dart';
@@ -17,21 +27,72 @@ class MainNavScreen extends StatefulWidget {
 
 class _MainNavScreenState extends State<MainNavScreen> {
   final DocumentsService _documentsService = DocumentsService.local();
+  StreamSubscription<List<SharedMediaFile>>? _shareSubscription;
   int _selectedIndex = 0;
 
   @override
+  void initState() {
+    super.initState();
+    _listenForSharedFiles();
+    // Daily cloud backup when enabled (silent, best-effort).
+    unawaited(
+      _documentsService.backup.runAutoBackupIfDue(
+        _documentsService.cloud.providerNamed,
+      ),
+    );
+  }
+
+  @override
   void dispose() {
+    _shareSubscription?.cancel();
     _documentsService.dispose();
     super.dispose();
+  }
+
+  /// "Share to AllDocs" / "Open with AllDocs" from other apps, both on a
+  /// cold start and while the app is running.
+  void _listenForSharedFiles() {
+    // Only the mobile plugins exist; elsewhere (tests, desktop) the channel
+    // is missing and reports an error.
+    if (!Platform.isAndroid && !Platform.isIOS) return;
+    try {
+      final intents = ReceiveSharingIntent.instance;
+      _shareSubscription = intents.getMediaStream().listen(
+        _handleSharedFiles,
+        onError: (_) {},
+      );
+      intents.getInitialMedia().then((files) {
+        _handleSharedFiles(files);
+        intents.reset();
+      }, onError: (_) {});
+    } catch (_) {
+      // Plugin unavailable (tests, desktop).
+    }
+  }
+
+  Future<void> _handleSharedFiles(List<SharedMediaFile> files) async {
+    // Only real files: a shared link or plain text arrives as a "path" that
+    // isn't one, while a .txt/.csv opened with AllDocs is typed as text.
+    final paths = [
+      for (final file in files)
+        if (file.path.isNotEmpty && File(file.path).existsSync()) file.path,
+    ];
+    if (paths.isEmpty) return;
+    // "Open with AllDocs" while the app is locked: import only once the PIN
+    // or biometrics succeed.
+    await SecurityGate.whenUnlocked();
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return;
+    setState(() => _selectedIndex = 0);
+    await importIncomingFiles(context, _documentsService, paths);
   }
 
   @override
   Widget build(BuildContext context) {
     // Wrapping the whole scaffold (not just the nav bar) means a color/
     // contrast change re-runs this build and constructs fresh (non-const)
-    // tab screens, so Docshelf/Archive/Profile all pick up the new theme
-    // immediately instead of only updating next time they happen to
-    // rebuild for an unrelated reason.
+    // tab screens, so every tab picks up the new theme immediately instead
+    // of only updating next time it happens to rebuild.
     return AnimatedBuilder(
       animation: Listenable.merge([
         AppTheme.primaryColor,
@@ -39,27 +100,57 @@ class _MainNavScreenState extends State<MainNavScreen> {
       ]),
       builder: (context, child) {
         final screens = [
-          DocshelfScreen(documentsService: _documentsService),
+          GalleryScreen(
+            documentsService: _documentsService,
+            onOpenProfile: _openProfile,
+            onOpenAlbums: () => _selectPage(1),
+            onOpenAlbum: _openAlbum,
+            onOpenCloud: _openCloud,
+          ),
+          AlbumsScreen(documentsService: _documentsService),
           ArchiveScreen(documentsService: _documentsService),
-          ProfileScreen(documentsService: _documentsService),
         ];
 
         return Scaffold(
-          body: DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [AppTheme.background, AppTheme.backgroundBottom],
-              ),
-            ),
-            child: SafeArea(
-              child: IndexedStack(index: _selectedIndex, children: screens),
-            ),
+          backgroundColor: AppTheme.background,
+          body: SafeArea(
+            bottom: false,
+            child: IndexedStack(index: _selectedIndex, children: screens),
           ),
-          bottomNavigationBar: _AllDocsNavBar(
+          bottomNavigationBar: NavigationBar(
             selectedIndex: _selectedIndex,
-            onSelected: _selectPage,
+            onDestinationSelected: _selectPage,
+            backgroundColor: AppTheme.surface,
+            indicatorColor: AppTheme.accent.withValues(alpha: 0.16),
+            surfaceTintColor: Colors.transparent,
+            height: 66,
+            labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+            destinations: [
+              NavigationDestination(
+                icon: const Icon(Icons.grid_view_outlined),
+                selectedIcon: Icon(
+                  Icons.grid_view_rounded,
+                  color: AppTheme.accent,
+                ),
+                label: AppConstants.navGallery.tr(),
+              ),
+              NavigationDestination(
+                icon: const Icon(Icons.folder_outlined),
+                selectedIcon: Icon(
+                  Icons.folder_rounded,
+                  color: AppTheme.accent,
+                ),
+                label: AppConstants.navAlbums.tr(),
+              ),
+              NavigationDestination(
+                icon: const Icon(Icons.inventory_2_outlined),
+                selectedIcon: Icon(
+                  Icons.inventory_2_rounded,
+                  color: AppTheme.accent,
+                ),
+                label: AppConstants.navArchive.tr(),
+              ),
+            ],
           ),
         );
       },
@@ -70,109 +161,35 @@ class _MainNavScreenState extends State<MainNavScreen> {
     if (_selectedIndex == index) return;
     setState(() => _selectedIndex = index);
   }
-}
 
-class _AllDocsNavBar extends StatelessWidget {
-  const _AllDocsNavBar({required this.selectedIndex, required this.onSelected});
-
-  final int selectedIndex;
-  final ValueChanged<int> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 6, 20, 12),
-      decoration: BoxDecoration(
-        color: AppTheme.surface.withValues(alpha: 0.94),
-        border: Border(
-          top: BorderSide(color: AppTheme.border.withValues(alpha: 0.45)),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.28),
-            blurRadius: 24,
-            offset: const Offset(0, -10),
+  void _openProfile() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => Scaffold(
+          backgroundColor: AppTheme.background,
+          body: SafeArea(
+            child: ProfileScreen(
+              documentsService: _documentsService,
+              showBackButton: true,
+            ),
           ),
-        ],
-      ),
-      child: SafeArea(
-        top: false,
-        child: Row(
-          children: [
-            _NavItem(
-              icon: Icons.view_week_rounded,
-              label: AppConstants.navShelf.tr(),
-              selected: selectedIndex == 0,
-              onTap: () => onSelected(0),
-            ),
-            _NavItem(
-              icon: Icons.folder_rounded,
-              label: AppConstants.navArchive.tr(),
-              selected: selectedIndex == 1,
-              onTap: () => onSelected(1),
-            ),
-            _NavItem(
-              icon: Icons.person_rounded,
-              label: AppConstants.navProfile.tr(),
-              selected: selectedIndex == 2,
-              onTap: () => onSelected(2),
-            ),
-          ],
         ),
       ),
     );
   }
-}
 
-class _NavItem extends StatelessWidget {
-  const _NavItem({
-    required this.icon,
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = selected ? AppTheme.accent : AppTheme.dimText;
-
-    return Expanded(
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          decoration: BoxDecoration(
-            color: selected
-                ? AppTheme.accent.withValues(alpha: 0.12)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(18),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 24, color: color),
-              const SizedBox(height: 2),
-              Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 12,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
+  void _openAlbum(DocumentAlbum album) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => AlbumDetailScreen(
+          documentsService: _documentsService,
+          albumId: album.id,
         ),
       ),
     );
+  }
+
+  void _openCloud(CloudProviderId? provider) {
+    openConnectionsPage(context, _documentsService, provider: provider);
   }
 }

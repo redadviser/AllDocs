@@ -23,13 +23,20 @@ class ApiHelpers {
   }) {
     return _guardRequest(
       () => http
-          .post(Uri.parse('${ApiBaseUrl.baseUrl}$path'), headers: headers, body: body)
+          .post(
+            Uri.parse('${ApiBaseUrl.baseUrl}$path'),
+            headers: headers,
+            body: body,
+          )
           .timeout(ApiBaseUrl.requestTimeout),
       path,
     );
   }
 
-  static Future<http.Response> get(String path, {Map<String, String>? headers}) {
+  static Future<http.Response> get(
+    String path, {
+    Map<String, String>? headers,
+  }) {
     return _guardRequest(
       () => http
           .get(Uri.parse('${ApiBaseUrl.baseUrl}$path'), headers: headers)
@@ -50,15 +57,22 @@ class ApiHelpers {
     );
   }
 
-  static Future<T> _guardRequest<T>(Future<T> Function() run, String path) async {
+  static Future<T> _guardRequest<T>(
+    Future<T> Function() run,
+    String path,
+  ) async {
     try {
       return await run();
     } on SocketException {
       throw Exception('Could not reach the AllDocs server ($path).');
     } on HttpException {
-      throw Exception('The AllDocs server returned an invalid response ($path).');
+      throw Exception(
+        'The AllDocs server returned an invalid response ($path).',
+      );
     } on FormatException {
-      throw Exception('The AllDocs server returned an unreadable response ($path).');
+      throw Exception(
+        'The AllDocs server returned an unreadable response ($path).',
+      );
     } on TimeoutException {
       throw Exception('The AllDocs server took too long to respond ($path).');
     }

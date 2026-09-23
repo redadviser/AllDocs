@@ -2,6 +2,7 @@ import 'device_folder.dart';
 import 'document_album.dart';
 import 'document_category.dart';
 import 'document_file.dart';
+import 'document_semantic_type.dart';
 import 'document_shelf.dart';
 import 'user_profile.dart';
 
@@ -17,6 +18,10 @@ class DocumentsSnapshot {
     required this.recentImports,
     required this.profile,
     this.expiringDocuments = const [],
+    this.archivedDocuments = const [],
+    this.trashDocuments = const [],
+    this.tags = const [],
+    this.suggestions = const [],
   });
 
   final List<DocumentShelf> shelves;
@@ -33,6 +38,24 @@ class DocumentsSnapshot {
   /// backs the "expiring soon" reminders section.
   final List<DocumentFile> expiringDocuments;
 
+  /// Archived (hidden from the gallery, still searchable from Archive).
+  final List<DocumentFile> archivedDocuments;
+
+  /// Recycle bin, most recently deleted first.
+  final List<DocumentFile> trashDocuments;
+
+  /// Every tag in use, alphabetically.
+  final List<String> tags;
+
+  /// Unorganized documents whose detected type matches an album (or could
+  /// start one), e.g. "looks like an invoice → Invoices".
+  final List<AlbumSuggestion> suggestions;
+
+  /// Every album across all shelves, in shelf order.
+  List<DocumentAlbum> get albums => [
+    for (final shelf in shelves) ...shelf.albums,
+  ];
+
   DocumentAlbum? albumById(String albumId) {
     for (final shelf in shelves) {
       for (final album in shelf.albums) {
@@ -43,7 +66,9 @@ class DocumentsSnapshot {
   }
 
   List<DocumentFile> documentsForAlbum(String albumId) {
-    return documents.where((document) => document.albumId == albumId).toList();
+    return documents
+        .where((document) => document.albumIds.contains(albumId))
+        .toList();
   }
 
   DocumentsSnapshot copyWith({
@@ -57,6 +82,10 @@ class DocumentsSnapshot {
     List<DocumentFile>? recentImports,
     UserProfile? profile,
     List<DocumentFile>? expiringDocuments,
+    List<DocumentFile>? archivedDocuments,
+    List<DocumentFile>? trashDocuments,
+    List<String>? tags,
+    List<AlbumSuggestion>? suggestions,
   }) {
     return DocumentsSnapshot(
       shelves: shelves ?? this.shelves,
@@ -69,6 +98,24 @@ class DocumentsSnapshot {
       recentImports: recentImports ?? this.recentImports,
       profile: profile ?? this.profile,
       expiringDocuments: expiringDocuments ?? this.expiringDocuments,
+      archivedDocuments: archivedDocuments ?? this.archivedDocuments,
+      trashDocuments: trashDocuments ?? this.trashDocuments,
+      tags: tags ?? this.tags,
+      suggestions: suggestions ?? this.suggestions,
     );
   }
+}
+
+class AlbumSuggestion {
+  const AlbumSuggestion({
+    required this.document,
+    required this.semanticType,
+    this.album,
+  });
+
+  final DocumentFile document;
+  final DocumentSemanticType semanticType;
+
+  /// Existing album that matches [semanticType]; null means "create one".
+  final DocumentAlbum? album;
 }

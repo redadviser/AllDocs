@@ -70,5 +70,16 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<!-- OAuth redirect for OneDrive/Dropbox sign-in (flutter_appauth);
+	     must match CloudConfig.redirectUri. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.eupasoft.alldocs</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

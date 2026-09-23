@@ -88,7 +88,7 @@ class _StoragePermissionGateState extends State<StoragePermissionGate>
                       style: const TextStyle(
                         color: AppTheme.text,
                         fontSize: 24,
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                     const SizedBox(height: 10),

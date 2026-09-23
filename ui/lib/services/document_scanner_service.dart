@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'document_classifier.dart';
+import 'scan_image_filter.dart';
 import 'searchable_pdf_builder.dart';
 
 class ScannedDocumentResult {
@@ -45,18 +46,26 @@ class ScannedDocumentResult {
   }
 }
 
+/// Asked once the pages are captured: which look to apply (original,
+/// grayscale, black & white, high contrast). Returning null cancels the scan.
+typedef ScanFilterChooser = Future<ScanFilter?> Function(List<String> pages);
+
 class DocumentScannerService {
   const DocumentScannerService();
 
-  Future<ScannedDocumentResult?> scanDocument() async {
+  Future<ScannedDocumentResult?> scanDocument({
+    ScanFilterChooser? chooseFilter,
+  }) async {
     if (Platform.isAndroid) {
-      return _scanWithMlKitDocumentScanner();
+      return _scanWithMlKitDocumentScanner(chooseFilter);
     }
 
-    return _scanWithFallbackCamera();
+    return _scanWithFallbackCamera(chooseFilter);
   }
 
-  Future<ScannedDocumentResult?> _scanWithMlKitDocumentScanner() async {
+  Future<ScannedDocumentResult?> _scanWithMlKitDocumentScanner(
+    ScanFilterChooser? chooseFilter,
+  ) async {
     final scanner = DocumentScanner(
       options: DocumentScannerOptions(
         documentFormats: const {DocumentFormat.jpeg, DocumentFormat.pdf},
@@ -72,8 +81,9 @@ class DocumentScannerService {
       final pdfPath = _existingPath(result.pdf?.uri);
 
       if (imagePaths.isNotEmpty) {
-        return _buildSearchableScanResult(
-          imagePaths: imagePaths,
+        return await _filterAndBuild(
+          imagePaths,
+          chooseFilter,
           fallbackPdfPath: pdfPath,
         );
       }
@@ -98,14 +108,55 @@ class DocumentScannerService {
   // Known gap: unlike the Android path above, this has no edge detection,
   // auto-crop, or multi-page capture. Accepted for now; see "iOS scanning
   // parity" in docs/architecture.md for the plan to close it.
-  Future<ScannedDocumentResult?> _scanWithFallbackCamera() async {
+  Future<ScannedDocumentResult?> _scanWithFallbackCamera(
+    ScanFilterChooser? chooseFilter,
+  ) async {
     final picked = await ImagePicker().pickImage(
       source: ImageSource.camera,
       imageQuality: 96,
     );
     if (picked == null) return null;
 
-    return _buildSearchableScanResult(imagePaths: [picked.path]);
+    return _filterAndBuild([picked.path], chooseFilter);
+  }
+
+  Future<ScannedDocumentResult?> _filterAndBuild(
+    List<String> imagePaths,
+    ScanFilterChooser? chooseFilter, {
+    String? fallbackPdfPath,
+  }) async {
+    final filter = chooseFilter == null
+        ? ScanFilter.original
+        : await chooseFilter(imagePaths);
+    if (filter == null) {
+      for (final path in [...imagePaths, ?fallbackPdfPath]) {
+        try {
+          await File(path).delete();
+        } catch (_) {}
+      }
+      return null;
+    }
+    final filtered = await applyScanFilter(imagePaths, filter);
+    final result = await _buildSearchableScanResult(
+      imagePaths: filtered,
+      // The ML Kit PDF is unfiltered; only fall back to it for "original".
+      fallbackPdfPath: filter == ScanFilter.original ? fallbackPdfPath : null,
+    );
+    return ScannedDocumentResult(
+      filePath: result.filePath,
+      fileName: result.fileName,
+      pageCount: result.pageCount,
+      searchable: result.searchable,
+      ocrText: result.ocrText,
+      cleanupPaths: {
+        ...result.cleanupPaths,
+        ...imagePaths,
+        ?fallbackPdfPath,
+      }.toList(),
+      semanticType: result.semanticType,
+      classificationConfidence: result.classificationConfidence,
+      validityDate: result.validityDate,
+    );
   }
 
   Future<ScannedDocumentResult> _buildSearchableScanResult({
@@ -134,11 +185,7 @@ class DocumentScannerService {
         pageCount: pages.length,
         searchable: text.isNotEmpty,
         ocrText: text.isEmpty ? null : text,
-        cleanupPaths: [
-          outputFile.path,
-          ?fallbackPdfPath,
-          ...imagePaths,
-        ],
+        cleanupPaths: [outputFile.path, ?fallbackPdfPath, ...imagePaths],
         semanticType: classification?.semanticType,
         classificationConfidence: classification?.confidence,
         validityDate: classification?.validityDate,

@@ -14,21 +14,31 @@ class AppTheme {
   static const String _textScaleFactorKey = 'theme.text_scale_factor';
   static const String _highContrastKey = 'theme.high_contrast';
 
-  static const Color _defaultBackground = Color(0xFF07111F);
-  static const Color _defaultBackgroundBottom = Color(0xFF0B1A2E);
-  static const Color surface = Color(0xFF0D2138);
-  static const Color surfaceStrong = Color(0xFF132D49);
-  static const Color surfaceSoft = Color(0xFF1A3858);
-  static const Color border = Color(0xFF25425F);
-  static const Color primary = Color(0xFF4F8FE8);
-  static const Color primarySoft = Color(0xFF8DB9F4);
-  static const Color text = Color(0xFFF2F5FA);
-  static const Color mutedText = Color(0xFFA7B5C8);
-  static const Color dimText = Color(0xFF7E8FA8);
-  static const Color success = Color(0xFF74D76A);
-  static const Color warning = Color(0xFFFFC94A);
-  static const Color premium = Color(0xFF9A5DFF);
-  static const Color destructive = Color(0xFFEF4444);
+  // Calm, mostly neutral dark palette: a hint of blue in the greys, colour
+  // reserved for the accent and for document types.
+  static const Color _defaultBackground = Color(0xFF111418);
+  static const Color _defaultBackgroundBottom = Color(0xFF111418);
+  static const Color surface = Color(0xFF191D23);
+  static const Color surfaceStrong = Color(0xFF21262E);
+  static const Color surfaceSoft = Color(0xFF2A3039);
+  static const Color border = Color(0xFF2A3038);
+  static const Color primary = Color(0xFF5B8DEF);
+  static const Color primarySoft = Color(0xFFAEB8C6);
+  static const Color text = Color(0xFFECEFF3);
+  static const Color mutedText = Color(0xFF9BA4B1);
+  static const Color dimText = Color(0xFF6E7784);
+  static const Color success = Color(0xFF5FBF77);
+  static const Color warning = Color(0xFFE8B84A);
+  static const Color premium = Color(0xFF9A7BE0);
+  static const Color destructive = Color(0xFFE5534B);
+
+  static const double radius = 14;
+
+  // Bookshelf (albums screen), same construction as AllPhotos' shelves in
+  // this app's neutral palette.
+  static const Color shelfBack = Color(0xFF1A1F26);
+  static const Color shelfSurface = Color(0xFF242A33);
+  static const Color shelfEdge = Color(0xFF12161B);
 
   static Color get accent {
     if (highContrastMode.value) return Colors.white;
@@ -42,14 +52,14 @@ class AppTheme {
     if (highContrastMode.value) return Colors.black;
     final custom = primaryColor.value;
     if (custom == null) return _defaultBackground;
-    return _darkTone(custom, saturation: 0.63, lightness: 0.075);
+    return _darkTone(custom, saturation: 0.16, lightness: 0.075);
   }
 
   static Color get backgroundBottom {
     if (highContrastMode.value) return Colors.black;
     final custom = primaryColor.value;
     if (custom == null) return _defaultBackgroundBottom;
-    return _darkTone(custom, saturation: 0.61, lightness: 0.112);
+    return _darkTone(custom, saturation: 0.16, lightness: 0.075);
   }
 
   static Color _darkTone(
@@ -63,12 +73,16 @@ class AppTheme {
 
   static ThemeData get darkTheme {
     final base = ThemeData.dark(useMaterial3: true);
+    final shape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(radius),
+    );
 
     return base.copyWith(
       scaffoldBackgroundColor: background,
       colorScheme: ColorScheme.fromSeed(
         seedColor: accent,
         brightness: Brightness.dark,
+        primary: accent,
         surface: highContrastMode.value ? Colors.black : surface,
       ),
       textTheme: base.textTheme.apply(
@@ -77,11 +91,92 @@ class AppTheme {
         fontFamily: 'Roboto',
       ),
       iconTheme: const IconThemeData(color: primarySoft),
+      dividerTheme: DividerThemeData(
+        color: border.withValues(alpha: 0.7),
+        thickness: 1,
+        space: 1,
+      ),
       chipTheme: base.chipTheme.copyWith(
         backgroundColor: surface,
-        selectedColor: accent.withValues(alpha: 0.18),
+        selectedColor: accent.withValues(alpha: 0.16),
         side: const BorderSide(color: border),
+        labelStyle: const TextStyle(color: text, fontSize: 13),
+        secondaryLabelStyle: const TextStyle(color: text, fontSize: 13),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        showCheckmark: false,
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: accent,
+          foregroundColor: Colors.white,
+          minimumSize: const Size(0, 46),
+          shape: shape,
+          textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: text,
+          minimumSize: const Size(0, 46),
+          side: const BorderSide(color: border),
+          shape: shape,
+          textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: accent,
+          textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: surfaceStrong,
+        hintStyle: const TextStyle(color: dimText),
         labelStyle: const TextStyle(color: mutedText),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 14,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(radius),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(radius),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(radius),
+          borderSide: BorderSide(color: accent.withValues(alpha: 0.7)),
+        ),
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: surface,
+        modalBackgroundColor: surface,
+        dragHandleColor: border,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        titleTextStyle: const TextStyle(
+          color: text,
+          fontSize: 18,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: surfaceSoft,
+        contentTextStyle: const TextStyle(color: text),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      listTileTheme: const ListTileThemeData(
+        iconColor: primarySoft,
+        textColor: text,
       ),
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.resolveWith(

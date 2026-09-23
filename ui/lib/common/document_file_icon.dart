@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/models.dart';
 
+/// Small file-type badge: tinted square with the type's icon and label.
 class DocumentFileIcon extends StatelessWidget {
   const DocumentFileIcon({super.key, required this.type, this.size = 48});
 
@@ -10,47 +11,29 @@ class DocumentFileIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final color = documentTypeColor(type);
     return Container(
       width: size,
-      height: size + 8,
+      height: size,
       decoration: BoxDecoration(
-        color: _colorFor(type),
-        borderRadius: BorderRadius.circular(9),
-        boxShadow: [
-          BoxShadow(
-            color: _colorFor(type).withValues(alpha: 0.28),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        color: color.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(size * 0.26),
       ),
-      child: Stack(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Positioned(
-            right: 0,
-            top: 0,
-            child: CustomPaint(
-              size: Size(size * 0.3, size * 0.3),
-              painter: _FoldPainter(color: Colors.white.withValues(alpha: 0.3)),
+          Icon(documentTypeIcon(type), color: color, size: size * 0.42),
+          if (size >= 40) ...[
+            const SizedBox(height: 1),
+            Text(
+              documentTypeLabel(type),
+              style: TextStyle(
+                color: color,
+                fontSize: size * 0.18,
+                fontWeight: FontWeight.w700,
+              ),
             ),
-          ),
-          Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(_iconFor(type), color: Colors.white, size: size * 0.36),
-                const SizedBox(height: 3),
-                Text(
-                  _labelFor(type),
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: size * 0.22,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
-            ),
-          ),
+          ],
         ],
       ),
     );
@@ -60,58 +43,34 @@ class DocumentFileIcon extends StatelessWidget {
 String documentTypeLabel(DocumentType type) {
   return switch (type) {
     DocumentType.pdf => 'PDF',
-    DocumentType.word => 'DOCX',
-    DocumentType.excel => 'XLSX',
-    DocumentType.presentation => 'PPTX',
+    DocumentType.word => 'DOC',
+    DocumentType.excel => 'XLS',
+    DocumentType.presentation => 'PPT',
     DocumentType.archive => 'ZIP',
-    DocumentType.image => 'JPG',
+    DocumentType.image => 'IMG',
   };
 }
 
-Color _colorFor(DocumentType type) {
+/// Muted per-type colours — enough to tell types apart at a glance without
+/// turning the gallery into a rainbow.
+Color documentTypeColor(DocumentType type) {
   return switch (type) {
-    DocumentType.pdf => const Color(0xFFD94343),
-    DocumentType.word => const Color(0xFF2D7BD8),
-    DocumentType.excel => const Color(0xFF2F9A43),
-    DocumentType.presentation => const Color(0xFFD98A2E),
-    DocumentType.archive => const Color(0xFF8A8F98),
-    DocumentType.image => const Color(0xFF7E45D8),
+    DocumentType.pdf => const Color(0xFFE06A5F),
+    DocumentType.word => const Color(0xFF6A9AE8),
+    DocumentType.excel => const Color(0xFF5DB37E),
+    DocumentType.presentation => const Color(0xFFE09A55),
+    DocumentType.archive => const Color(0xFF9AA1AB),
+    DocumentType.image => const Color(0xFFA487DE),
   };
 }
 
-IconData _iconFor(DocumentType type) {
+IconData documentTypeIcon(DocumentType type) {
   return switch (type) {
-    DocumentType.pdf => Icons.picture_as_pdf_rounded,
-    DocumentType.word => Icons.description_rounded,
-    DocumentType.excel => Icons.table_chart_rounded,
-    DocumentType.presentation => Icons.slideshow_rounded,
-    DocumentType.archive => Icons.folder_zip_rounded,
-    DocumentType.image => Icons.image_rounded,
+    DocumentType.pdf => Icons.picture_as_pdf_outlined,
+    DocumentType.word => Icons.description_outlined,
+    DocumentType.excel => Icons.table_chart_outlined,
+    DocumentType.presentation => Icons.slideshow_outlined,
+    DocumentType.archive => Icons.folder_zip_outlined,
+    DocumentType.image => Icons.image_outlined,
   };
-}
-
-String _labelFor(DocumentType type) {
-  return documentTypeLabel(type);
-}
-
-class _FoldPainter extends CustomPainter {
-  const _FoldPainter({required this.color});
-
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = color;
-    final path = Path()
-      ..moveTo(size.width, 0)
-      ..lineTo(size.width, size.height)
-      ..lineTo(0, 0)
-      ..close();
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant _FoldPainter oldDelegate) {
-    return color != oldDelegate.color;
-  }
 }

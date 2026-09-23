@@ -74,9 +74,7 @@ class _SnapshotBuilderState extends State<SnapshotBuilder> {
           );
         }
 
-        return Center(
-          child: CircularProgressIndicator(color: AppTheme.accent),
-        );
+        return Center(child: CircularProgressIndicator(color: AppTheme.accent));
       },
     );
   }

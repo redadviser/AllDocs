@@ -5,7 +5,10 @@
   "nav": {
     "shelf": "Shelf",
     "archive": "Archive",
-    "profile": "Profile"
+    "profile": "Profile",
+    "gallery": "Gallery",
+    "albums": "Albums",
+    "cloud": "Cloud"
   },
   "auth": {
     "title": "AllID",
@@ -73,7 +76,8 @@
     "open_document": "Open document",
     "favorite": "Favorite",
     "remove_favorite": "Remove favorite",
-    "close": "Close"
+    "close": "Close",
+    "save": "Save"
   },
   "docshelf": {
     "title": "Docshelf",
@@ -157,7 +161,10 @@
     "zip_preview_subtitle": "Choose which ones to add to AllDocs.",
     "zip_preview_select_all": "Select all",
     "zip_preview_select_none": "Clear selection",
-    "zip_preview_import": "Import ({count})"
+    "zip_preview_import": "Import ({count})",
+    "archived": "Archived",
+    "archived_hint": "Archived documents leave the gallery but still show up in search.",
+    "empty_state": "Nothing archived."
   },
   "profile": {
     "title": "Profile",
@@ -253,5 +260,217 @@
     "q6_answer": "The PIN/biometrics lock access to the app on your device. It's independent from your AllID account password — losing one doesn't affect the other.",
     "q7_question": "How do I export or remove my documents?",
     "q7_answer": "You can export all your documents to a folder of your choice from Settings > Export documents. To remove a specific document, long-press it in the archive."
+  },
+  "gallery": {
+    "hello": "Hello",
+    "hello_name": "Hello, {name}",
+    "documents_count": "{count} documents",
+    "search_hint": "Search documents on your phone",
+    "add": "Add",
+    "scan": "Scan",
+    "suggestions": "Suggestions",
+    "albums": "Albums",
+    "all_documents": "All documents · {count}",
+    "images": "Images",
+    "results": "{count} results",
+    "also_archived": "In the archive · {count}",
+    "device_search": "Search the phone for \"{query}\"",
+    "device_search_hint": "Finds files by name or by their text and adds them straight to the gallery.",
+    "device_results_title": "On the phone: \"{query}\"",
+    "device_nothing": "No files found on the phone.",
+    "filter_favorites": "Favorites",
+    "filter_date": "Date",
+    "filter_type": "Type",
+    "date_any": "Any date",
+    "date_7": "Last 7 days",
+    "date_30": "Last 30 days",
+    "date_year": "This year",
+    "date_older": "Previous years",
+    "selected": "{count} selected",
+    "empty_title": "No documents yet",
+    "empty_message": "Add files from your phone, scan paper with the camera or import from the cloud."
+  },
+  "suggestion": {
+    "add": "Looks like: {type}. Add to \"{album}\"?",
+    "create": "Looks like: {type}. You don't have an album for this yet.",
+    "yes": "Yes",
+    "choose_other": "Choose another",
+    "create_action": "Create \"{album}\""
+  },
+  "document_type_plural": {
+    "invoice": "Invoices",
+    "receipt": "Receipts",
+    "contract": "Contracts",
+    "identity_document": "Personal documents",
+    "medical": "Health",
+    "insurance": "Insurance",
+    "warranty": "Warranties",
+    "other": "Documents"
+  },
+  "details": {
+    "title": "Details",
+    "imported_one": "Document imported",
+    "imported_many": "{count} documents imported",
+    "many_hint": "The albums and tags you pick are added to all of them.",
+    "detected_type": "Looks like: {type}",
+    "name": "Name",
+    "albums": "Albums",
+    "no_albums": "You don't have any albums yet.",
+    "tags": "Tags",
+    "add_tag": "Add a tag (e.g. Client A, 2026)"
+  },
+  "actions": {
+    "share": "Share",
+    "edit_details": "Name, albums and tags",
+    "albums": "Add to albums",
+    "albums_hint": "A document can be in several albums without being duplicated.",
+    "remove_from_album": "Remove from this album",
+    "unarchive": "Unarchive",
+    "archived": "Archived",
+    "unarchived": "Back in the gallery",
+    "move_to_trash": "Move to recycle bin",
+    "moved_to_trash": "{count} moved to the recycle bin",
+    "undo": "Undo"
+  },
+  "add": {
+    "file": "File",
+    "many_files": "Several files",
+    "zip": "ZIP file",
+    "zip_hint": "See what's inside and choose what to extract",
+    "scan_hint": "Camera with page detection and multiple pages",
+    "image": "Image or photo",
+    "from_device": "Phone folders",
+    "from_device_hint": "Downloads, WhatsApp, Documents…"
+  },
+  "device": {
+    "found": "{count} files found",
+    "add_selected": "Add to gallery ({count})"
+  },
+  "import": {
+    "all_duplicates": "These files are already in AllDocs.",
+    "some_duplicates": "{count} imported, {skipped} were already there."
+  },
+  "zip": {
+    "destination_album": "Destination album",
+    "no_album": "None (gallery only)",
+    "large_title": "Very large ZIP",
+    "large_message": "Once extracted, this ZIP could take up {size}. For safety only up to {limit} is extracted.",
+    "large_continue": "Continue",
+    "nested_skipped": "{count} ZIP files inside the ZIP were skipped."
+  },
+  "scan_filter": {
+    "title": "Document look",
+    "pages": "{count} page(s) scanned",
+    "original": "Original",
+    "grayscale": "Grayscale",
+    "black_white": "Black & white",
+    "contrast": "High contrast",
+    "save": "Save PDF"
+  },
+  "albums": {
+    "title": "Albums",
+    "edit_album": "Edit album",
+    "rename_shelf": "Rename shelf",
+    "empty_title": "Organize with albums",
+    "empty_message": "Create albums like Clients, Invoices or 2026. The same document can be in several.",
+    "add_documents": "Add documents",
+    "from_gallery": "Pick from the gallery",
+    "import_new": "Import new ones",
+    "add_count": "Add ({count})",
+    "modern_view": "Show covers",
+    "classic_view": "Show spines",
+    "sort_by_name": "Sort albums by name",
+    "collections": "Collections",
+    "search_gallery": "Search the gallery"
+  },
+  "trash": {
+    "title": "Recycle bin",
+    "hint": "Documents are deleted for good after {days} days.",
+    "empty": "Empty",
+    "empty_title": "Empty the recycle bin?",
+    "empty_state": "The recycle bin is empty.",
+    "restore": "Restore",
+    "restored": "Document restored",
+    "delete_forever": "Delete permanently",
+    "delete_forever_title": "Delete permanently?",
+    "delete_forever_message": "{count} document(s) and their files will be erased. This can't be undone.",
+    "days_left": "Deleted in {days} days"
+  },
+  "cloud": {
+    "title": "Cloud",
+    "subtitle": "Importing from the cloud keeps a copy on the phone, so the document is available offline.",
+    "connect": "Connect",
+    "disconnect": "Disconnect",
+    "browse": "Browse files",
+    "connected": "{provider} connected",
+    "connected_short": "Connected",
+    "not_connected": "Not connected",
+    "not_configured": "This integration isn't set up in this version of the app yet.",
+    "not_configured_short": "Coming soon",
+    "connect_failed": "Couldn't connect the account.",
+    "disconnect_title": "Disconnect {provider}?",
+    "disconnect_message": "Documents already imported stay in AllDocs.",
+    "quick_import": "Quick import",
+    "quick_import_hint": "Uses the system picker — includes Drive, OneDrive and other installed cloud apps.",
+    "updates_title": "New versions",
+    "check_updates": "Check for updates",
+    "updates_hint": "See whether any imported document changed in the cloud.",
+    "up_to_date": "Everything is up to date.",
+    "updates_found": "{count} document(s) with a new version",
+    "updated_file": "\"{name}\" was updated",
+    "update": "Update",
+    "keep_current": "Keep current version",
+    "updated": "Document updated",
+    "request_failed": "Couldn't reach the cloud. Try again.",
+    "search_hint": "Search {provider}",
+    "search_results": "Results: {query}",
+    "empty_folder": "No documents in this folder.",
+    "import_count": "Import {count} file(s)",
+    "downloading": "Downloading {done} of {total}…"
+  },
+  "backup": {
+    "title": "Backup",
+    "hint": "Saves every document, album and tag into one file you can restore on a new phone.",
+    "destination": "Save to",
+    "this_device": "This phone",
+    "auto": "Daily automatic backup",
+    "auto_hint": "Runs when the app opens, at most once a day.",
+    "auto_needs_cloud": "Pick a connected cloud account as the destination.",
+    "last": "Last backup",
+    "never": "Never",
+    "now": "Back up now",
+    "save_device": "Save to phone",
+    "restore": "Restore",
+    "restore_title": "Restore backup?",
+    "restore_message": "Your current documents and organization are replaced by the backup's.",
+    "from_device": "File on the phone",
+    "pick_folder": "Choose where to save the backup",
+    "done": "Backup complete",
+    "saved_to": "Backup saved to {path}",
+    "failed": "The backup couldn't be completed.",
+    "none_found": "No backups in this account.",
+    "invalid": "This file isn't an AllDocs backup.",
+    "restored": "Backup restored ({count} documents)"
+  },
+  "settings": {
+    "auto_lock": "Lock automatically",
+    "auto_lock_hint": "Asks for the PIN or biometrics when you come back to the app after this long.",
+    "auto_lock_immediately": "Immediately",
+    "auto_lock_minutes": "After {count} min",
+    "auto_lock_never": "Never",
+    "hide_previews": "Hide previews"
+  },
+  "connections": {
+    "title": "Connections",
+    "subtitle": "OneDrive, Google Drive, Dropbox and backup"
+  },
+  "viewer": {
+    "open_elsewhere": "Open in another app",
+    "no_preview": "No text preview for this file. Open it in another app to see the original layout.",
+    "missing_file": "This document's file is no longer on the phone."
+  },
+  "incoming": {
+    "added": "\"{name}\" added to the gallery",
+    "open": "Open"
   }
 }

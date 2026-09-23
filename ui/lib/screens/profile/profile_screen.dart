@@ -14,13 +14,21 @@ import '../../models/models.dart';
 import '../../services/services.dart';
 import '../../theme/app_theme.dart';
 import '../auth/auth_gate.dart';
+import '../cloud/cloud_screen.dart';
 import '../security/devices_screen.dart';
 import '../support/faq_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key, required this.documentsService});
+  const ProfileScreen({
+    super.key,
+    required this.documentsService,
+    this.showBackButton = false,
+  });
 
   final DocumentsService documentsService;
+
+  /// True when opened as its own page (from the gallery avatar).
+  final bool showBackButton;
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -50,12 +58,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
         final profile = snapshot.profile;
 
         return Padding(
-          padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
           child: Column(
             children: [
               _ProfileTitle(
                 settingsOpen: _settingsPage == 1,
                 onSettingsTap: _toggleSettingsPage,
+                showBackButton: widget.showBackButton,
               ),
               const SizedBox(height: 18),
               Expanded(
@@ -115,6 +124,14 @@ class _ProfileOverviewPage extends StatelessWidget {
         ),
         const SizedBox(height: 14),
         _StoragePanel(summary: profile.storageSummary),
+        const SizedBox(height: 14),
+        _ProfileWideAction(
+          icon: Icons.cloud_outlined,
+          iconColor: AppTheme.accent,
+          title: AppConstants.connectionsTitle.tr(),
+          subtitle: AppConstants.connectionsSubtitle.tr(),
+          onTap: () => openConnectionsPage(context, documentsService),
+        ),
         const SizedBox(height: 14),
         _StatsPanel(profile: profile),
         const SizedBox(height: 14),
@@ -205,9 +222,9 @@ class _SupportPanel extends StatelessWidget {
       launched = false;
     }
     if (!launched && context.mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(AppConstants.profileLinkOpenError.tr())));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppConstants.profileLinkOpenError.tr())),
+      );
     }
   }
 }
@@ -243,9 +260,9 @@ class _ProfileSettingsPage extends StatelessWidget {
           iconColor: const Color(0xFF37C66A),
           title: AppConstants.profileSecurity.tr(),
           subtitle: AppConstants.profileSecuritySubtitle.tr(),
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const DevicesScreen()),
-          ),
+          onTap: () => Navigator.of(
+            context,
+          ).push(MaterialPageRoute(builder: (_) => const DevicesScreen())),
         ),
         const SizedBox(height: 14),
         _PremiumPanel(profile: profile),
@@ -314,22 +331,25 @@ class _ProfileTitle extends StatelessWidget {
   const _ProfileTitle({
     required this.settingsOpen,
     required this.onSettingsTap,
+    this.showBackButton = false,
   });
 
   final bool settingsOpen;
   final VoidCallback onSettingsTap;
+  final bool showBackButton;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
+        if (showBackButton) ...[const BackButton(), const SizedBox(width: 4)],
         Expanded(
           child: Text(
             AppConstants.profileTitle.tr(),
             style: const TextStyle(
               color: AppTheme.text,
               fontSize: 30,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ),
@@ -408,11 +428,7 @@ class _ProfileHeader extends StatelessWidget {
                 height: 96,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  gradient: avatarUrl == null
-                      ? const LinearGradient(
-                          colors: [Color(0xFF3F8DFF), Color(0xFF102D63)],
-                        )
-                      : null,
+                  color: avatarUrl == null ? AppTheme.surfaceStrong : null,
                   image: isNetworkAvatar
                       ? DecorationImage(
                           image: NetworkImage(avatarUrl),
@@ -432,7 +448,7 @@ class _ProfileHeader extends StatelessWidget {
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 24,
-                            fontWeight: FontWeight.w900,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       )
@@ -471,7 +487,7 @@ class _ProfileHeader extends StatelessWidget {
                   style: const TextStyle(
                     color: AppTheme.text,
                     fontSize: 22,
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -556,7 +572,7 @@ class _StoragePanel extends StatelessWidget {
                         style: const TextStyle(
                           color: AppTheme.text,
                           fontSize: 15,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
@@ -730,7 +746,7 @@ class _CustomizationPanel extends StatelessWidget {
                 AppConstants.profilePrimaryColor.tr(),
                 style: const TextStyle(
                   color: AppTheme.text,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
               const SizedBox(height: 10),
@@ -749,7 +765,7 @@ class _CustomizationPanel extends StatelessWidget {
                       AppConstants.profileFontSize.tr(),
                       style: const TextStyle(
                         color: AppTheme.text,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
@@ -884,7 +900,7 @@ class _StatCard extends StatelessWidget {
               color: AppTheme.text,
               fontSize: 22,
               height: 1.05,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w700,
             ),
           ),
           Text(
@@ -913,19 +929,28 @@ class _SettingsPanel extends StatelessWidget {
     return GlassPanel(
       child: Column(
         children: [
-          _SettingsTile(
-            icon: Icons.cloud_outlined,
-            title: AppConstants.profileCloudSync.tr(),
-            value: AppConstants.profileActive.tr(),
-          ),
-          const Divider(height: 1),
-          _SettingsTile(
-            icon: Icons.settings_backup_restore_rounded,
-            title: AppConstants.profileAutoBackup.tr(),
-            value: AppConstants.profileDaily.tr(),
-          ),
-          const Divider(height: 1),
           const _BiometricSettingsTile(),
+          const Divider(height: 1),
+          ValueListenableBuilder<int>(
+            valueListenable: AppSettings.autoLockMinutes,
+            builder: (context, minutes, _) => _SettingsTile(
+              icon: Icons.timer_outlined,
+              title: AppConstants.settingsAutoLock.tr(),
+              value: autoLockLabel(minutes),
+              onTap: () => _showAutoLockSheet(context),
+            ),
+          ),
+          const Divider(height: 1),
+          ValueListenableBuilder<bool>(
+            valueListenable: AppSettings.hidePreviews,
+            builder: (context, enabled, _) => _SettingsTile(
+              icon: Icons.visibility_off_outlined,
+              title: AppConstants.settingsHidePreviews.tr(),
+              trailingSwitch: true,
+              switchValue: enabled,
+              onSwitchChanged: AppSettings.setHidePreviews,
+            ),
+          ),
           const Divider(height: 1),
           _SettingsTile(
             icon: Icons.collections_bookmark_rounded,
@@ -965,6 +990,59 @@ class _SettingsPanel extends StatelessWidget {
       context,
     ).showSnackBar(SnackBar(content: Text(message)));
   }
+}
+
+String autoLockLabel(int minutes) {
+  if (minutes < 0) return AppConstants.settingsAutoLockNever.tr();
+  if (minutes == 0) return AppConstants.settingsAutoLockImmediately.tr();
+  return AppConstants.settingsAutoLockMinutes.tr(
+    namedArgs: {'count': '$minutes'},
+  );
+}
+
+void _showAutoLockSheet(BuildContext context) {
+  showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    builder: (context) => SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
+            child: Text(
+              AppConstants.settingsAutoLock.tr(),
+              style: const TextStyle(
+                color: AppTheme.text,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+            child: Text(
+              AppConstants.settingsAutoLockHint.tr(),
+              style: const TextStyle(color: AppTheme.mutedText, fontSize: 13),
+            ),
+          ),
+          for (final minutes in AppSettings.autoLockChoices)
+            ListTile(
+              title: Text(autoLockLabel(minutes)),
+              trailing: AppSettings.autoLockMinutes.value == minutes
+                  ? Icon(Icons.check_rounded, color: AppTheme.accent)
+                  : null,
+              onTap: () {
+                AppSettings.setAutoLockMinutes(minutes);
+                Navigator.of(context).pop();
+              },
+            ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    ),
+  );
 }
 
 class _BiometricSettingsTile extends StatefulWidget {
@@ -1048,7 +1126,7 @@ void _showAlbumsSheet(BuildContext context, DocumentsSnapshot snapshot) {
                       style: const TextStyle(
                         color: AppTheme.text,
                         fontSize: 18,
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ),
@@ -1208,7 +1286,7 @@ void _showLanguageSheet(BuildContext context) {
                 style: const TextStyle(
                   color: AppTheme.text,
                   fontSize: 18,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
               const SizedBox(height: 8),
@@ -1218,10 +1296,7 @@ void _showLanguageSheet(BuildContext context) {
                   title: Text(option.label),
                   trailing:
                       context.locale.languageCode == option.locale.languageCode
-                      ? Icon(
-                          Icons.check_circle_rounded,
-                          color: AppTheme.accent,
-                        )
+                      ? Icon(Icons.check_circle_rounded, color: AppTheme.accent)
                       : null,
                   onTap: () async {
                     await context.setLocale(option.locale);
@@ -1278,7 +1353,7 @@ class _ProfileWideAction extends StatelessWidget {
                     style: const TextStyle(
                       color: AppTheme.text,
                       fontSize: 15,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -1290,7 +1365,10 @@ class _ProfileWideAction extends StatelessWidget {
               ),
             ),
             if (onTap != null)
-              const Icon(Icons.chevron_right_rounded, color: AppTheme.mutedText),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: AppTheme.mutedText,
+              ),
           ],
         ),
       ),
@@ -1337,7 +1415,7 @@ class _PremiumPanel extends StatelessWidget {
                   style: const TextStyle(
                     color: AppTheme.text,
                     fontSize: 15,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: 4),

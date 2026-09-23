@@ -37,11 +37,18 @@ void main() {
       ('invoice.pdf', 'pdf content'),
       ('notes.txt', 'text content'),
       ('photo.jpg', 'image bytes'),
+      ('setup.exe', 'binary'),
     ]);
 
     final entries = await store.extractZipPreview(zip);
 
-    expect(entries.map((e) => e.fileName).toSet(), {'invoice.pdf', 'notes.txt'});
+    // Images are importable too (receipt photos, screenshots); anything
+    // else (executables, ...) is left out.
+    expect(entries.map((e) => e.fileName).toSet(), {
+      'invoice.pdf',
+      'notes.txt',
+      'photo.jpg',
+    });
   });
 
   test(
@@ -55,10 +62,12 @@ void main() {
 
       // Only "import" the pdf, as if the user unchecked notes.txt in the
       // preview sheet — the txt file must never reach the store.
-      final selected = entries.where((e) => e.fileName == 'invoice.pdf').toList();
+      final selected = entries
+          .where((e) => e.fileName == 'invoice.pdf')
+          .toList();
       final imported = await store.importExtractedZipEntries(selected);
 
-      expect(imported, 1);
+      expect(imported.count, 1);
 
       final snapshot = await store.loadSnapshot();
       expect(snapshot.documents, hasLength(1));
@@ -96,24 +105,27 @@ void main() {
     expect(snapshot.unorganizedDocuments, isEmpty);
   });
 
-  test('importScannedDocuments skips a .zip instead of importing it whole', () async {
-    final zipFile = File('${tempDir.path}/bundle.zip')
-      ..writeAsBytesSync(_buildZip([('invoice.pdf', 'pdf content')]));
+  test(
+    'importScannedDocuments skips a .zip instead of importing it whole',
+    () async {
+      final zipFile = File('${tempDir.path}/bundle.zip')
+        ..writeAsBytesSync(_buildZip([('invoice.pdf', 'pdf content')]));
 
-    final zipDocument = DocumentFile(
-      id: 'scan_1',
-      title: 'bundle',
-      fileName: 'bundle.zip',
-      type: DocumentType.archive,
-      dateLabel: '01/01/2024',
-      sizeLabel: '1 KB',
-      localPath: zipFile.path,
-    );
+      final zipDocument = DocumentFile(
+        id: 'scan_1',
+        title: 'bundle',
+        fileName: 'bundle.zip',
+        type: DocumentType.archive,
+        dateLabel: '01/01/2024',
+        sizeLabel: '1 KB',
+        localPath: zipFile.path,
+      );
 
-    final imported = await store.importScannedDocuments([zipDocument]);
+      final imported = await store.importScannedDocuments([zipDocument]);
 
-    expect(imported, 0);
-    final snapshot = await store.loadSnapshot();
-    expect(snapshot.documents, isEmpty);
-  });
+      expect(imported.count, 0);
+      final snapshot = await store.loadSnapshot();
+      expect(snapshot.documents, isEmpty);
+    },
+  );
 }

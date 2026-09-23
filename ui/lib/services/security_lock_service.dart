@@ -17,6 +17,25 @@ class SecurityLockService {
 
   final LocalAuthentication _localAuthentication;
 
+  static int _autoLockSuspensions = 0;
+
+  /// True while AllDocs itself sent the user to another screen (file
+  /// picker, scanner, share sheet, OAuth login...). Leaving the app for
+  /// those must not trigger the auto-lock.
+  static bool get autoLockSuspended => _autoLockSuspensions > 0;
+
+  static Future<T> withoutAutoLock<T>(Future<T> Function() action) async {
+    _autoLockSuspensions++;
+    try {
+      return await action();
+    } finally {
+      // Resume events arrive slightly after the awaited call returns.
+      Future<void>.delayed(const Duration(seconds: 2), () {
+        _autoLockSuspensions--;
+      });
+    }
+  }
+
   Future<bool> hasPin() async {
     final prefs = await SharedPreferences.getInstance();
     final pinHash = prefs.getString(_pinHashKey);
@@ -89,7 +108,7 @@ class SecurityLockService {
 
   Future<bool> authenticateWithBiometrics({required String reason}) async {
     try {
-      return _localAuthentication.authenticate(
+      return await _localAuthentication.authenticate(
         localizedReason: reason,
         biometricOnly: true,
         sensitiveTransaction: true,

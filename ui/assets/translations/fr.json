@@ -5,7 +5,10 @@
   "nav": {
     "shelf": "Étagère",
     "archive": "Archive",
-    "profile": "Profil"
+    "profile": "Profil",
+    "gallery": "Galerie",
+    "albums": "Albums",
+    "cloud": "Cloud"
   },
   "auth": {
     "title": "AllID",
@@ -73,7 +76,8 @@
     "open_document": "Ouvrir le document",
     "favorite": "Favori",
     "remove_favorite": "Retirer des favoris",
-    "close": "Fermer"
+    "close": "Fermer",
+    "save": "Enregistrer"
   },
   "docshelf": {
     "title": "Docshelf",
@@ -157,7 +161,10 @@
     "zip_preview_subtitle": "Choisis ceux à ajouter à AllDocs.",
     "zip_preview_select_all": "Tout sélectionner",
     "zip_preview_select_none": "Effacer la sélection",
-    "zip_preview_import": "Importer ({count})"
+    "zip_preview_import": "Importer ({count})",
+    "archived": "Archivés",
+    "archived_hint": "Les documents archivés quittent la galerie mais restent visibles dans la recherche.",
+    "empty_state": "Rien d'archivé."
   },
   "profile": {
     "title": "Profil",
@@ -253,5 +260,217 @@
     "q6_answer": "Le code PIN/la biométrie verrouille l'accès à l'app sur ton appareil. C'est indépendant du mot de passe de ton compte AllID — perdre l'un n'affecte pas l'autre.",
     "q7_question": "Comment exporter ou supprimer mes documents ?",
     "q7_answer": "Tu peux exporter tous tes documents vers un dossier de ton choix depuis Paramètres > Exporter les documents. Pour supprimer un document précis, appuie longuement dessus dans les archives."
+  },
+  "gallery": {
+    "hello": "Bonjour",
+    "hello_name": "Bonjour, {name}",
+    "documents_count": "{count} documents",
+    "search_hint": "Chercher des documents sur le téléphone",
+    "add": "Ajouter",
+    "scan": "Scanner",
+    "suggestions": "Suggestions",
+    "albums": "Albums",
+    "all_documents": "Tous les documents · {count}",
+    "images": "Images",
+    "results": "{count} résultats",
+    "also_archived": "Dans les archives · {count}",
+    "device_search": "Chercher « {query} » sur le téléphone",
+    "device_search_hint": "Trouve des fichiers par leur nom ou leur texte et ajoute-les à la galerie.",
+    "device_results_title": "Sur le téléphone : « {query} »",
+    "device_nothing": "Aucun fichier trouvé sur le téléphone.",
+    "filter_favorites": "Favoris",
+    "filter_date": "Date",
+    "filter_type": "Type",
+    "date_any": "Toutes les dates",
+    "date_7": "7 derniers jours",
+    "date_30": "30 derniers jours",
+    "date_year": "Cette année",
+    "date_older": "Années précédentes",
+    "selected": "{count} sélectionnés",
+    "empty_title": "Pas encore de documents",
+    "empty_message": "Ajoute des fichiers du téléphone, scanne du papier avec l'appareil photo ou importe depuis le cloud."
+  },
+  "suggestion": {
+    "add": "Ressemble à : {type}. Ajouter à « {album} » ?",
+    "create": "Ressemble à : {type}. Tu n'as pas encore d'album pour ça.",
+    "yes": "Oui",
+    "choose_other": "Choisir un autre",
+    "create_action": "Créer « {album} »"
+  },
+  "document_type_plural": {
+    "invoice": "Factures",
+    "receipt": "Reçus",
+    "contract": "Contrats",
+    "identity_document": "Documents personnels",
+    "medical": "Santé",
+    "insurance": "Assurances",
+    "warranty": "Garanties",
+    "other": "Documents"
+  },
+  "details": {
+    "title": "Détails",
+    "imported_one": "Document importé",
+    "imported_many": "{count} documents importés",
+    "many_hint": "Les albums et tags choisis sont ajoutés à tous.",
+    "detected_type": "Ressemble à : {type}",
+    "name": "Nom",
+    "albums": "Albums",
+    "no_albums": "Tu n'as pas encore d'albums.",
+    "tags": "Tags",
+    "add_tag": "Ajouter un tag (ex. : Client A, 2026)"
+  },
+  "actions": {
+    "share": "Partager",
+    "edit_details": "Nom, albums et tags",
+    "albums": "Ajouter aux albums",
+    "albums_hint": "Un document peut être dans plusieurs albums sans être dupliqué.",
+    "remove_from_album": "Retirer de cet album",
+    "unarchive": "Désarchiver",
+    "archived": "Archivé",
+    "unarchived": "De retour dans la galerie",
+    "move_to_trash": "Mettre à la corbeille",
+    "moved_to_trash": "{count} mis à la corbeille",
+    "undo": "Annuler"
+  },
+  "add": {
+    "file": "Fichier",
+    "many_files": "Plusieurs fichiers",
+    "zip": "Fichier ZIP",
+    "zip_hint": "Vois le contenu et choisis quoi extraire",
+    "scan_hint": "Appareil photo avec détection de page et plusieurs pages",
+    "image": "Image ou photo",
+    "from_device": "Dossiers du téléphone",
+    "from_device_hint": "Téléchargements, WhatsApp, Documents…"
+  },
+  "device": {
+    "found": "{count} fichiers trouvés",
+    "add_selected": "Ajouter à la galerie ({count})"
+  },
+  "import": {
+    "all_duplicates": "Ces fichiers sont déjà dans AllDocs.",
+    "some_duplicates": "{count} importés, {skipped} existaient déjà."
+  },
+  "zip": {
+    "destination_album": "Album de destination",
+    "no_album": "Aucun (galerie seulement)",
+    "large_title": "ZIP très volumineux",
+    "large_message": "Une fois extrait, ce ZIP pourrait occuper {size}. Par sécurité, seuls {limit} sont extraits.",
+    "large_continue": "Continuer",
+    "nested_skipped": "{count} ZIP à l'intérieur du ZIP ont été ignorés."
+  },
+  "scan_filter": {
+    "title": "Apparence du document",
+    "pages": "{count} page(s) scannée(s)",
+    "original": "Original",
+    "grayscale": "Niveaux de gris",
+    "black_white": "Noir et blanc",
+    "contrast": "Contraste",
+    "save": "Enregistrer le PDF"
+  },
+  "albums": {
+    "title": "Albums",
+    "edit_album": "Modifier l'album",
+    "rename_shelf": "Renommer l'étagère",
+    "empty_title": "Organise avec des albums",
+    "empty_message": "Crée des albums comme Clients, Factures ou 2026. Un même document peut être dans plusieurs.",
+    "add_documents": "Ajouter des documents",
+    "from_gallery": "Choisir dans la galerie",
+    "import_new": "Importer de nouveaux",
+    "add_count": "Ajouter ({count})",
+    "modern_view": "Voir les couvertures",
+    "classic_view": "Voir les tranches",
+    "sort_by_name": "Trier les albums par nom",
+    "collections": "Collections",
+    "search_gallery": "Rechercher dans la galerie"
+  },
+  "trash": {
+    "title": "Corbeille",
+    "hint": "Les documents sont supprimés définitivement après {days} jours.",
+    "empty": "Vider",
+    "empty_title": "Vider la corbeille ?",
+    "empty_state": "La corbeille est vide.",
+    "restore": "Restaurer",
+    "restored": "Document restauré",
+    "delete_forever": "Supprimer définitivement",
+    "delete_forever_title": "Supprimer définitivement ?",
+    "delete_forever_message": "{count} document(s) et leurs fichiers seront effacés. Impossible d'annuler.",
+    "days_left": "Supprimé dans {days} jours"
+  },
+  "cloud": {
+    "title": "Cloud",
+    "subtitle": "Importer depuis le cloud garde une copie sur le téléphone ; le document reste disponible hors ligne.",
+    "connect": "Connecter",
+    "disconnect": "Déconnecter",
+    "browse": "Parcourir",
+    "connected": "{provider} connecté",
+    "connected_short": "Connecté",
+    "not_connected": "Non connecté",
+    "not_configured": "Cette intégration n'est pas encore configurée dans cette version de l'app.",
+    "not_configured_short": "Bientôt disponible",
+    "connect_failed": "Impossible de connecter le compte.",
+    "disconnect_title": "Déconnecter {provider} ?",
+    "disconnect_message": "Les documents déjà importés restent dans AllDocs.",
+    "quick_import": "Import rapide",
+    "quick_import_hint": "Utilise le sélecteur du système — inclut Drive, OneDrive et les autres apps cloud installées.",
+    "updates_title": "Nouvelles versions",
+    "check_updates": "Rechercher des mises à jour",
+    "updates_hint": "Vérifie si un document importé a changé dans le cloud.",
+    "up_to_date": "Tout est à jour.",
+    "updates_found": "{count} document(s) avec une nouvelle version",
+    "updated_file": "« {name} » a été mis à jour",
+    "update": "Mettre à jour",
+    "keep_current": "Garder la version actuelle",
+    "updated": "Document mis à jour",
+    "request_failed": "Impossible de joindre le cloud. Réessaie.",
+    "search_hint": "Rechercher dans {provider}",
+    "search_results": "Résultats : {query}",
+    "empty_folder": "Aucun document dans ce dossier.",
+    "import_count": "Importer {count} fichier(s)",
+    "downloading": "Téléchargement {done} sur {total}…"
+  },
+  "backup": {
+    "title": "Sauvegarde",
+    "hint": "Enregistre tous les documents, albums et tags dans un seul fichier à restaurer sur un nouveau téléphone.",
+    "destination": "Enregistrer dans",
+    "this_device": "Ce téléphone",
+    "auto": "Sauvegarde automatique quotidienne",
+    "auto_hint": "Faite à l'ouverture de l'app, au plus une fois par jour.",
+    "auto_needs_cloud": "Choisis un compte cloud connecté comme destination.",
+    "last": "Dernière sauvegarde",
+    "never": "Jamais",
+    "now": "Sauvegarder maintenant",
+    "save_device": "Enregistrer sur le téléphone",
+    "restore": "Restaurer",
+    "restore_title": "Restaurer la sauvegarde ?",
+    "restore_message": "Tes documents et ton organisation actuels sont remplacés par ceux de la sauvegarde.",
+    "from_device": "Fichier sur le téléphone",
+    "pick_folder": "Choisis où enregistrer la sauvegarde",
+    "done": "Sauvegarde terminée",
+    "saved_to": "Sauvegarde enregistrée dans {path}",
+    "failed": "La sauvegarde n'a pas pu être terminée.",
+    "none_found": "Aucune sauvegarde dans ce compte.",
+    "invalid": "Ce fichier n'est pas une sauvegarde AllDocs.",
+    "restored": "Sauvegarde restaurée ({count} documents)"
+  },
+  "settings": {
+    "auto_lock": "Verrouiller automatiquement",
+    "auto_lock_hint": "Demande le PIN ou la biométrie quand tu reviens dans l'app après ce délai.",
+    "auto_lock_immediately": "Immédiatement",
+    "auto_lock_minutes": "Après {count} min",
+    "auto_lock_never": "Jamais",
+    "hide_previews": "Masquer les aperçus"
+  },
+  "connections": {
+    "title": "Connexions",
+    "subtitle": "OneDrive, Google Drive, Dropbox et sauvegarde"
+  },
+  "viewer": {
+    "open_elsewhere": "Ouvrir dans une autre app",
+    "no_preview": "Pas d'aperçu texte pour ce fichier. Ouvre-le dans une autre app pour voir la mise en page d'origine.",
+    "missing_file": "Le fichier de ce document n'est plus sur le téléphone."
+  },
+  "incoming": {
+    "added": "« {name} » ajouté à la galerie",
+    "open": "Ouvrir"
   }
 }

@@ -4,7 +4,10 @@ import '../models/document_file.dart';
 /// Pure decision logic, kept separate from [ExpiryReminderService] so it's
 /// unit-testable without touching the notifications plugin.
 class ReminderPlan {
-  const ReminderPlan({required this.notificationId, required this.scheduledFor});
+  const ReminderPlan({
+    required this.notificationId,
+    required this.scheduledFor,
+  });
 
   final int notificationId;
   final DateTime scheduledFor;

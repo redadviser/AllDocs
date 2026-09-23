@@ -58,9 +58,7 @@ Future<void> buildSearchablePdf({
             ignoreMargins: true,
             child: pw.Stack(
               children: [
-                pw.Positioned.fill(
-                  child: pw.Image(image, fit: pw.BoxFit.fill),
-                ),
+                pw.Positioned.fill(child: pw.Image(image, fit: pw.BoxFit.fill)),
                 for (final line in page.lines)
                   ocrTextLayer(line, pageWidth, pageHeight),
               ],

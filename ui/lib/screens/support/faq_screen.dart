@@ -46,7 +46,7 @@ class FaqScreen extends StatelessWidget {
                         style: const TextStyle(
                           color: AppTheme.text,
                           fontSize: 20,
-                          fontWeight: FontWeight.w900,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ),

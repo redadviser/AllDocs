@@ -100,71 +100,80 @@ void main() {
     };
   }
 
-  test('migrates seeded mock albums into the inbox and bumps the version', () async {
-    writeRawState(v1StateFixture());
+  test(
+    'migrates seeded mock albums into the inbox and bumps the version',
+    () async {
+      writeRawState(v1StateFixture());
 
-    final snapshot = await const LocalDocumentsStore().loadSnapshot();
+      final snapshot = await const LocalDocumentsStore().loadSnapshot();
 
-    // The seeded "Documentos" shelf only ever held the mock album, so once
-    // that album is stripped out the now-empty shelf is dropped too.
-    expect(
-      snapshot.shelves.where((shelf) => shelf.name == 'Documentos'),
-      isEmpty,
-    );
+      // The seeded "Documentos" shelf only ever held the mock album, so once
+      // that album is stripped out the now-empty shelf is dropped too.
+      expect(
+        snapshot.shelves.where((shelf) => shelf.name == 'Documentos'),
+        isEmpty,
+      );
 
-    // A real, user-created shelf/album must survive migration untouched.
-    final userShelf = snapshot.shelves.singleWhere(
-      (shelf) => shelf.id == 'shelf_user',
-    );
-    expect(userShelf.albums.single.id, 'album_user_contratos');
-    expect(
-      snapshot.documentsForAlbum('album_user_contratos').single.id,
-      'doc_real',
-    );
+      // A real, user-created shelf/album must survive migration untouched.
+      final userShelf = snapshot.shelves.singleWhere(
+        (shelf) => shelf.id == 'shelf_user',
+      );
+      expect(userShelf.albums.single.id, 'album_user_contratos');
+      expect(
+        snapshot.documentsForAlbum('album_user_contratos').single.id,
+        'doc_real',
+      );
 
-    // The document that lived only in the removed mock album lands unfiled.
-    final migratedDoc = snapshot.documents.singleWhere(
-      (doc) => doc.id == 'doc_mock',
-    );
-    expect(migratedDoc.albumId, isNull);
-    expect(migratedDoc.isNew, isTrue);
-    expect(
-      snapshot.unorganizedDocuments.map((doc) => doc.id),
-      contains('doc_mock'),
-    );
+      // The document that lived only in the removed mock album lands unfiled.
+      final migratedDoc = snapshot.documents.singleWhere(
+        (doc) => doc.id == 'doc_mock',
+      );
+      expect(migratedDoc.albumId, isNull);
+      expect(migratedDoc.isNew, isTrue);
+      expect(
+        snapshot.unorganizedDocuments.map((doc) => doc.id),
+        contains('doc_mock'),
+      );
 
-    // Migration is persisted back to disk, not just applied in memory.
-    expect(readRawState()['version'], 2);
-  });
+      // Migration is persisted back to disk, not just applied in memory.
+      expect(readRawState()['version'], 3);
+    },
+  );
 
-  test('does not re-run migration once the state is already on version 2', () async {
-    final alreadyMigrated = Map<String, dynamic>.from(v1StateFixture());
-    alreadyMigrated['version'] = 2;
-    writeRawState(alreadyMigrated);
+  test(
+    'does not re-run migration once the state is already on version 2',
+    () async {
+      final alreadyMigrated = Map<String, dynamic>.from(v1StateFixture());
+      alreadyMigrated['version'] = 2;
+      writeRawState(alreadyMigrated);
 
-    final snapshot = await const LocalDocumentsStore().loadSnapshot();
+      final snapshot = await const LocalDocumentsStore().loadSnapshot();
 
-    // With version already at 2, the mock-seed cleanup must not run, even
-    // though the fixture still contains a mock-shaped album.
-    expect(
-      snapshot.shelves.where((shelf) => shelf.name == 'Documentos'),
-      isNotEmpty,
-    );
-    final migratedDoc = snapshot.documents.singleWhere(
-      (doc) => doc.id == 'doc_mock',
-    );
-    expect(migratedDoc.albumId, 'album_1700000000000_pessoais');
-  });
+      // With version already at 2, the mock-seed cleanup must not run, even
+      // though the fixture still contains a mock-shaped album.
+      expect(
+        snapshot.shelves.where((shelf) => shelf.name == 'Documentos'),
+        isNotEmpty,
+      );
+      final migratedDoc = snapshot.documents.singleWhere(
+        (doc) => doc.id == 'doc_mock',
+      );
+      expect(migratedDoc.albumId, 'album_1700000000000_pessoais');
+    },
+  );
 
-  test('recovers with a clean initial state when the JSON file is corrupt', () async {
-    File(
-      '${tempDir.path}/alldocs_state.json',
-    ).writeAsStringSync('{not valid json');
+  test(
+    'recovers with a clean initial state when the JSON file is corrupt',
+    () async {
+      File(
+        '${tempDir.path}/alldocs_state.json',
+      ).writeAsStringSync('{not valid json');
 
-    final snapshot = await const LocalDocumentsStore().loadSnapshot();
+      final snapshot = await const LocalDocumentsStore().loadSnapshot();
 
-    expect(snapshot.documents, isEmpty);
-    expect(snapshot.shelves, isEmpty);
-    expect(readRawState()['version'], 2);
-  });
+      expect(snapshot.documents, isEmpty);
+      expect(snapshot.shelves, isEmpty);
+      expect(readRawState()['version'], 3);
+    },
+  );
 }

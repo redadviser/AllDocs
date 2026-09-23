@@ -4,19 +4,31 @@ import 'dart:io';
 import 'dart:isolate';
 import 'dart:typed_data';
 
+import 'package:crypto/crypto.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../models/models.dart';
+import 'document_classifier.dart';
 import 'document_scanner_service.dart';
+import 'document_search.dart';
+import 'document_text_extractor.dart';
+import 'document_text_indexer.dart';
 import 'expiry_reminder_service.dart';
 import 'secure_zip_extractor.dart';
 
 final _expiryReminderService = ExpiryReminderService();
 
+/// What kind of files a picker call should offer.
+enum ImportPickKind { documents, images, zip }
+
 class LocalDocumentsStore {
   const LocalDocumentsStore();
+
+  /// How long a document stays in the recycle bin before it's removed for
+  /// good on the next load.
+  static const trashRetention = Duration(days: 30);
 
   static Directory? _debugDirectory;
 
@@ -28,27 +40,29 @@ class LocalDocumentsStore {
   static set debugDirectory(Directory? value) {
     _debugDirectory = value;
     _cachedState = null;
+    _cachedDeviceFolders = null;
+    _deviceFoldersCountedAt = null;
   }
 
   static Directory? _fallbackDirectory;
 
+  /// Called after background work (OCR indexing) changes the stored state,
+  /// so the UI can reload. Set by [DocumentsService].
+  static void Function()? onBackgroundUpdate;
+  static bool _indexing = false;
+
   // Every mutation (favoriting, importing, moving a document, ...) used to
   // re-read and fully re-parse the whole state JSON from disk — and since
-  // all three tabs stay mounted (IndexedStack) and share one
-  // DocumentsService, a single change fired that reload three times over.
-  // As the document list grows this JSON blob grows with it (OCR text is
-  // stored per document), so that repeated parsing was a real, scaling
-  // source of jank. Caching the parsed state in memory turns every read
-  // after the first into a plain map lookup; only genuine writes still
-  // touch disk.
+  // all tabs stay mounted (IndexedStack) and share one DocumentsService, a
+  // single change fired that reload several times over. As the document
+  // list grows this JSON blob grows with it (extracted text is stored per
+  // document), so that repeated parsing was a real, scaling source of jank.
+  // Caching the parsed state in memory turns every read after the first
+  // into a plain map lookup; only genuine writes still touch disk.
   static Map<String, dynamic>? _cachedState;
-  static const _stateFileName = 'alldocs_state.json';
-  static const _documentsFolderName = 'documents';
-  // AllDocs organizes documents, not photos — that's AllPhotos' job. Images
-  // are only accepted from the dedicated Screenshots folder below (people
-  // do sometimes need to keep a screenshot, e.g. a QR code or confirmation
-  // screen, alongside their documents), never from manual import or the
-  // other device folders.
+  static const stateFileName = 'alldocs_state.json';
+  static const documentsFolderName = 'documents';
+  static const _stateVersion = 3;
   static const _documentExtensions = [
     'pdf',
     'doc',
@@ -65,6 +79,15 @@ class LocalDocumentsStore {
     'odp',
   ];
   static const _imageExtensions = ['jpg', 'jpeg', 'png', 'heic', 'webp'];
+
+  /// Everything that can be stored in AllDocs: documents plus images (a
+  /// receipt photo, a screenshot of a QR code, ...). Device-folder scans
+  /// still only surface documents (except the Screenshots folder) so the
+  /// camera roll doesn't flood the results — photos are AllPhotos' job.
+  static const importableExtensions = [
+    ..._documentExtensions,
+    ..._imageExtensions,
+  ];
   static const _screenshotsFolderId = 'screenshots';
   static const _deviceFolderSpecs = [
     DeviceFolder(id: 'downloads', title: 'Downloads', itemCount: 0),
@@ -77,65 +100,127 @@ class LocalDocumentsStore {
 
   static List<String> _allowedExtensionsFor(String folderId) {
     return folderId == _screenshotsFolderId
-        ? const [..._documentExtensions, ..._imageExtensions]
+        ? importableExtensions
         : _documentExtensions;
+  }
+
+  static bool isImportable(String fileName) {
+    final lower = fileName.toLowerCase();
+    return importableExtensions.any((ext) => lower.endsWith('.$ext'));
   }
 
   Future<DocumentsSnapshot> loadSnapshot() async {
     final state = await _readState();
+    if (await _purgeExpiredTrash(state)) await _writeState(state);
+    unawaited(_indexPendingDocuments());
     return _snapshotFromState(state);
   }
+
+  // ---------------------------------------------------------------------
+  // Import
+  // ---------------------------------------------------------------------
 
   /// Just the system file picker — importing is a separate step so the UI
   /// can detect a .zip among the picked files and route it through the
   /// extract-preview-select flow (see [extractZipPreview]) instead of
-  /// silently importing it whole.
-  Future<List<PlatformFile>> pickFilesForImport() async {
+  /// silently importing it whole. On Android the system picker also lists
+  /// cloud providers (Drive, OneDrive, Dropbox...), which is the "quick
+  /// import" path from the cloud.
+  Future<List<PlatformFile>> pickFilesForImport({
+    ImportPickKind kind = ImportPickKind.documents,
+    bool allowMultiple = true,
+  }) async {
     final result = await FilePicker.pickFiles(
-      allowMultiple: true,
-      type: FileType.custom,
-      allowedExtensions: [..._documentExtensions, 'zip'],
+      allowMultiple: allowMultiple,
+      type: kind == ImportPickKind.images ? FileType.image : FileType.custom,
+      allowedExtensions: switch (kind) {
+        ImportPickKind.images => null,
+        ImportPickKind.zip => const ['zip'],
+        ImportPickKind.documents => const [...importableExtensions, 'zip'],
+      },
       withData: true,
     );
     return result?.files ?? const [];
   }
 
-  Future<int> importPickedFiles(
+  Future<ImportResult> importPickedFiles(
     List<PlatformFile> files, {
     String? albumId,
+    DocumentSource source = DocumentSource.local,
   }) async {
-    if (files.isEmpty) return 0;
+    if (files.isEmpty) return ImportResult.empty;
 
     final state = await _readState();
-    final documents = _documentsRaw(state);
-    var imported = 0;
+    final imported = <DocumentFile>[];
+    var duplicates = 0;
 
     for (final picked in files) {
       final originalName = picked.name.trim().isEmpty
           ? 'documento_${DateTime.now().millisecondsSinceEpoch}.pdf'
           : picked.name.trim();
-
-      final id = _newId('doc');
-      final storedPath = await _copyPickedFile(
-        id: id,
+      final document = await _importOne(
+        state,
         originalName: originalName,
-        pickedPath: picked.path,
+        sourcePath: picked.path,
         bytes: picked.bytes,
-      );
-      final importedDocument = await _documentFromStoredFile(
-        id: id,
-        fileName: originalName,
-        storedPath: storedPath,
         albumId: albumId,
+        source: source,
       );
-      documents.add(importedDocument.toJson());
-
-      if (albumId != null) _addDocumentToAlbum(state, albumId, id);
-      imported++;
+      document == null ? duplicates++ : imported.add(document);
     }
 
-    await _writeState(state);
-    return imported;
+    return _finishImport(state, imported, duplicates);
+  }
+
+  /// Imports files already on disk (e.g. shared into AllDocs from another
+  /// app), copying them into AllDocs' own storage.
+  Future<ImportResult> importFilePaths(
+    List<String> paths, {
+    String? albumId,
+    DocumentSource source = DocumentSource.shared,
+  }) async {
+    final state = await _readState();
+    final imported = <DocumentFile>[];
+    var duplicates = 0;
+
+    for (final path in paths) {
+      final file = File(path);
+      if (!await file.exists()) continue;
+      final name = _fileNameFromPath(path);
+      if (!isImportable(name)) continue;
+      final document = await _importOne(
+        state,
+        originalName: name,
+        sourcePath: path,
+        albumId: albumId,
+        source: source,
+      );
+      document == null ? duplicates++ : imported.add(document);
+    }
+
+    return _finishImport(state, imported, duplicates);
+  }
+
+  /// Imports a single in-memory file, e.g. downloaded from a cloud provider.
+  Future<ImportResult> importBytes(
+    String fileName,
+    Uint8List bytes, {
+    String? albumId,
+    DocumentSource source = DocumentSource.local,
+    String? cloudFileId,
+    String? cloudVersion,
+  }) async {
+    final state = await _readState();
+    final document = await _importOne(
+      state,
+      originalName: fileName,
+      bytes: bytes,
+      albumId: albumId,
+      source: source,
+      cloudFileId: cloudFileId,
+      cloudVersion: cloudVersion,
+    );
+    return _finishImport(state, [?document], document == null ? 1 : 0);
   }
 
   /// Lists the supported documents inside a .zip without importing anything
@@ -146,73 +231,59 @@ class LocalDocumentsStore {
   Future<List<ExtractedZipEntry>> extractZipPreview(Uint8List zipBytes) {
     return const SecureZipExtractor().extractInBackground(
       zipBytes,
-      allowedExtensions: _documentExtensions,
+      allowedExtensions: importableExtensions,
     );
   }
 
   /// Same as [extractZipPreview], reading the zip from a file already on
-  /// disk — used for a zip found via "search the whole device" scanning,
-  /// where there's a [localPath] instead of in-memory bytes.
+  /// disk — used for a zip found via "search the whole device" scanning or
+  /// shared from another app, where there's a path instead of bytes.
   Future<List<ExtractedZipEntry>> extractZipPreviewFromPath(String path) async {
     final file = File(path);
     if (!await file.exists()) return const [];
     return extractZipPreview(await file.readAsBytes());
   }
 
-  Future<int> importExtractedZipEntries(
+  Future<ImportResult> importExtractedZipEntries(
     List<ExtractedZipEntry> entries, {
     String? albumId,
   }) async {
-    if (entries.isEmpty) return 0;
+    if (entries.isEmpty) return ImportResult.empty;
 
     final state = await _readState();
-    final documents = _documentsRaw(state);
-    var imported = 0;
+    final imported = <DocumentFile>[];
+    var duplicates = 0;
 
     for (final entry in entries) {
-      final id = _newId('doc');
-      final storedPath = await _copyPickedFile(
-        id: id,
+      final document = await _importOne(
+        state,
         originalName: entry.fileName,
-        pickedPath: null,
         bytes: entry.bytes,
-      );
-      final importedDocument = await _documentFromStoredFile(
-        id: id,
-        fileName: entry.fileName,
-        storedPath: storedPath,
         albumId: albumId,
+        source: DocumentSource.zip,
       );
-      documents.add(importedDocument.toJson());
-
-      if (albumId != null) _addDocumentToAlbum(state, albumId, id);
-      imported++;
+      document == null ? duplicates++ : imported.add(document);
     }
 
-    await _writeState(state);
-    return imported;
+    return _finishImport(state, imported, duplicates);
   }
 
-  Future<int> scanDocumentWithCamera({String? albumId}) async {
-    final scanned = await const DocumentScannerService().scanDocument();
-    if (scanned == null) return 0;
+  Future<ImportResult> scanDocumentWithCamera({
+    String? albumId,
+    ScanFilterChooser? chooseFilter,
+  }) async {
+    final scanned = await const DocumentScannerService().scanDocument(
+      chooseFilter: chooseFilter,
+    );
+    if (scanned == null) return ImportResult.empty;
 
     final state = await _readState();
-    final documents = _documentsRaw(state);
-    final id = _newId('doc');
-    final storedPath = await _copyPickedFile(
-      id: id,
+    final document = await _importOne(
+      state,
       originalName: scanned.fileName,
-      pickedPath: scanned.filePath,
-      bytes: null,
-    );
-    await scanned.cleanup();
-
-    final importedDocument = await _documentFromStoredFile(
-      id: id,
-      fileName: scanned.fileName,
-      storedPath: storedPath,
+      sourcePath: scanned.filePath,
       albumId: albumId,
+      source: DocumentSource.scan,
       pageCount: scanned.pageCount,
       isSearchable: scanned.searchable,
       ocrText: scanned.ocrText,
@@ -220,13 +291,220 @@ class LocalDocumentsStore {
       classificationConfidence: scanned.classificationConfidence,
       validityDate: scanned.validityDate,
     );
-    documents.add(importedDocument.toJson());
-
-    if (albumId != null) _addDocumentToAlbum(state, albumId, id);
-    await _writeState(state);
-    unawaited(_syncReminderBestEffort(importedDocument));
-    return 1;
+    await scanned.cleanup();
+    return _finishImport(state, [?document], 0);
   }
+
+  /// Imports documents found via device-folder scanning. A .zip among
+  /// [scannedDocuments] is skipped here — the UI routes those through
+  /// [extractZipPreviewFromPath]/[importExtractedZipEntries] instead, so the
+  /// user sees what's inside before anything is added.
+  Future<ImportResult> importScannedDocuments(
+    List<DocumentFile> scannedDocuments, {
+    String? albumId,
+  }) async {
+    if (scannedDocuments.isEmpty) return ImportResult.empty;
+
+    final state = await _readState();
+    final imported = <DocumentFile>[];
+    var duplicates = 0;
+
+    for (final scanned in scannedDocuments) {
+      if (scanned.fileName.toLowerCase().endsWith('.zip')) continue;
+
+      final sourcePath = scanned.localPath;
+      if (sourcePath == null || sourcePath.isEmpty) continue;
+      if (!await File(sourcePath).exists()) continue;
+
+      final document = await _importOne(
+        state,
+        originalName: scanned.fileName,
+        sourcePath: sourcePath,
+        albumId: albumId,
+        source: DocumentSource.device,
+      );
+      document == null ? duplicates++ : imported.add(document);
+    }
+
+    return _finishImport(state, imported, duplicates);
+  }
+
+  /// Copies one file into AllDocs' storage, fingerprints it, extracts its
+  /// text when that's cheap, and appends it to [state]. Returns null when
+  /// the exact same file is already in AllDocs (it isn't imported twice).
+  Future<DocumentFile?> _importOne(
+    Map<String, dynamic> state, {
+    required String originalName,
+    String? sourcePath,
+    Uint8List? bytes,
+    String? albumId,
+    required DocumentSource source,
+    String? cloudFileId,
+    String? cloudVersion,
+    int? pageCount,
+    bool isSearchable = false,
+    String? ocrText,
+    DocumentSemanticType? semanticType,
+    double? classificationConfidence,
+    DateTime? validityDate,
+  }) async {
+    final id = _newId('doc');
+    final storedPath = await _copyPickedFile(
+      id: id,
+      originalName: originalName,
+      pickedPath: sourcePath,
+      bytes: bytes,
+    );
+
+    final checksum = await _checksumOf(storedPath);
+    if (checksum != null && _findByChecksum(state, checksum) != null) {
+      try {
+        await File(storedPath).delete();
+      } catch (_) {}
+      return null;
+    }
+
+    var text = ocrText;
+    var textIndexed = text != null;
+    if (text == null && DocumentTextExtractor.canExtract(originalName)) {
+      text = await const DocumentTextIndexer().extractPlainText(storedPath);
+      textIndexed = true;
+    }
+
+    var type = semanticType;
+    var confidence = classificationConfidence;
+    var validity = validityDate;
+    if (type == null && text != null && text.trim().isNotEmpty) {
+      final classification = const DocumentClassifier().classify(text);
+      type = classification.semanticType;
+      confidence = classification.confidence;
+      validity = classification.validityDate;
+    }
+
+    final document = await _documentFromStoredFile(
+      id: id,
+      fileName: originalName,
+      storedPath: storedPath,
+      albumId: albumId,
+      pageCount: pageCount,
+      isSearchable: isSearchable || (text != null && text.isNotEmpty),
+      ocrText: text,
+      semanticType: type,
+      classificationConfidence: confidence,
+      validityDate: validity,
+      checksum: checksum,
+      source: source,
+      cloudFileId: cloudFileId,
+      cloudVersion: cloudVersion,
+    );
+
+    final json = document.toJson();
+    if (textIndexed) json['text_indexed'] = true;
+    _documentsRaw(state).add(json);
+    if (albumId != null) _addDocumentToAlbum(state, albumId, id);
+    return document;
+  }
+
+  Future<ImportResult> _finishImport(
+    Map<String, dynamic> state,
+    List<DocumentFile> imported,
+    int duplicates,
+  ) async {
+    if (imported.isNotEmpty) await _writeState(state);
+    for (final document in imported) {
+      if (document.validityDate != null) {
+        unawaited(_syncReminderBestEffort(document));
+      }
+    }
+    if (imported.isNotEmpty) unawaited(_indexPendingDocuments());
+    return ImportResult(documents: imported, skippedDuplicates: duplicates);
+  }
+
+  Future<String?> _checksumOf(String path) async {
+    try {
+      return await Isolate.run(() async {
+        final digest = await sha256.bind(File(path).openRead()).first;
+        return digest.toString();
+      });
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Map<String, dynamic>? _findByChecksum(
+    Map<String, dynamic> state,
+    String checksum,
+  ) {
+    for (final raw in _documentsList(state)) {
+      if (raw['checksum'] == checksum && raw['deleted_at'] == null) return raw;
+    }
+    return null;
+  }
+
+  /// OCR for PDFs/images that have no text yet, one at a time in the
+  /// background. Best-effort: failures just leave the document unindexed
+  /// (it is marked so it isn't retried on every load).
+  Future<void> _indexPendingDocuments() async {
+    if (_indexing || debugDirectory != null) return;
+    const indexer = DocumentTextIndexer();
+    if (!DocumentTextIndexer.ocrAvailable) return;
+    _indexing = true;
+    try {
+      while (true) {
+        final state = await _readState();
+        final pending = _documentsList(state).where((raw) {
+          if (raw['text_indexed'] == true) return false;
+          if (raw['deleted_at'] != null) return false;
+          final text = raw['ocr_text']?.toString() ?? '';
+          if (text.isNotEmpty) return false;
+          return indexer.needsOcr(
+            documentTypeFromName(raw['type']?.toString()),
+          );
+        }).firstOrNull;
+        if (pending == null) break;
+
+        final path = pending['local_path']?.toString();
+        String? text;
+        if (path != null && await File(path).exists()) {
+          text = await indexer.recognizeText(
+            path,
+            documentTypeFromName(pending['type']?.toString()),
+          );
+        }
+
+        // The entry may have been replaced (renamed, moved...) while OCR
+        // ran; update whatever is current for this id.
+        final target =
+            _findDocument(state, pending['id']?.toString() ?? '') ?? pending;
+        target['text_indexed'] = true;
+        if (text != null && text.isNotEmpty) {
+          target['ocr_text'] = text;
+          target['is_searchable'] = true;
+          if (target['semantic_type'] == null) {
+            final classification = const DocumentClassifier().classify(text);
+            target['semantic_type'] = classification.semanticType.name;
+            target['classification_confidence'] = classification.confidence;
+            target['validity_date'] = classification.validityDate
+                ?.toIso8601String();
+          }
+        }
+        await _writeState(state);
+        final document = DocumentFile.fromJson(target);
+        if (document.validityDate != null) {
+          unawaited(_syncReminderBestEffort(document));
+        }
+        onBackgroundUpdate?.call();
+      }
+    } catch (_) {
+      // Indexing is an enhancement; never let it surface as an error.
+    } finally {
+      _indexing = false;
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  // Device folders and device search
+  // ---------------------------------------------------------------------
 
   Future<DeviceFolderScan?> openDeviceFolder(
     String folderId, {
@@ -259,11 +537,12 @@ class LocalDocumentsStore {
     if (path == null || path.trim().isEmpty) return null;
 
     paths[folderId] = path;
+    _deviceFoldersCountedAt = null;
     await _writeState(state);
     return _scanDeviceFolder(folderId, path, title: folderTitle);
   }
 
-  Future<DeviceFolderScan?> scanAllDeviceDocuments({String? title}) async {
+  Future<List<Directory>> _deviceSearchRoots() async {
     final state = await _readState();
     final paths = _deviceFolderPathsRaw(state);
     final rootPaths = <String>[];
@@ -293,17 +572,17 @@ class LocalDocumentsStore {
 
     if (Platform.isAndroid) addPath('/storage/emulated/0');
 
-    if (rootPaths.isEmpty) {
-      addPath((await _appDirectory()).path);
-    }
-
     final roots = <Directory>[];
     for (final path in rootPaths) {
       final directory = Directory(path);
       if (await directory.exists()) roots.add(directory);
     }
+    return roots;
+  }
 
-    if (roots.isEmpty) return null;
+  Future<DeviceFolderScan?> scanAllDeviceDocuments({String? title}) async {
+    final roots = await _deviceSearchRoots();
+    if (roots.isEmpty) roots.add(await _appDirectory());
 
     // Unlike the per-folder scans, "search the whole device" also surfaces
     // .zip files — a common user downloading one often doesn't realize it
@@ -327,50 +606,41 @@ class LocalDocumentsStore {
     );
   }
 
-  /// Imports documents found via device-folder scanning. A .zip among
-  /// [scannedDocuments] is skipped here — the UI routes those through
-  /// [extractZipPreviewFromPath]/[importExtractedZipEntries] instead, so the
-  /// user sees what's inside before anything is added.
-  Future<int> importScannedDocuments(
-    List<DocumentFile> scannedDocuments, {
-    String? albumId,
-  }) async {
-    if (scannedDocuments.isEmpty) return 0;
+  /// Finds files anywhere on the device whose name — or, for text-based
+  /// formats (txt, csv, docx, xlsx, pptx, OpenDocument), whose contents —
+  /// contain every word of [query]. Files already in AllDocs are skipped.
+  Future<DeviceFolderScan?> searchDevice(String query, {String? title}) async {
+    final tokens = searchTokens(query);
+    if (tokens.isEmpty) return null;
+    final roots = await _deviceSearchRoots();
+    if (roots.isEmpty) return null;
 
-    final state = await _readState();
-    final documents = _documentsRaw(state);
-    var imported = 0;
-
-    for (final scanned in scannedDocuments) {
-      if (scanned.fileName.toLowerCase().endsWith('.zip')) continue;
-
-      final sourcePath = scanned.localPath;
-      if (sourcePath == null || sourcePath.isEmpty) continue;
-      final source = File(sourcePath);
-      if (!await source.exists()) continue;
-
-      final id = _newId('doc');
-      final storedPath = await _copyPickedFile(
-        id: id,
-        originalName: scanned.fileName,
-        pickedPath: sourcePath,
-        bytes: null,
+    final appPath = (await _appDirectory()).path;
+    final rootPaths = roots.map((directory) => directory.path).toList();
+    final results = await Isolate.run(() {
+      return _searchDevicePaths(
+        rootPaths: rootPaths,
+        tokens: tokens,
+        excludePath: appPath,
+        allowedExtensions: [..._documentExtensions, ..._imageExtensions, 'zip'],
+        limit: 300,
       );
-      final importedDocument = await _documentFromStoredFile(
-        id: id,
-        fileName: scanned.fileName,
-        storedPath: storedPath,
-        albumId: albumId,
-      );
-      documents.add(importedDocument.toJson());
+    });
 
-      if (albumId != null) _addDocumentToAlbum(state, albumId, id);
-      imported++;
-    }
-
-    await _writeState(state);
-    return imported;
+    final documents = results
+        .map((json) => DocumentFile.fromJson(Map<String, dynamic>.from(json)))
+        .toList();
+    return DeviceFolderScan(
+      folderId: 'search',
+      path: roots.first.path,
+      title: title ?? query,
+      documents: documents,
+    );
   }
+
+  // ---------------------------------------------------------------------
+  // Shelves and albums
+  // ---------------------------------------------------------------------
 
   Future<void> createShelf(String name) async {
     final normalized = name.trim();
@@ -389,24 +659,52 @@ class LocalDocumentsStore {
     await _writeState(state);
   }
 
-  Future<void> createAlbum(
-    String shelfId,
-    String name, {
-    int? colorValue,
-    String iconName = 'folder',
-  }) async {
+  Future<void> renameShelf(String shelfId, String name) async {
     final normalized = name.trim();
     if (normalized.isEmpty) return;
-
     final state = await _readState();
     final shelf = _findShelf(state, shelfId);
     if (shelf == null) return;
+    shelf['name'] = normalized;
+    await _writeState(state);
+  }
+
+  /// Creates an album and returns its id. When there is no shelf yet (or
+  /// [shelfId] is null) the first shelf is used, creating a default one.
+  Future<String?> createAlbum(
+    String? shelfId,
+    String name, {
+    int? colorValue,
+    String iconName = 'folder',
+    String defaultShelfName = 'Documentos',
+  }) async {
+    final normalized = name.trim();
+    if (normalized.isEmpty) return null;
+
+    final state = await _readState();
+    var shelf = shelfId == null ? null : _findShelf(state, shelfId);
+    if (shelf == null) {
+      final shelves = _shelvesList(state);
+      if (shelves.isNotEmpty) {
+        shelf = shelves.first;
+      } else {
+        final created = DocumentShelf(
+          id: _newId('shelf'),
+          name: defaultShelfName,
+          position: 0,
+          albums: const [],
+        ).toJson();
+        _shelvesRaw(state).add(created);
+        shelf = created;
+      }
+    }
 
     final albums = _albumsRaw(shelf);
+    final id = _newId('album');
     albums.add(
       DocumentAlbum(
-        id: _newId('album'),
-        shelfId: shelfId,
+        id: id,
+        shelfId: shelf['id'].toString(),
         name: normalized,
         colorValue: colorValue ?? _albumColorFor(albums.length),
         iconName: iconName,
@@ -414,6 +712,63 @@ class LocalDocumentsStore {
         documentIds: const [],
       ).toJson(),
     );
+    await _writeState(state);
+    return id;
+  }
+
+  Future<void> updateAlbum(
+    String albumId, {
+    String? name,
+    int? colorValue,
+    String? iconName,
+  }) async {
+    final state = await _readState();
+    final album = _findAlbum(state, albumId);
+    if (album == null) return;
+    if (name != null && name.trim().isNotEmpty) album['name'] = name.trim();
+    if (colorValue != null) album['color_value'] = colorValue;
+    if (iconName != null) album['icon_name'] = iconName;
+    await _writeState(state);
+  }
+
+  Future<void> reorderShelves(List<String> shelfIds) async {
+    final state = await _readState();
+    final shelves = _shelvesRaw(state);
+    int rank(dynamic shelf) {
+      final index = shelfIds.indexOf((shelf as Map)['id']?.toString() ?? '');
+      return index < 0 ? shelfIds.length : index;
+    }
+
+    shelves.sort((a, b) => rank(a).compareTo(rank(b)));
+    _reindexShelves(state);
+    await _writeState(state);
+  }
+
+  Future<void> reorderAlbums(String shelfId, List<String> albumIds) async {
+    final state = await _readState();
+    final shelf = _findShelf(state, shelfId);
+    if (shelf == null) return;
+    final albums = _albumsRaw(shelf);
+    int rank(dynamic album) {
+      final index = albumIds.indexOf((album as Map)['id']?.toString() ?? '');
+      return index < 0 ? albumIds.length : index;
+    }
+
+    albums.sort((a, b) => rank(a).compareTo(rank(b)));
+    _reindexAlbums(shelf);
+    await _writeState(state);
+  }
+
+  Future<void> sortAlbumsByName(String shelfId) async {
+    final state = await _readState();
+    final shelf = _findShelf(state, shelfId);
+    if (shelf == null) return;
+    _albumsRaw(shelf).sort(
+      (a, b) => normalizeForSearch(
+        (a as Map)['name']?.toString() ?? '',
+      ).compareTo(normalizeForSearch((b as Map)['name']?.toString() ?? '')),
+    );
+    _reindexAlbums(shelf);
     await _writeState(state);
   }
 
@@ -452,67 +807,221 @@ class LocalDocumentsStore {
     }
   }
 
-  Future<void> moveDocumentToAlbum(String documentId, String albumId) async {
-    final state = await _readState();
-    final documents = _documentsRaw(state);
-    final index = documents.indexWhere((document) {
-      return document is Map && document['id']?.toString() == documentId;
-    });
-    if (index < 0) return;
+  // ---------------------------------------------------------------------
+  // Document changes
+  // ---------------------------------------------------------------------
 
-    final document = DocumentFile.fromJson(
-      Map<String, dynamic>.from(documents[index] as Map),
-    );
-    _removeDocumentFromAlbums(state, documentId);
-    _addDocumentToAlbum(state, albumId, documentId);
-    documents[index] = document
-        .copyWith(albumId: albumId, isNew: false, isImported: true)
-        .toJson();
+  /// Replaces the full set of albums [documentId] belongs to.
+  Future<void> setDocumentAlbums(
+    String documentId,
+    List<String> albumIds,
+  ) async {
+    final state = await _readState();
+    if (!_setAlbums(state, documentId, albumIds)) return;
     await _writeState(state);
   }
 
-  Future<void> moveDocumentToInbox(String documentId) async {
+  /// Adds documents to one more album, keeping every album they're in.
+  Future<void> addDocumentsToAlbum(
+    List<String> documentIds,
+    String albumId,
+  ) async {
     final state = await _readState();
+    var changed = false;
+    for (final id in documentIds) {
+      final raw = _findDocument(state, id);
+      if (raw == null) continue;
+      final document = DocumentFile.fromJson(raw);
+      changed |= _setAlbums(
+        state,
+        id,
+        {...document.albumIds, albumId}.toList(),
+      );
+    }
+    if (changed) await _writeState(state);
+  }
+
+  Future<void> removeDocumentFromAlbum(
+    String documentId,
+    String albumId,
+  ) async {
+    final state = await _readState();
+    final raw = _findDocument(state, documentId);
+    if (raw == null) return;
+    final document = DocumentFile.fromJson(raw);
+    _setAlbums(
+      state,
+      documentId,
+      document.albumIds.where((id) => id != albumId).toList(),
+    );
+    await _writeState(state);
+  }
+
+  Future<void> moveDocumentToAlbum(String documentId, String albumId) {
+    return setDocumentAlbums(documentId, [albumId]);
+  }
+
+  Future<void> moveDocumentToInbox(String documentId) {
+    return setDocumentAlbums(documentId, const []);
+  }
+
+  bool _setAlbums(
+    Map<String, dynamic> state,
+    String documentId,
+    List<String> albumIds,
+  ) {
     final documents = _documentsRaw(state);
     final index = documents.indexWhere((document) {
       return document is Map && document['id']?.toString() == documentId;
     });
-    if (index < 0) return;
+    if (index < 0) return false;
 
-    final document = DocumentFile.fromJson(
-      Map<String, dynamic>.from(documents[index] as Map),
-    );
+    final raw = Map<String, dynamic>.from(documents[index] as Map);
+    final document = DocumentFile.fromJson(raw);
+    final validIds = albumIds
+        .where((id) => _findAlbum(state, id) != null)
+        .toSet()
+        .toList();
     _removeDocumentFromAlbums(state, documentId);
-    documents[index] = document
-        .copyWith(clearAlbumId: true, isNew: true)
-        .toJson();
-    await _writeState(state);
+    for (final albumId in validIds) {
+      _addDocumentToAlbum(state, albumId, documentId);
+    }
+    documents[index] = _mergeJson(
+      raw,
+      document
+          .copyWith(
+            albumIds: validIds,
+            isNew: validIds.isEmpty,
+            isImported: true,
+          )
+          .toJson(),
+    );
+    return true;
+  }
+
+  /// Edits name/tags/favorite/albums in one write — used by the details
+  /// sheet shown after importing and from a document's menu.
+  Future<void> updateDocument(
+    String documentId, {
+    String? title,
+    List<String>? tags,
+    bool? isFavorite,
+    List<String>? albumIds,
+  }) async {
+    final state = await _readState();
+    if (albumIds != null) _setAlbums(state, documentId, albumIds);
+    final changed = _updateDocumentJson(state, documentId, (document) {
+      return document.copyWith(
+        title: title == null || title.trim().isEmpty ? null : title.trim(),
+        tags: tags == null ? null : _normalizeTags(tags),
+        isFavorite: isFavorite,
+      );
+    });
+    if (changed || albumIds != null) await _writeState(state);
+  }
+
+  Future<void> renameDocument(String documentId, String title) {
+    return updateDocument(documentId, title: title);
   }
 
   Future<void> toggleFavorite(String documentId) async {
     final state = await _readState();
-    final documents = _documentsRaw(state);
-    final index = documents.indexWhere((document) {
-      return document is Map && document['id']?.toString() == documentId;
+    final changed = _updateDocumentJson(state, documentId, (document) {
+      return document.copyWith(isFavorite: !document.isFavorite);
     });
-    if (index < 0) return;
+    if (changed) await _writeState(state);
+  }
 
-    final document = DocumentFile.fromJson(
-      Map<String, dynamic>.from(documents[index] as Map),
-    );
-    documents[index] = document
-        .copyWith(isFavorite: !document.isFavorite)
-        .toJson();
+  Future<void> dismissSuggestion(String documentId) async {
+    final state = await _readState();
+    final changed = _updateDocumentJson(state, documentId, (document) {
+      return document.copyWith(suggestionDismissed: true);
+    });
+    if (changed) await _writeState(state);
+  }
+
+  Future<void> setArchived(List<String> documentIds, bool archived) async {
+    final state = await _readState();
+    var changed = false;
+    for (final id in documentIds) {
+      changed |= _updateDocumentJson(state, id, (document) {
+        return document.copyWith(isArchived: archived);
+      });
+    }
+    if (changed) await _writeState(state);
+  }
+
+  /// Moves documents to the recycle bin. Files stay on disk (and in their
+  /// albums) so restoring puts everything back exactly as it was.
+  Future<void> moveToTrash(List<String> documentIds) async {
+    final state = await _readState();
+    final now = DateTime.now();
+    var changed = false;
+    for (final id in documentIds) {
+      changed |= _updateDocumentJson(state, id, (document) {
+        return document.copyWith(deletedAt: now);
+      });
+      unawaited(_cancelReminderBestEffort(id));
+    }
+    if (changed) await _writeState(state);
+  }
+
+  Future<void> restoreFromTrash(List<String> documentIds) async {
+    final state = await _readState();
+    final restored = <DocumentFile>[];
+    for (final id in documentIds) {
+      _updateDocumentJson(state, id, (document) {
+        final updated = document.copyWith(clearDeletedAt: true);
+        restored.add(updated);
+        return updated;
+      });
+    }
+    if (restored.isEmpty) return;
+    await _writeState(state);
+    for (final document in restored) {
+      if (document.validityDate != null) {
+        unawaited(_syncReminderBestEffort(document));
+      }
+    }
+  }
+
+  /// Removes documents and their files for good.
+  Future<void> deletePermanently(List<String> documentIds) async {
+    final state = await _readState();
+    var changed = false;
+    for (final id in documentIds) {
+      changed |= await _deleteDocumentAndFile(state, id);
+    }
+    if (changed) await _writeState(state);
+  }
+
+  Future<void> emptyTrash() async {
+    final state = await _readState();
+    final ids = _documentsList(state)
+        .where((raw) => raw['deleted_at'] != null)
+        .map((raw) => raw['id'].toString())
+        .toList();
+    if (ids.isEmpty) return;
+    for (final id in ids) {
+      await _deleteDocumentAndFile(state, id);
+    }
     await _writeState(state);
   }
 
-  Future<void> deleteDocument(String documentId) async {
-    final state = await _readState();
+  /// Permanent delete of a single document (kept for existing callers).
+  Future<void> deleteDocument(String documentId) {
+    return deletePermanently([documentId]);
+  }
+
+  Future<bool> _deleteDocumentAndFile(
+    Map<String, dynamic> state,
+    String documentId,
+  ) async {
     final documents = _documentsRaw(state);
     final index = documents.indexWhere((document) {
       return document is Map && document['id']?.toString() == documentId;
     });
-    if (index < 0) return;
+    if (index < 0) return false;
 
     final document = DocumentFile.fromJson(
       Map<String, dynamic>.from(documents.removeAt(index) as Map),
@@ -520,11 +1029,113 @@ class LocalDocumentsStore {
     _removeDocumentFromAlbums(state, documentId);
     final localPath = document.localPath;
     if (localPath != null && localPath.isNotEmpty) {
-      final file = File(localPath);
-      if (await file.exists()) await file.delete();
+      try {
+        final file = File(localPath);
+        if (await file.exists()) await file.delete();
+      } catch (_) {}
+    }
+    unawaited(_cancelReminderBestEffort(documentId));
+    return true;
+  }
+
+  Future<bool> _purgeExpiredTrash(Map<String, dynamic> state) async {
+    final cutoff = DateTime.now().subtract(trashRetention);
+    final expired = _documentsList(state)
+        .where((raw) {
+          final deletedAt = DateTime.tryParse(
+            raw['deleted_at']?.toString() ?? '',
+          );
+          return deletedAt != null && deletedAt.isBefore(cutoff);
+        })
+        .map((raw) => raw['id'].toString())
+        .toList();
+    for (final id in expired) {
+      await _deleteDocumentAndFile(state, id);
+    }
+    return expired.isNotEmpty;
+  }
+
+  /// Swaps a document's file for a newer version (cloud sync "Update"),
+  /// keeping its albums, tags and history.
+  Future<void> replaceDocumentContent(
+    String documentId,
+    Uint8List bytes, {
+    String? cloudVersion,
+  }) async {
+    final state = await _readState();
+    final raw = _findDocument(state, documentId);
+    if (raw == null) return;
+    final document = DocumentFile.fromJson(raw);
+    final path = document.localPath;
+    if (path == null) return;
+    await File(path).writeAsBytes(bytes, flush: true);
+    final checksum = await _checksumOf(path);
+    String? text;
+    if (DocumentTextExtractor.canExtract(document.fileName)) {
+      text = await const DocumentTextIndexer().extractPlainText(path);
+    }
+    _updateDocumentJson(state, documentId, (document) {
+      return document.copyWith(
+        sizeBytes: bytes.length,
+        sizeLabel: _formatBytes(bytes.length),
+        checksum: checksum,
+        cloudVersion: cloudVersion,
+        ocrText: text,
+      );
+    });
+    final updated = _findDocument(state, documentId);
+    if (updated != null && text == null) {
+      updated['text_indexed'] = false;
+      updated['ocr_text'] = null;
     }
     await _writeState(state);
-    unawaited(_cancelReminderBestEffort(documentId));
+    unawaited(_indexPendingDocuments());
+  }
+
+  /// "Keep current version": remember the remote version the user saw so
+  /// the same update isn't offered again.
+  Future<void> setCloudVersion(String documentId, String? version) async {
+    final state = await _readState();
+    final changed = _updateDocumentJson(state, documentId, (document) {
+      return document.copyWith(cloudVersion: version);
+    });
+    if (changed) await _writeState(state);
+  }
+
+  bool _updateDocumentJson(
+    Map<String, dynamic> state,
+    String documentId,
+    DocumentFile Function(DocumentFile document) update,
+  ) {
+    final documents = _documentsRaw(state);
+    final index = documents.indexWhere((document) {
+      return document is Map && document['id']?.toString() == documentId;
+    });
+    if (index < 0) return false;
+    final raw = Map<String, dynamic>.from(documents[index] as Map);
+    documents[index] = _mergeJson(
+      raw,
+      update(DocumentFile.fromJson(raw)).toJson(),
+    );
+    return true;
+  }
+
+  // toJson() only knows model fields; keep store-only bookkeeping keys
+  // (like `text_indexed`) that the raw map carries.
+  Map<String, dynamic> _mergeJson(
+    Map<String, dynamic> raw,
+    Map<String, dynamic> updated,
+  ) {
+    return {...raw, ...updated};
+  }
+
+  List<String> _normalizeTags(List<String> tags) {
+    final seen = <String>{};
+    return [
+      for (final tag in tags)
+        if (tag.trim().isNotEmpty && seen.add(normalizeForSearch(tag.trim())))
+          tag.trim(),
+    ];
   }
 
   Future<void> _syncReminderBestEffort(DocumentFile document) async {
@@ -555,7 +1166,7 @@ class LocalDocumentsStore {
     final state = await _readState();
     final documents = _documentsList(state)
         .map(DocumentFile.fromJson)
-        .where((document) => document.localPath != null)
+        .where((document) => document.localPath != null && !document.isDeleted)
         .toList();
     if (documents.isEmpty) {
       return const DocumentExportResult(count: 0, path: null);
@@ -588,6 +1199,39 @@ class LocalDocumentsStore {
     return DocumentExportResult(count: exported, path: exportDir.path);
   }
 
+  // ---------------------------------------------------------------------
+  // Backup support
+  // ---------------------------------------------------------------------
+
+  Future<Directory> appDirectory() => _appDirectory();
+
+  Future<Directory> documentsDirectory() => _documentsDirectory();
+
+  /// Deep copy of the current state, for writing into a backup.
+  Future<Map<String, dynamic>> exportState() async {
+    final state = await _readState();
+    return Map<String, dynamic>.from(jsonDecode(jsonEncode(state)) as Map);
+  }
+
+  /// Replaces the whole state with one from a backup. Stored file paths are
+  /// rewritten to this device's documents folder (a backup made on another
+  /// phone has that phone's absolute paths).
+  Future<void> restoreState(Map<String, dynamic> restored) async {
+    final documentsDir = await _documentsDirectory();
+    for (final raw in _documentsList(restored)) {
+      final path = raw['local_path']?.toString();
+      if (path == null || path.isEmpty) continue;
+      raw['local_path'] =
+          '${documentsDir.path}/${_fileNameFromPath(path.replaceAll('\\', '/'))}';
+    }
+    _migrateState(restored);
+    await _writeState(restored);
+  }
+
+  // ---------------------------------------------------------------------
+  // State persistence
+  // ---------------------------------------------------------------------
+
   Future<Map<String, dynamic>> _readState() async {
     final cached = _cachedState;
     if (cached != null) return cached;
@@ -601,9 +1245,9 @@ class LocalDocumentsStore {
 
     try {
       // Parsing runs off the UI thread — with enough accumulated documents
-      // (each carrying its own OCR text) this file stops being "small JSON",
-      // and this is only the cold path anyway: every read after this one is
-      // served straight from _cachedState.
+      // (each carrying its own extracted text) this file stops being "small
+      // JSON", and this is only the cold path anyway: every read after this
+      // one is served straight from _cachedState.
       final raw = await file.readAsString();
       final decoded = await Isolate.run(() => jsonDecode(raw));
       if (decoded is Map<String, dynamic>) {
@@ -627,19 +1271,25 @@ class LocalDocumentsStore {
     await file.parent.create(recursive: true);
     // Encoding also runs off the UI thread, and compact rather than
     // indented — nothing reads this file by hand, and both save real time
-    // once it's carrying a large document history.
+    // once it's carrying a large document history. Written to a temp file
+    // first so a crash mid-write can't leave a truncated state file.
     final encoded = await Isolate.run(() => jsonEncode(state));
-    await file.writeAsString(encoded);
+    // Unique name: background indexing can write while the UI does.
+    final temp = File(
+      '${file.path}.${DateTime.now().microsecondsSinceEpoch}.tmp',
+    );
+    await temp.writeAsString(encoded, flush: true);
+    await temp.rename(file.path);
   }
 
   Future<File> _stateFile() async {
     final dir = await _appDirectory();
-    return File('${dir.path}/$_stateFileName');
+    return File('${dir.path}/$stateFileName');
   }
 
   Future<Directory> _documentsDirectory() async {
     final dir = await _appDirectory();
-    final documentsDir = Directory('${dir.path}/$_documentsFolderName');
+    final documentsDir = Directory('${dir.path}/$documentsFolderName');
     await documentsDir.create(recursive: true);
     return documentsDir;
   }
@@ -690,6 +1340,10 @@ class LocalDocumentsStore {
     DocumentSemanticType? semanticType,
     double? classificationConfidence,
     DateTime? validityDate,
+    String? checksum,
+    DocumentSource source = DocumentSource.local,
+    String? cloudFileId,
+    String? cloudVersion,
   }) async {
     final file = File(storedPath);
     final sizeBytes = await file.length();
@@ -706,7 +1360,7 @@ class LocalDocumentsStore {
       localPath: storedPath,
       sizeBytes: sizeBytes,
       importedAt: importedAt,
-      albumId: albumId,
+      albumIds: [?albumId],
       isNew: albumId == null,
       isImported: true,
       pageCount: pageCount,
@@ -715,18 +1369,29 @@ class LocalDocumentsStore {
       semanticType: semanticType,
       classificationConfidence: classificationConfidence,
       validityDate: validityDate,
+      checksum: checksum,
+      source: source,
+      cloudFileId: cloudFileId,
+      cloudVersion: cloudVersion,
     );
   }
 
   Future<DocumentsSnapshot> _snapshotFromState(
     Map<String, dynamic> state,
   ) async {
-    final documents =
+    final allDocuments =
         _documentsList(state)
             .map(DocumentFile.fromJson)
             .where((document) => document.id.isNotEmpty)
             .toList()
           ..sort(_newestFirst);
+    final documents = allDocuments.where((d) => d.isActive).toList();
+    final archivedDocuments = allDocuments
+        .where((d) => d.isArchived && !d.isDeleted)
+        .toList();
+    final trashDocuments = allDocuments.where((d) => d.isDeleted).toList()
+      ..sort((a, b) => b.deletedAt!.compareTo(a.deletedAt!));
+
     final shelves =
         _shelvesList(state)
             .map(DocumentShelf.fromJson)
@@ -744,9 +1409,9 @@ class LocalDocumentsStore {
     // O(albums × documents), and both grow as the archive fills up.
     final albumDocumentCounts = <String, int>{};
     for (final document in documents) {
-      final albumId = document.albumId;
-      if (albumId == null || albumId.isEmpty) continue;
-      albumDocumentCounts[albumId] = (albumDocumentCounts[albumId] ?? 0) + 1;
+      for (final albumId in document.albumIds) {
+        albumDocumentCounts[albumId] = (albumDocumentCounts[albumId] ?? 0) + 1;
+      }
     }
 
     final categories = <DocumentCategory>[
@@ -767,18 +1432,41 @@ class LocalDocumentsStore {
         .toList();
     final favoriteDocuments = favoriteDocumentsAll.take(5).toList();
     final unorganizedDocuments = documents
-        .where((document) => document.albumId == null || document.albumId == '')
+        .where((document) => document.albumIds.isEmpty)
         .toList();
     final recentImports = documents.take(4).toList();
     final expiringDocuments =
         documents.where((document) => document.validityDate != null).toList()
-          ..sort(
-            (a, b) => a.validityDate!.compareTo(b.validityDate!),
-          );
-    final usedBytes = documents.fold<int>(
+          ..sort((a, b) => a.validityDate!.compareTo(b.validityDate!));
+    final usedBytes = allDocuments.fold<int>(
       0,
       (total, document) => total + document.sizeBytes,
     );
+    final tags =
+        {for (final document in allDocuments) ...document.tags}.toList()..sort(
+          (a, b) => normalizeForSearch(a).compareTo(normalizeForSearch(b)),
+        );
+
+    final albums = [for (final shelf in shelves) ...shelf.albums];
+    final suggestions = <AlbumSuggestion>[];
+    for (final document in unorganizedDocuments) {
+      final type = document.semanticType;
+      if (type == null ||
+          type == DocumentSemanticType.other ||
+          document.suggestionDismissed ||
+          (document.classificationConfidence ?? 0) < 0.4) {
+        continue;
+      }
+      suggestions.add(
+        AlbumSuggestion(
+          document: document,
+          semanticType: type,
+          album: albumForSemanticType(type, albums),
+        ),
+      );
+      if (suggestions.length >= 5) break;
+    }
+
     final deviceFolders = await _deviceFoldersFromState(state);
 
     return DocumentsSnapshot(
@@ -791,6 +1479,10 @@ class LocalDocumentsStore {
       deviceFolders: deviceFolders,
       recentImports: recentImports,
       expiringDocuments: expiringDocuments.take(5).toList(),
+      archivedDocuments: archivedDocuments,
+      trashDocuments: trashDocuments,
+      tags: tags,
+      suggestions: suggestions,
       // Overwritten with the real signed-in user's name/email/plan by
       // DocumentsService.loadSnapshot() — these are just the fallback values
       // if that overlay is skipped (e.g. calling this store directly).
@@ -811,7 +1503,7 @@ class LocalDocumentsStore {
 
   Map<String, dynamic> _initialState() {
     return {
-      'version': 2,
+      'version': _stateVersion,
       'shelves': <Map<String, dynamic>>[],
       'documents': <Map<String, dynamic>>[],
       'device_folder_paths': <String, String>{},
@@ -820,8 +1512,37 @@ class LocalDocumentsStore {
 
   bool _migrateState(Map<String, dynamic> state) {
     final version = state['version'];
-    if (version == 2) return false;
+    if (version == _stateVersion) return false;
 
+    if (version is! int || version < 2) _migrateToV2(state);
+
+    // v3: documents can belong to several albums (`album_ids`). Rebuild it
+    // from the albums' own `document_ids`, which already allowed that.
+    final membership = <String, List<String>>{};
+    for (final shelf in _shelvesList(state)) {
+      for (final album in _albumsList(shelf)) {
+        final albumId = album['id']?.toString() ?? '';
+        for (final id in (album['document_ids'] as List<dynamic>? ?? [])) {
+          membership.putIfAbsent(id.toString(), () => []).add(albumId);
+        }
+      }
+    }
+    for (final raw in _documentsList(state)) {
+      final id = raw['id']?.toString() ?? '';
+      final ids = <String>{
+        ...?membership[id],
+        if (raw['album_id'] != null && raw['album_id'].toString().isNotEmpty)
+          raw['album_id'].toString(),
+      }.toList();
+      raw['album_ids'] = ids;
+      raw['album_id'] = ids.isEmpty ? null : ids.first;
+    }
+
+    state['version'] = _stateVersion;
+    return true;
+  }
+
+  void _migrateToV2(Map<String, dynamic> state) {
     const mockNames = {
       'Pessoais',
       'Trabalho',
@@ -860,8 +1581,6 @@ class LocalDocumentsStore {
     });
 
     _reindexShelves(state);
-    state['version'] = 2;
-    return true;
   }
 
   List<dynamic> _shelvesRaw(Map<String, dynamic> state) {
@@ -906,6 +1625,16 @@ class LocalDocumentsStore {
 
   List<Map<String, dynamic>> _albumsList(Map<String, dynamic> shelf) {
     return _albumsRaw(shelf).whereType<Map<String, dynamic>>().toList();
+  }
+
+  Map<String, dynamic>? _findDocument(
+    Map<String, dynamic> state,
+    String documentId,
+  ) {
+    for (final raw in _documentsList(state)) {
+      if (raw['id']?.toString() == documentId) return raw;
+    }
+    return null;
   }
 
   Map<String, dynamic>? _findShelf(Map<String, dynamic> state, String shelfId) {
@@ -965,11 +1694,18 @@ class LocalDocumentsStore {
     for (var i = 0; i < documents.length; i++) {
       final raw = documents[i];
       if (raw is! Map) continue;
-      final document = DocumentFile.fromJson(Map<String, dynamic>.from(raw));
-      if (!albumIds.contains(document.albumId)) continue;
-      documents[i] = document
-          .copyWith(clearAlbumId: true, isNew: true)
-          .toJson();
+      final json = Map<String, dynamic>.from(raw);
+      final document = DocumentFile.fromJson(json);
+      if (!document.albumIds.any(albumIds.contains)) continue;
+      final remaining = document.albumIds
+          .where((id) => !albumIds.contains(id))
+          .toList();
+      documents[i] = _mergeJson(
+        json,
+        document
+            .copyWith(albumIds: remaining, isNew: remaining.isEmpty)
+            .toJson(),
+      );
     }
   }
 
@@ -995,7 +1731,59 @@ class LocalDocumentsStore {
     return bDate.compareTo(aDate);
   }
 
+  // Counting files walks up to thousands of directories per folder; doing
+  // that on every snapshot (i.e. every favorite tap) made the whole app
+  // sluggish. The snapshot now uses the last counts and refreshes them in
+  // the background at most every [_deviceFolderRefresh].
+  static List<DeviceFolder>? _cachedDeviceFolders;
+  static DateTime? _deviceFoldersCountedAt;
+  static bool _countingDeviceFolders = false;
+  static const _deviceFolderRefresh = Duration(minutes: 2);
+
   Future<List<DeviceFolder>> _deviceFoldersFromState(
+    Map<String, dynamic> state,
+  ) async {
+    final cached = _cachedDeviceFolders;
+    final countedAt = _deviceFoldersCountedAt;
+    final stale =
+        countedAt == null ||
+        DateTime.now().difference(countedAt) > _deviceFolderRefresh;
+    if (cached != null && !stale) return cached;
+    if (cached != null) {
+      unawaited(_refreshDeviceFolders(state));
+      return cached;
+    }
+    return _refreshDeviceFolders(state);
+  }
+
+  Future<List<DeviceFolder>> _refreshDeviceFolders(
+    Map<String, dynamic> state,
+  ) async {
+    if (_countingDeviceFolders && _cachedDeviceFolders != null) {
+      return _cachedDeviceFolders!;
+    }
+    _countingDeviceFolders = true;
+    try {
+      final previous = _cachedDeviceFolders;
+      final folders = await _countDeviceFolders(state);
+      _cachedDeviceFolders = folders;
+      _deviceFoldersCountedAt = DateTime.now();
+      final changed =
+          previous != null &&
+          [
+            for (var i = 0; i < folders.length; i++)
+              i < previous.length &&
+                  previous[i].itemCount == folders[i].itemCount &&
+                  previous[i].path == folders[i].path,
+          ].contains(false);
+      if (changed) onBackgroundUpdate?.call();
+      return folders;
+    } finally {
+      _countingDeviceFolders = false;
+    }
+  }
+
+  Future<List<DeviceFolder>> _countDeviceFolders(
     Map<String, dynamic> state,
   ) async {
     final paths = _deviceFolderPathsRaw(state);
@@ -1115,7 +1903,7 @@ class LocalDocumentsStore {
     required List<String> allowedExtensions,
   }) async {
     try {
-      return Isolate.run(() {
+      return await Isolate.run(() {
         return _countSupportedFilesInPath(
           directory.path,
           limit: 250,
@@ -1457,4 +2245,115 @@ String _scanFormatBytes(int bytes) {
   }
   if (bytes >= 1024) return '${(bytes / 1024).round()} KB';
   return '$bytes B';
+}
+
+/// Device-wide search: files whose name contains every token, or — for the
+/// text-based formats [DocumentTextExtractor] understands, up to a few MB —
+/// whose contents do. Runs inside an isolate.
+List<Map<String, Object?>> _searchDevicePaths({
+  required List<String> rootPaths,
+  required List<String> tokens,
+  required String excludePath,
+  required List<String> allowedExtensions,
+  required int limit,
+}) {
+  const maxContentChecks = 400;
+  const maxContentBytes = 4 * 1024 * 1024;
+  final results = <Map<String, Object?>>[];
+  final seenFiles = <String>{};
+  final seenDirectories = <String>{};
+  final queue = [for (final path in rootPaths) Directory(path)];
+  final normalizedExclude = excludePath.replaceAll(r'\', '/').toLowerCase();
+  var scannedDirectories = 0;
+  var contentChecks = 0;
+  const extractor = DocumentTextExtractor();
+
+  bool matchesAll(String haystack) => tokens.every(haystack.contains);
+
+  while (queue.isNotEmpty &&
+      results.length < limit &&
+      scannedDirectories < 9000) {
+    final directory = queue.removeAt(0);
+    final directoryPath = directory.path;
+    if (!seenDirectories.add(directoryPath)) continue;
+    if (_scanShouldSkipDirectory(directoryPath)) continue;
+    if (directoryPath
+        .replaceAll(r'\', '/')
+        .toLowerCase()
+        .startsWith(normalizedExclude)) {
+      continue;
+    }
+    scannedDirectories++;
+
+    late final List<FileSystemEntity> children;
+    try {
+      children = directory.listSync(followLinks: false);
+    } catch (_) {
+      continue;
+    }
+
+    for (final child in children) {
+      if (child is Directory) {
+        queue.add(child);
+        continue;
+      }
+      if (child is! File) continue;
+      final path = child.path;
+      if (!seenFiles.add(path)) continue;
+      final fileName = _scanFileNameFromPath(path);
+      if (!_scanIsSupportedFile(fileName, allowedExtensions)) continue;
+
+      String? snippet;
+      var matched = matchesAll(normalizeForSearch(fileName));
+      if (!matched &&
+          contentChecks < maxContentChecks &&
+          DocumentTextExtractor.canExtract(fileName)) {
+        try {
+          if (child.lengthSync() <= maxContentBytes) {
+            contentChecks++;
+            final text = extractor.extractFromPath(path, maxChars: 60000);
+            if (text != null) {
+              final normalized = normalizeForSearch(text);
+              if (matchesAll(normalized)) {
+                matched = true;
+                final index = normalized.indexOf(tokens.first);
+                final start = (index - 30).clamp(0, text.length);
+                final end = (index + 70).clamp(0, text.length);
+                snippet = text
+                    .substring(start, end)
+                    .replaceAll(RegExp(r'\s+'), ' ')
+                    .trim();
+              }
+            }
+          }
+        } catch (_) {}
+      }
+      if (!matched) continue;
+
+      try {
+        final stat = child.statSync();
+        results.add({
+          'id': 'scan_${path.hashCode}',
+          'title': _scanTitleFromFileName(fileName),
+          'file_name': fileName,
+          'type': documentTypeFromFileName(fileName).name,
+          'date_label': _scanDateLabel(stat.modified),
+          'time_label': _scanTimeLabel(stat.modified),
+          'size_label': _scanFormatBytes(stat.size),
+          'local_path': path,
+          'size_bytes': stat.size,
+          'imported_at': stat.modified.toIso8601String(),
+          'ocr_text': snippet,
+        });
+      } catch (_) {
+        continue;
+      }
+      if (results.length >= limit) break;
+    }
+  }
+
+  results.sort((a, b) {
+    return (b['imported_at'] as String).compareTo(a['imported_at'] as String);
+  });
+  return results;
 }

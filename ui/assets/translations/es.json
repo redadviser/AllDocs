@@ -5,7 +5,10 @@
   "nav": {
     "shelf": "Estante",
     "archive": "Archivo",
-    "profile": "Perfil"
+    "profile": "Perfil",
+    "gallery": "Galería",
+    "albums": "Álbumes",
+    "cloud": "Nube"
   },
   "auth": {
     "title": "AllID",
@@ -73,7 +76,8 @@
     "open_document": "Abrir documento",
     "favorite": "Favorito",
     "remove_favorite": "Quitar favorito",
-    "close": "Cerrar"
+    "close": "Cerrar",
+    "save": "Guardar"
   },
   "docshelf": {
     "title": "Docshelf",
@@ -157,7 +161,10 @@
     "zip_preview_subtitle": "Elige cuáles quieres añadir a AllDocs.",
     "zip_preview_select_all": "Seleccionar todo",
     "zip_preview_select_none": "Borrar selección",
-    "zip_preview_import": "Importar ({count})"
+    "zip_preview_import": "Importar ({count})",
+    "archived": "Archivados",
+    "archived_hint": "Los documentos archivados salen de la galería pero siguen apareciendo en la búsqueda.",
+    "empty_state": "Nada archivado."
   },
   "profile": {
     "title": "Perfil",
@@ -253,5 +260,217 @@
     "q6_answer": "El PIN/biometría bloquea el acceso a la app en tu dispositivo. Es independiente de la contraseña de tu cuenta AllID: perder uno no afecta al otro.",
     "q7_question": "¿Cómo exporto o elimino mis documentos?",
     "q7_answer": "Puedes exportar todos tus documentos a una carpeta a tu elección desde Ajustes > Exportar documentos. Para eliminar un documento concreto, mantén pulsado el documento en el archivo."
+  },
+  "gallery": {
+    "hello": "Hola",
+    "hello_name": "Hola, {name}",
+    "documents_count": "{count} documentos",
+    "search_hint": "Buscar documentos en el teléfono",
+    "add": "Añadir",
+    "scan": "Escanear",
+    "suggestions": "Sugerencias",
+    "albums": "Álbumes",
+    "all_documents": "Todos los documentos · {count}",
+    "images": "Imágenes",
+    "results": "{count} resultados",
+    "also_archived": "En el archivo · {count}",
+    "device_search": "Buscar \"{query}\" en el teléfono",
+    "device_search_hint": "Encuentra archivos por nombre o por su texto y añádelos a la galería.",
+    "device_results_title": "En el teléfono: \"{query}\"",
+    "device_nothing": "No se encontraron archivos en el teléfono.",
+    "filter_favorites": "Favoritos",
+    "filter_date": "Fecha",
+    "filter_type": "Tipo",
+    "date_any": "Cualquier fecha",
+    "date_7": "Últimos 7 días",
+    "date_30": "Últimos 30 días",
+    "date_year": "Este año",
+    "date_older": "Años anteriores",
+    "selected": "{count} seleccionados",
+    "empty_title": "Aún no hay documentos",
+    "empty_message": "Añade archivos del teléfono, escanea papel con la cámara o importa desde la nube."
+  },
+  "suggestion": {
+    "add": "Parece: {type}. ¿Añadir a \"{album}\"?",
+    "create": "Parece: {type}. Aún no tienes un álbum para esto.",
+    "yes": "Sí",
+    "choose_other": "Elegir otro",
+    "create_action": "Crear \"{album}\""
+  },
+  "document_type_plural": {
+    "invoice": "Facturas",
+    "receipt": "Recibos",
+    "contract": "Contratos",
+    "identity_document": "Documentos personales",
+    "medical": "Salud",
+    "insurance": "Seguros",
+    "warranty": "Garantías",
+    "other": "Documentos"
+  },
+  "details": {
+    "title": "Detalles",
+    "imported_one": "Documento importado",
+    "imported_many": "{count} documentos importados",
+    "many_hint": "Los álbumes y etiquetas elegidos se añaden a todos.",
+    "detected_type": "Parece: {type}",
+    "name": "Nombre",
+    "albums": "Álbumes",
+    "no_albums": "Aún no tienes álbumes.",
+    "tags": "Etiquetas",
+    "add_tag": "Añadir etiqueta (ej.: Cliente A, 2026)"
+  },
+  "actions": {
+    "share": "Compartir",
+    "edit_details": "Nombre, álbumes y etiquetas",
+    "albums": "Añadir a álbumes",
+    "albums_hint": "Un documento puede estar en varios álbumes sin duplicarse.",
+    "remove_from_album": "Quitar de este álbum",
+    "unarchive": "Desarchivar",
+    "archived": "Archivado",
+    "unarchived": "De vuelta en la galería",
+    "move_to_trash": "Mover a la papelera",
+    "moved_to_trash": "{count} movidos a la papelera",
+    "undo": "Deshacer"
+  },
+  "add": {
+    "file": "Archivo",
+    "many_files": "Varios archivos",
+    "zip": "Archivo ZIP",
+    "zip_hint": "Mira lo que contiene y elige qué extraer",
+    "scan_hint": "Cámara con detección de hoja y varias páginas",
+    "image": "Imagen o foto",
+    "from_device": "Carpetas del teléfono",
+    "from_device_hint": "Descargas, WhatsApp, Documentos…"
+  },
+  "device": {
+    "found": "{count} archivos encontrados",
+    "add_selected": "Añadir a la galería ({count})"
+  },
+  "import": {
+    "all_duplicates": "Estos archivos ya están en AllDocs.",
+    "some_duplicates": "{count} importados, {skipped} ya existían."
+  },
+  "zip": {
+    "destination_album": "Álbum de destino",
+    "no_album": "Ninguno (solo galería)",
+    "large_title": "ZIP muy grande",
+    "large_message": "Una vez extraído, este ZIP puede ocupar {size}. Por seguridad solo se extraen hasta {limit}.",
+    "large_continue": "Continuar",
+    "nested_skipped": "Se ignoraron {count} ZIP dentro del ZIP."
+  },
+  "scan_filter": {
+    "title": "Aspecto del documento",
+    "pages": "{count} página(s) escaneada(s)",
+    "original": "Original",
+    "grayscale": "Grises",
+    "black_white": "Blanco y negro",
+    "contrast": "Contraste",
+    "save": "Guardar PDF"
+  },
+  "albums": {
+    "title": "Álbumes",
+    "edit_album": "Editar álbum",
+    "rename_shelf": "Renombrar estante",
+    "empty_title": "Organiza con álbumes",
+    "empty_message": "Crea álbumes como Clientes, Facturas o 2026. El mismo documento puede estar en varios.",
+    "add_documents": "Añadir documentos",
+    "from_gallery": "Elegir de la galería",
+    "import_new": "Importar nuevos",
+    "add_count": "Añadir ({count})",
+    "modern_view": "Ver portadas",
+    "classic_view": "Ver lomos",
+    "sort_by_name": "Ordenar álbumes por nombre",
+    "collections": "Colecciones",
+    "search_gallery": "Buscar en la galería"
+  },
+  "trash": {
+    "title": "Papelera",
+    "hint": "Los documentos se eliminan definitivamente tras {days} días.",
+    "empty": "Vaciar",
+    "empty_title": "¿Vaciar la papelera?",
+    "empty_state": "La papelera está vacía.",
+    "restore": "Restaurar",
+    "restored": "Documento restaurado",
+    "delete_forever": "Eliminar definitivamente",
+    "delete_forever_title": "¿Eliminar definitivamente?",
+    "delete_forever_message": "Se borrarán {count} documento(s) y sus archivos. No se puede deshacer.",
+    "days_left": "Se elimina en {days} días"
+  },
+  "cloud": {
+    "title": "Nube",
+    "subtitle": "Importar desde la nube guarda una copia en el teléfono; el documento sigue disponible sin internet.",
+    "connect": "Conectar",
+    "disconnect": "Desconectar",
+    "browse": "Ver archivos",
+    "connected": "{provider} conectado",
+    "connected_short": "Conectado",
+    "not_connected": "No conectado",
+    "not_configured": "Esta integración aún no está configurada en esta versión de la app.",
+    "not_configured_short": "Próximamente",
+    "connect_failed": "No se pudo conectar la cuenta.",
+    "disconnect_title": "¿Desconectar {provider}?",
+    "disconnect_message": "Los documentos ya importados se quedan en AllDocs.",
+    "quick_import": "Importación rápida",
+    "quick_import_hint": "Usa el selector del sistema: incluye Drive, OneDrive y otras apps de nube instaladas.",
+    "updates_title": "Nuevas versiones",
+    "check_updates": "Buscar actualizaciones",
+    "updates_hint": "Comprueba si algún documento importado cambió en la nube.",
+    "up_to_date": "Todo está actualizado.",
+    "updates_found": "{count} documento(s) con nueva versión",
+    "updated_file": "\"{name}\" se actualizó",
+    "update": "Actualizar",
+    "keep_current": "Mantener versión actual",
+    "updated": "Documento actualizado",
+    "request_failed": "No se pudo contactar con la nube. Inténtalo de nuevo.",
+    "search_hint": "Buscar en {provider}",
+    "search_results": "Resultados: {query}",
+    "empty_folder": "No hay documentos en esta carpeta.",
+    "import_count": "Importar {count} archivo(s)",
+    "downloading": "Descargando {done} de {total}…"
+  },
+  "backup": {
+    "title": "Copia de seguridad",
+    "hint": "Guarda todos los documentos, álbumes y etiquetas en un único archivo para restaurar en un teléfono nuevo.",
+    "destination": "Guardar en",
+    "this_device": "Este teléfono",
+    "auto": "Copia automática diaria",
+    "auto_hint": "Se hace al abrir la app, como máximo una vez al día.",
+    "auto_needs_cloud": "Elige una cuenta de nube conectada como destino.",
+    "last": "Última copia",
+    "never": "Nunca",
+    "now": "Hacer copia ahora",
+    "save_device": "Guardar en el teléfono",
+    "restore": "Restaurar",
+    "restore_title": "¿Restaurar copia de seguridad?",
+    "restore_message": "Los documentos y la organización actuales se sustituyen por los de la copia.",
+    "from_device": "Archivo en el teléfono",
+    "pick_folder": "Elige dónde guardar la copia",
+    "done": "Copia completada",
+    "saved_to": "Copia guardada en {path}",
+    "failed": "No se pudo completar la copia.",
+    "none_found": "No hay copias en esta cuenta.",
+    "invalid": "Este archivo no es una copia de AllDocs.",
+    "restored": "Copia restaurada ({count} documentos)"
+  },
+  "settings": {
+    "auto_lock": "Bloquear automáticamente",
+    "auto_lock_hint": "Pide el PIN o la biometría al volver a la app tras este tiempo.",
+    "auto_lock_immediately": "Inmediatamente",
+    "auto_lock_minutes": "Tras {count} min",
+    "auto_lock_never": "Nunca",
+    "hide_previews": "Ocultar vistas previas"
+  },
+  "connections": {
+    "title": "Conexiones",
+    "subtitle": "OneDrive, Google Drive, Dropbox y copia de seguridad"
+  },
+  "viewer": {
+    "open_elsewhere": "Abrir en otra app",
+    "no_preview": "No hay vista previa de texto para este archivo. Ábrelo en otra app para ver el formato original.",
+    "missing_file": "El archivo de este documento ya no está en el teléfono."
+  },
+  "incoming": {
+    "added": "\"{name}\" añadido a la galería",
+    "open": "Abrir"
   }
 }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:easy_localization/easy_localization.dart';
@@ -10,6 +11,25 @@ import '../../services/services.dart';
 import '../../theme/app_theme.dart';
 
 class SecurityGate extends StatefulWidget {
+  /// True while the user is past the PIN / biometrics. Work that must not
+  /// happen behind the lock screen (importing a file opened with AllDocs)
+  /// waits on this.
+  static final unlocked = ValueNotifier<bool>(false);
+
+  /// Completes as soon as [unlocked] is true.
+  static Future<void> whenUnlocked() {
+    if (unlocked.value) return Future.value();
+    final completer = Completer<void>();
+    void listener() {
+      if (!unlocked.value) return;
+      unlocked.removeListener(listener);
+      completer.complete();
+    }
+
+    unlocked.addListener(listener);
+    return completer.future;
+  }
+
   const SecurityGate({
     super.key,
     required this.userName,
@@ -25,10 +45,15 @@ class SecurityGate extends StatefulWidget {
   State<SecurityGate> createState() => _SecurityGateState();
 }
 
-class _SecurityGateState extends State<SecurityGate> {
+class _SecurityGateState extends State<SecurityGate>
+    with WidgetsBindingObserver {
   final SecurityLockService _securityLockService = SecurityLockService();
   bool _loading = true;
   bool _unlocked = false;
+  // Once the app has been unlocked, later locks cover the app instead of
+  // replacing it, so tabs, scroll positions and open sheets survive.
+  bool _everUnlocked = false;
+  DateTime? _backgroundedAt;
   bool _hasPin = false;
   bool _biometricEnabled = false;
   bool _canUseBiometrics = false;
@@ -37,13 +62,72 @@ class _SecurityGateState extends State<SecurityGate> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadSecurityState();
   }
 
   @override
-  Widget build(BuildContext context) {
-    if (_unlocked) return widget.child;
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    SecurityGate.unlocked.value = false;
+    super.dispose();
+  }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!_unlocked || !_hasPin) return;
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
+      if (!SecurityLockService.autoLockSuspended) {
+        _backgroundedAt ??= DateTime.now();
+      }
+      return;
+    }
+    if (state != AppLifecycleState.resumed) return;
+    final leftAt = _backgroundedAt;
+    _backgroundedAt = null;
+    if (leftAt == null || SecurityLockService.autoLockSuspended) return;
+    final minutes = AppSettings.autoLockMinutes.value;
+    if (minutes < 0) return;
+    if (DateTime.now().difference(leftAt) >= Duration(minutes: minutes)) {
+      // Pages, sheets and dialogs opened on top of the app live above this
+      // gate in the navigator; close them so nothing shows past the lock.
+      Navigator.of(context).popUntil((route) => route.isFirst);
+      setState(() {
+        _unlocked = false;
+        _promptedBiometrics = false;
+      });
+      if (_biometricEnabled && _canUseBiometrics) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && !_unlocked) _unlockWithBiometrics();
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Build-time sync is enough here: every lock/unlock goes through
+    // setState, and listeners only react after the frame.
+    if (SecurityGate.unlocked.value != _unlocked) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        SecurityGate.unlocked.value = _unlocked;
+      });
+    }
+    if (!_unlocked && !_everUnlocked) return _buildLockScreen(context);
+    // Same structure locked or unlocked, so the app below keeps its state.
+    return Stack(
+      children: [
+        Offstage(
+          offstage: !_unlocked,
+          child: TickerMode(enabled: _unlocked, child: widget.child),
+        ),
+        if (!_unlocked) Positioned.fill(child: _buildLockScreen(context)),
+      ],
+    );
+  }
+
+  Widget _buildLockScreen(BuildContext context) {
     if (_loading) {
       return _SecurityShell(
         greeting: '',
@@ -106,13 +190,13 @@ class _SecurityGateState extends State<SecurityGate> {
     setState(() {
       _hasPin = true;
       _biometricEnabled = enableBiometrics;
-      _unlocked = true;
+      _unlocked = _everUnlocked = true;
     });
   }
 
   Future<bool> _unlockWithPin(String pin) async {
     final valid = await _securityLockService.verifyPin(pin);
-    if (valid && mounted) setState(() => _unlocked = true);
+    if (valid && mounted) setState(() => _unlocked = _everUnlocked = true);
     return valid;
   }
 
@@ -121,7 +205,7 @@ class _SecurityGateState extends State<SecurityGate> {
     final ok = await _securityLockService.authenticateWithBiometrics(
       reason: AppConstants.securityBiometricReason.tr(),
     );
-    if (ok && mounted) setState(() => _unlocked = true);
+    if (ok && mounted) setState(() => _unlocked = _everUnlocked = true);
     return ok;
   }
 }
@@ -177,7 +261,7 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
             style: const TextStyle(
               color: AppTheme.mutedText,
               fontSize: 12,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w600,
             ),
           ),
           if (widget.canUseBiometrics) ...[
@@ -449,7 +533,7 @@ class _SecurityShell extends StatelessWidget {
                           style: const TextStyle(
                             color: AppTheme.text,
                             fontSize: 18,
-                            fontWeight: FontWeight.w900,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       ],
@@ -465,7 +549,7 @@ class _SecurityShell extends StatelessWidget {
                           style: const TextStyle(
                             color: AppTheme.text,
                             fontSize: 27,
-                            fontWeight: FontWeight.w900,
+                            fontWeight: FontWeight.w700,
                           ),
                         )
                       else ...[
@@ -475,7 +559,7 @@ class _SecurityShell extends StatelessWidget {
                           style: const TextStyle(
                             color: AppTheme.primarySoft,
                             fontSize: 15,
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -485,7 +569,7 @@ class _SecurityShell extends StatelessWidget {
                           style: const TextStyle(
                             color: AppTheme.text,
                             fontSize: 27,
-                            fontWeight: FontWeight.w900,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       ],
@@ -590,7 +674,7 @@ class _SecurityAvatar extends StatelessWidget {
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 26,
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   )
@@ -695,7 +779,7 @@ class _BiometricChoice extends StatelessWidget {
                 style: const TextStyle(
                   color: AppTheme.text,
                   fontSize: 13,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
@@ -808,7 +892,7 @@ class _KeypadButton extends StatelessWidget {
             style: const TextStyle(
               color: AppTheme.text,
               fontSize: 24,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w700,
             ),
           )
         : Icon(icon, color: AppTheme.primarySoft, size: 25);
@@ -857,7 +941,7 @@ class _SecurityFootnote extends StatelessWidget {
           style: const TextStyle(
             color: AppTheme.success,
             fontSize: 12,
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w600,
           ),
         ),
       ],

@@ -3,21 +3,49 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../models/models.dart';
 import 'auth_service.dart';
+import 'backup_service.dart';
+import 'cloud/cloud_provider.dart';
+import 'cloud/cloud_service.dart';
+import 'document_scanner_service.dart';
 import 'local_documents_store.dart';
 import 'secure_zip_extractor.dart';
+import 'security_lock_service.dart';
 
 class DocumentsService {
-  DocumentsService.local() : _store = const LocalDocumentsStore();
+  DocumentsService.local() : _store = const LocalDocumentsStore() {
+    LocalDocumentsStore.onBackgroundUpdate = _notifyChangedSoon;
+  }
 
   final revision = ValueNotifier<int>(0);
   final LocalDocumentsStore _store;
+  late final CloudService cloud = CloudService(store: _store);
+  late final BackupService backup = BackupService(store: _store);
   final Map<String, StreamSubscription<FileSystemEvent>> _folderWatchers = {};
   Timer? _folderWatchDebounce;
 
-  Future<DocumentsSnapshot> loadSnapshot() async {
+  Future<DocumentsSnapshot>? _snapshot;
+  int _snapshotRevision = -1;
+
+  /// Every tab listens to [revision]; they all get the same snapshot future
+  /// for a given revision instead of each rebuilding it.
+  Future<DocumentsSnapshot> loadSnapshot() {
+    final cached = _snapshot;
+    if (cached != null && _snapshotRevision == revision.value) return cached;
+    _snapshotRevision = revision.value;
+    final future = _buildSnapshot();
+    _snapshot = future;
+    future.catchError((Object _) {
+      if (identical(_snapshot, future)) _snapshot = null;
+      return future;
+    });
+    return future;
+  }
+
+  Future<DocumentsSnapshot> _buildSnapshot() async {
     final snapshot = await _store.loadSnapshot();
     _syncDeviceFolderWatchers(snapshot.deviceFolders);
     return _withSignedInProfile(snapshot);
@@ -46,17 +74,32 @@ class DocumentsService {
     return plan[0].toUpperCase() + plan.substring(1);
   }
 
-  Future<List<PlatformFile>> pickFilesForImport() {
-    return _store.pickFilesForImport();
+  // Import --------------------------------------------------------------
+
+  Future<List<PlatformFile>> pickFilesForImport({
+    ImportPickKind kind = ImportPickKind.documents,
+    bool allowMultiple = true,
+  }) {
+    return SecurityLockService.withoutAutoLock(
+      () => _store.pickFilesForImport(kind: kind, allowMultiple: allowMultiple),
+    );
   }
 
-  Future<int> importPickedFiles(
+  Future<ImportResult> importPickedFiles(
     List<PlatformFile> files, {
     String? albumId,
-  }) async {
-    final imported = await _store.importPickedFiles(files, albumId: albumId);
-    if (imported > 0) _notifyChanged();
-    return imported;
+  }) {
+    return _notifyIfImported(_store.importPickedFiles(files, albumId: albumId));
+  }
+
+  Future<ImportResult> importFilePaths(
+    List<String> paths, {
+    String? albumId,
+    DocumentSource source = DocumentSource.shared,
+  }) {
+    return _notifyIfImported(
+      _store.importFilePaths(paths, albumId: albumId, source: source),
+    );
   }
 
   Future<List<ExtractedZipEntry>> extractZipPreview(Uint8List zipBytes) {
@@ -67,22 +110,27 @@ class DocumentsService {
     return _store.extractZipPreviewFromPath(path);
   }
 
-  Future<int> importExtractedZipEntries(
+  Future<ImportResult> importExtractedZipEntries(
     List<ExtractedZipEntry> entries, {
     String? albumId,
-  }) async {
-    final imported = await _store.importExtractedZipEntries(
-      entries,
-      albumId: albumId,
+  }) {
+    return _notifyIfImported(
+      _store.importExtractedZipEntries(entries, albumId: albumId),
     );
-    if (imported > 0) _notifyChanged();
-    return imported;
   }
 
-  Future<int> scanDocumentWithCamera({String? albumId}) async {
-    final imported = await _store.scanDocumentWithCamera(albumId: albumId);
-    if (imported > 0) _notifyChanged();
-    return imported;
+  Future<ImportResult> scanDocumentWithCamera({
+    String? albumId,
+    ScanFilterChooser? chooseFilter,
+  }) {
+    return _notifyIfImported(
+      SecurityLockService.withoutAutoLock(
+        () => _store.scanDocumentWithCamera(
+          albumId: albumId,
+          chooseFilter: chooseFilter,
+        ),
+      ),
+    );
   }
 
   Future<DeviceFolderScan?> openDeviceFolder(
@@ -90,10 +138,12 @@ class DocumentsService {
     String? folderTitle,
     String? dialogTitle,
   }) async {
-    final scan = await _store.openDeviceFolder(
-      folder.id,
-      folderTitle: folderTitle ?? folder.title,
-      dialogTitle: dialogTitle,
+    final scan = await SecurityLockService.withoutAutoLock(
+      () => _store.openDeviceFolder(
+        folder.id,
+        folderTitle: folderTitle ?? folder.title,
+        dialogTitle: dialogTitle,
+      ),
     );
     if (scan != null) _notifyChanged();
     return scan;
@@ -103,74 +153,217 @@ class DocumentsService {
     return _store.scanAllDeviceDocuments(title: title);
   }
 
-  Future<int> importScannedDocuments(
+  Future<DeviceFolderScan?> searchDevice(String query, {String? title}) {
+    return _store.searchDevice(query, title: title);
+  }
+
+  Future<ImportResult> importScannedDocuments(
     List<DocumentFile> documents, {
     String? albumId,
-  }) async {
-    final imported = await _store.importScannedDocuments(
-      documents,
-      albumId: albumId,
+  }) {
+    return _notifyIfImported(
+      _store.importScannedDocuments(documents, albumId: albumId),
     );
-    if (imported > 0) _notifyChanged();
-    return imported;
   }
 
-  Future<void> createShelf(String name) async {
-    await _store.createShelf(name);
-    _notifyChanged();
+  Future<ImportResult> importFromCloud(
+    CloudProvider provider,
+    List<CloudItem> items, {
+    String? albumId,
+    void Function(int done, int total)? onProgress,
+  }) {
+    return _notifyIfImported(
+      cloud.importItems(
+        provider,
+        items,
+        albumId: albumId,
+        onProgress: onProgress,
+      ),
+    );
   }
 
-  Future<void> createAlbum(
-    String shelfId,
+  Future<ImportResult> _notifyIfImported(Future<ImportResult> import) async {
+    final result = await import;
+    if (!result.isEmpty) _notifyChanged();
+    return result;
+  }
+
+  // Organization ----------------------------------------------------------
+
+  Future<void> createShelf(String name) => _mutate(_store.createShelf(name));
+
+  Future<void> renameShelf(String shelfId, String name) {
+    return _mutate(_store.renameShelf(shelfId, name));
+  }
+
+  Future<String?> createAlbum(
+    String? shelfId,
     String name, {
     int? colorValue,
     String iconName = 'folder',
   }) async {
-    await _store.createAlbum(
+    final id = await _store.createAlbum(
       shelfId,
       name,
       colorValue: colorValue,
       iconName: iconName,
     );
     _notifyChanged();
+    return id;
   }
 
-  Future<void> deleteShelf(String shelfId) async {
-    await _store.deleteShelf(shelfId);
-    _notifyChanged();
+  Future<void> updateAlbum(
+    String albumId, {
+    String? name,
+    int? colorValue,
+    String? iconName,
+  }) {
+    return _mutate(
+      _store.updateAlbum(
+        albumId,
+        name: name,
+        colorValue: colorValue,
+        iconName: iconName,
+      ),
+    );
   }
 
-  Future<void> deleteAlbum(String albumId) async {
-    await _store.deleteAlbum(albumId);
-    _notifyChanged();
+  Future<void> reorderShelves(List<String> shelfIds) {
+    return _mutate(_store.reorderShelves(shelfIds));
   }
 
-  Future<void> moveDocumentToAlbum(String documentId, String albumId) async {
-    await _store.moveDocumentToAlbum(documentId, albumId);
-    _notifyChanged();
+  Future<void> reorderAlbums(String shelfId, List<String> albumIds) {
+    return _mutate(_store.reorderAlbums(shelfId, albumIds));
   }
 
-  Future<void> moveDocumentToInbox(String documentId) async {
-    await _store.moveDocumentToInbox(documentId);
-    _notifyChanged();
+  Future<void> sortAlbumsByName(String shelfId) {
+    return _mutate(_store.sortAlbumsByName(shelfId));
   }
 
-  Future<void> toggleFavorite(String documentId) async {
-    await _store.toggleFavorite(documentId);
-    _notifyChanged();
+  Future<void> deleteShelf(String shelfId) {
+    return _mutate(_store.deleteShelf(shelfId));
   }
 
-  Future<void> deleteDocument(String documentId) async {
-    await _store.deleteDocument(documentId);
-    _notifyChanged();
+  Future<void> deleteAlbum(String albumId) {
+    return _mutate(_store.deleteAlbum(albumId));
   }
+
+  Future<void> setDocumentAlbums(String documentId, List<String> albumIds) {
+    return _mutate(_store.setDocumentAlbums(documentId, albumIds));
+  }
+
+  Future<void> addDocumentsToAlbum(List<String> documentIds, String albumId) {
+    return _mutate(_store.addDocumentsToAlbum(documentIds, albumId));
+  }
+
+  Future<void> removeDocumentFromAlbum(String documentId, String albumId) {
+    return _mutate(_store.removeDocumentFromAlbum(documentId, albumId));
+  }
+
+  Future<void> moveDocumentToAlbum(String documentId, String albumId) {
+    return _mutate(_store.moveDocumentToAlbum(documentId, albumId));
+  }
+
+  Future<void> moveDocumentToInbox(String documentId) {
+    return _mutate(_store.moveDocumentToInbox(documentId));
+  }
+
+  Future<void> updateDocument(
+    String documentId, {
+    String? title,
+    List<String>? tags,
+    bool? isFavorite,
+    List<String>? albumIds,
+  }) {
+    return _mutate(
+      _store.updateDocument(
+        documentId,
+        title: title,
+        tags: tags,
+        isFavorite: isFavorite,
+        albumIds: albumIds,
+      ),
+    );
+  }
+
+  Future<void> toggleFavorite(String documentId) {
+    return _mutate(_store.toggleFavorite(documentId));
+  }
+
+  Future<void> dismissSuggestion(String documentId) {
+    return _mutate(_store.dismissSuggestion(documentId));
+  }
+
+  Future<void> setArchived(List<String> documentIds, bool archived) {
+    return _mutate(_store.setArchived(documentIds, archived));
+  }
+
+  Future<void> moveToTrash(List<String> documentIds) {
+    return _mutate(_store.moveToTrash(documentIds));
+  }
+
+  Future<void> restoreFromTrash(List<String> documentIds) {
+    return _mutate(_store.restoreFromTrash(documentIds));
+  }
+
+  Future<void> deletePermanently(List<String> documentIds) {
+    return _mutate(_store.deletePermanently(documentIds));
+  }
+
+  Future<void> emptyTrash() => _mutate(_store.emptyTrash());
+
+  Future<void> deleteDocument(String documentId) {
+    return _mutate(_store.deleteDocument(documentId));
+  }
+
+  // Cloud sync --------------------------------------------------------------
+
+  Future<List<CloudUpdate>> checkCloudUpdates(List<DocumentFile> documents) {
+    return cloud.checkForUpdates(documents);
+  }
+
+  Future<void> applyCloudUpdate(CloudUpdate update) {
+    return _mutate(cloud.applyUpdate(update));
+  }
+
+  Future<void> keepCurrentVersion(CloudUpdate update) {
+    return _mutate(
+      _store.setCloudVersion(update.document.id, update.remote.version),
+    );
+  }
+
+  /// Restores a backup and reloads everything.
+  Future<BackupInfo?> restoreBackup(Future<BackupInfo?> restore) async {
+    final info = await restore;
+    if (info != null) _notifyChanged();
+    return info;
+  }
+
+  // Files ---------------------------------------------------------------------
 
   Future<void> openDocument(DocumentFile document) {
-    return _store.openDocument(document);
+    return SecurityLockService.withoutAutoLock(
+      () => _store.openDocument(document),
+    );
+  }
+
+  Future<void> shareDocuments(List<DocumentFile> documents) async {
+    final files = [
+      for (final document in documents)
+        if (document.localPath != null &&
+            File(document.localPath!).existsSync())
+          XFile(document.localPath!, name: document.fileName),
+    ];
+    if (files.isEmpty) return;
+    await SecurityLockService.withoutAutoLock(
+      () => SharePlus.instance.share(ShareParams(files: files)),
+    );
   }
 
   Future<DocumentExportResult> exportDocuments({String? dialogTitle}) {
-    return _store.exportDocuments(dialogTitle: dialogTitle);
+    return SecurityLockService.withoutAutoLock(
+      () => _store.exportDocuments(dialogTitle: dialogTitle),
+    );
   }
 
   /// Re-reads the signed-in profile fields (name/email/plan/avatar) into the
@@ -184,7 +377,15 @@ class DocumentsService {
     }
     _folderWatchers.clear();
     _folderWatchDebounce?.cancel();
+    if (LocalDocumentsStore.onBackgroundUpdate == _notifyChangedSoon) {
+      LocalDocumentsStore.onBackgroundUpdate = null;
+    }
     revision.dispose();
+  }
+
+  Future<void> _mutate(Future<void> change) async {
+    await change;
+    _notifyChanged();
   }
 
   void _notifyChanged() {

@@ -15,6 +15,22 @@ class ZipExtractionLimits {
   final int maxEntryUncompressedBytes;
 }
 
+class ZipInspection {
+  const ZipInspection({
+    required this.fileCount,
+    required this.declaredBytes,
+    required this.nestedZipCount,
+    required this.exceedsLimits,
+  });
+
+  final int fileCount;
+  final int declaredBytes;
+
+  /// Zips inside the zip are never opened (see [SecureZipExtractor]).
+  final int nestedZipCount;
+  final bool exceedsLimits;
+}
+
 class ExtractedZipEntry {
   const ExtractedZipEntry({required this.fileName, required this.bytes});
 
@@ -65,6 +81,41 @@ class SecureZipExtractor {
     return Isolate.run(
       () => extract(zipBytes, allowedExtensions: allowedExtensions),
     );
+  }
+
+  /// Reads only the zip's central directory (nothing is decompressed) to
+  /// report how much space its contents *declare* they need — so the UI can
+  /// warn before extracting a zip that would expand to gigabytes.
+  Future<ZipInspection> inspectInBackground(Uint8List zipBytes) {
+    return Isolate.run(() {
+      try {
+        final archive = ZipDecoder().decodeBytes(zipBytes, verify: false);
+        var total = 0;
+        var files = 0;
+        var nestedZips = 0;
+        for (final entry in archive.files) {
+          if (!entry.isFile) continue;
+          files++;
+          total += entry.size;
+          if (entry.name.toLowerCase().endsWith('.zip')) nestedZips++;
+        }
+        return ZipInspection(
+          fileCount: files,
+          declaredBytes: total,
+          nestedZipCount: nestedZips,
+          exceedsLimits:
+              total > limits.maxTotalUncompressedBytes ||
+              files > limits.maxEntries,
+        );
+      } catch (_) {
+        return const ZipInspection(
+          fileCount: 0,
+          declaredBytes: 0,
+          nestedZipCount: 0,
+          exceedsLimits: false,
+        );
+      }
+    });
   }
 
   List<ExtractedZipEntry> extract(

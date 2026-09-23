@@ -21,16 +21,9 @@ class GlassPanel extends StatelessWidget {
       margin: margin,
       padding: padding,
       decoration: BoxDecoration(
-        color: AppTheme.surface.withValues(alpha: 0.9),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppTheme.border.withValues(alpha: 0.58)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.16),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
-          ),
-        ],
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(AppTheme.radius + 2),
+        border: Border.all(color: AppTheme.border.withValues(alpha: 0.6)),
       ),
       child: child,
     );
@@ -55,7 +48,7 @@ class SectionTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, color: AppTheme.primarySoft, size: 21),
+        Icon(icon, color: AppTheme.mutedText, size: 19),
         const SizedBox(width: 8),
         Expanded(
           child: Row(
@@ -66,31 +59,20 @@ class SectionTitle extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    color: AppTheme.primarySoft,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.6,
+                    color: AppTheme.text,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
               if (count != null) ...[
                 const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppTheme.accent.withValues(alpha: 0.82),
-                    borderRadius: BorderRadius.circular(99),
-                  ),
-                  child: Text(
-                    '$count',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                    ),
+                Text(
+                  '$count',
+                  style: const TextStyle(
+                    color: AppTheme.dimText,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ],
@@ -121,17 +103,11 @@ class SectionAction extends StatelessWidget {
           children: [
             Text(
               label,
-              style: const TextStyle(
-                color: AppTheme.mutedText,
-                fontSize: 12,
+              style: TextStyle(
+                color: AppTheme.accent,
+                fontSize: 13,
                 fontWeight: FontWeight.w600,
               ),
-            ),
-            const SizedBox(width: 4),
-            const Icon(
-              Icons.chevron_right_rounded,
-              color: AppTheme.primarySoft,
-              size: 20,
             ),
           ],
         ),

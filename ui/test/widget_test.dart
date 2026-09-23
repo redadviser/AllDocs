@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -63,9 +64,23 @@ void main() {
     await tester.pump(const Duration(milliseconds: 800));
     await tester.pump(const Duration(milliseconds: 800));
 
-    expect(find.text('Estante'), findsOneWidget);
-    expect(find.text('Arquivo'), findsOneWidget);
-    expect(find.text('Perfil'), findsOneWidget);
+    expect(find.text('Galeria'), findsWidgets);
+    expect(find.text('Álbuns'), findsWidgets);
+    expect(find.text('Arquivo'), findsWidgets);
+
+    // Creating a shelf used to crash when the name dialog closed
+    // ("_dependents.isEmpty is not true").
+    await tester.tap(find.text('Álbuns').last);
+    // The document store parses/encodes state on real isolates, which only
+    // progress outside the fake test clock.
+    await _settleRealAsync(tester);
+    await tester.tap(find.byTooltip('Nova estante').first);
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.enterText(find.byType(TextField).last, 'Trabalho');
+    await tester.tap(find.text('Criar').last);
+    await _settleRealAsync(tester);
+    expect(tester.takeException(), isNull);
+    expect(find.text('TRABALHO'), findsOneWidget);
   });
 }
 
@@ -73,5 +88,14 @@ Future<void> _tapPin(WidgetTester tester, String pin) async {
   for (final digit in pin.split('')) {
     await tester.tap(find.text(digit));
     await tester.pump(const Duration(milliseconds: 80));
+  }
+}
+
+Future<void> _settleRealAsync(WidgetTester tester) async {
+  for (var i = 0; i < 20; i++) {
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 250)),
+    );
+    await tester.pump(const Duration(milliseconds: 150));
   }
 }
