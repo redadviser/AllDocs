@@ -2,20 +2,16 @@ import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
 import { SignJWT, jwtVerify } from 'jose'
 import type { Request } from 'express'
-import { accountsSql, sql } from './db'
+import { sql } from './db'
 
-// Own signing secret — deliberately not shared with AllPhotos. A token
-// issued here must never be valid on the AllPhotos backend, even though
-// both back the same `users`/`profiles` rows.
+// Session tokens are signed with this server's own secret.
 const JWT_SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || 'default-dev-secret-change-in-production'
 )
 export const COOKIE_NAME = 'session_token'
 const SESSION_DURATION = 60 * 60 * 24 * 30
 
-// `plan` is the shared "All" subscription — a purchase in either app is
-// meant to unlock premium in both, since it's read from the same profiles
-// row AllPhotos already manages billing against.
+// `plan` is the account's subscription (free/premium/pro).
 export interface AccountUser {
   id: string
   email: string
@@ -49,33 +45,30 @@ function defaultDisplayName(email: string, requested?: string): string {
   return trimmed && trimmed.length > 0 ? trimmed : email.split('@')[0]
 }
 
-// Reads/writes the `users` and `profiles` tables shared with AllPhotos (same
-// Postgres server, different database in production). AllDocs never touches
-// AllPhotos' own domain tables (albums, photos, shelves, ...) or the Google
-// Drive-linking columns on profiles (google_access_token, etc.) — only
-// display_name and plan.
+// AllDocs accounts: `users` (credentials) + `profiles` (display name, plan,
+// avatar), in AllDocs' own database.
 export async function signUp(
   email: string,
   password: string,
   displayName?: string,
   deviceId?: string
 ) {
-  const existing = await accountsSql`SELECT id FROM users WHERE email = ${email}`
+  const existing = await sql`SELECT id FROM users WHERE email = ${email}`
   if (existing.length > 0) throw new Error('Email already registered')
 
   const id = crypto.randomUUID()
   const passwordHash = await hashPassword(password)
   const resolvedName = defaultDisplayName(email, displayName)
 
-  await accountsSql`INSERT INTO users (id, email, password_hash) VALUES (${id}, ${email}, ${passwordHash})`
-  await accountsSql`INSERT INTO profiles (id, display_name, plan) VALUES (${id}, ${resolvedName}, 'free')`
+  await sql`INSERT INTO users (id, email, password_hash) VALUES (${id}, ${email}, ${passwordHash})`
+  await sql`INSERT INTO profiles (id, display_name, plan) VALUES (${id}, ${resolvedName}, 'free')`
 
   const user: AccountUser = { id, email, displayName: resolvedName, plan: 'free', avatarUrl: null }
   return { user, token: await createToken(id, email, deviceId) }
 }
 
 export async function signIn(email: string, password: string, deviceId?: string) {
-  const rows = await accountsSql`
+  const rows = await sql`
     SELECT u.id, u.email, u.password_hash, p.display_name, p.plan, p.avatar_url
     FROM users u
     LEFT JOIN profiles p ON p.id = u.id
@@ -97,17 +90,16 @@ export async function signIn(email: string, password: string, deviceId?: string)
   return { user, token: await createToken(user.id, user.email, deviceId) }
 }
 
-// Used by Google sign-in: the same shared `users`/`profiles` rows are reused
-// whenever the email matches, so a Google account and a password account
-// with the same email resolve to one identity — sign in with either, on
-// either app.
+// Used by Google sign-in: an existing account with the same email is
+// reused, so a Google account and a password account with the same email
+// resolve to one identity — sign in with either.
 export async function findOrCreateUserByEmail(
   email: string,
   displayName?: string,
   pictureUrl?: string,
   deviceId?: string
 ) {
-  const existing = await accountsSql`
+  const existing = await sql`
     SELECT u.id, u.email, p.display_name, p.plan, p.avatar_url
     FROM users u
     LEFT JOIN profiles p ON p.id = u.id
@@ -118,7 +110,7 @@ export async function findOrCreateUserByEmail(
     // Don't overwrite a photo the user may already have set — only fill it
     // in the first time Google gives us one and profiles.avatar_url is empty.
     if (pictureUrl && !row.avatar_url) {
-      await accountsSql`UPDATE profiles SET avatar_url = ${pictureUrl} WHERE id = ${row.id}`
+      await sql`UPDATE profiles SET avatar_url = ${pictureUrl} WHERE id = ${row.id}`
     }
     const user: AccountUser = {
       id: row.id as string,
@@ -132,13 +124,13 @@ export async function findOrCreateUserByEmail(
 
   const id = crypto.randomUUID()
   // Social-only accounts still need a password_hash value (the column is
-  // NOT NULL on the users table shared with AllPhotos) — a random, never
+  // NOT NULL on the users table) — a random, never
   // issued hash satisfies that without creating a guessable password.
   const passwordHash = await hashPassword(crypto.randomUUID())
   const resolvedName = defaultDisplayName(email, displayName)
 
-  await accountsSql`INSERT INTO users (id, email, password_hash) VALUES (${id}, ${email}, ${passwordHash})`
-  await accountsSql`
+  await sql`INSERT INTO users (id, email, password_hash) VALUES (${id}, ${email}, ${passwordHash})`
+  await sql`
     INSERT INTO profiles (id, display_name, plan, avatar_url)
     VALUES (${id}, ${resolvedName}, 'free', ${pictureUrl ?? null})
   `
@@ -177,7 +169,7 @@ export async function getCurrentUserFromToken(
       if (device.length === 0) return null
     }
 
-    const rows = await accountsSql`
+    const rows = await sql`
       SELECT u.id, u.email, p.display_name, p.plan, p.avatar_url
       FROM users u
       LEFT JOIN profiles p ON p.id = u.id

@@ -11,8 +11,8 @@
     "cloud": "Cloud"
   },
   "auth": {
-    "title": "AllID",
-    "subtitle": "Your account for AllPhotos and AllDocs.",
+    "title": "AllDocs",
+    "subtitle": "Sign in to your AllDocs account.",
     "display_name": "Display name",
     "email": "Email",
     "password": "Password",
@@ -20,13 +20,12 @@
     "forgot_hint": "Password recovery isn't available yet.",
     "login": "Sign in",
     "signup": "Create account",
-    "toggle_to_signup": "New here? Create an AllID",
-    "toggle_to_login": "Already have an AllID? Sign in",
+    "toggle_to_signup": "New here? Create an account",
+    "toggle_to_login": "Already have an account? Sign in",
     "continue_with_google": "Continue with Google",
     "or_divider": "or",
     "login_error": "We couldn't sign you in. Check your details and try again.",
-    "offline": "Local mode active",
-    "continue_with_allid": "Continue with AllID"
+    "offline": "Local mode active"
   },
   "security": {
     "greeting_morning": "Good morning, {name}",
@@ -47,7 +46,7 @@
     "biometric_reason": "Unlock AllDocs",
     "biometric_unavailable": "Could not authenticate with biometrics.",
     "devices_title": "Devices",
-    "devices_subtitle": "Devices signed in to your AllID account.",
+    "devices_subtitle": "Devices signed in to your account.",
     "devices_current": "This device",
     "devices_last_seen": "Last seen {date}",
     "devices_empty": "No devices found.",
@@ -214,7 +213,7 @@
     "link_open_error": "Could not open this link.",
     "logout": "Sign out",
     "logout_confirm_title": "Sign out of AllDocs?",
-    "logout_confirm_message": "You'll need your AllID email and password (or Google account) to sign in again on this device."
+    "logout_confirm_message": "You'll need your email and password (or Google account) to sign in again on this device."
   },
   "permission": {
     "storage_title": "Allow file access",
@@ -250,14 +249,14 @@
     "q1_answer": "AllDocs uses on-device text recognition (OCR) to scan and make documents searchable. Images and recognized text never leave your phone during this process.",
     "q2_question": "Are my documents stored in the cloud?",
     "q2_answer": "For now, your documents are stored only on your device. Cross-device sync is being built and will follow the same principle: content is always encrypted before it leaves your phone.",
-    "q3_question": "What is the AllID account?",
-    "q3_answer": "AllID is the account shared between AllDocs and AllPhotos. You use the same email and password (or the same Google sign-in) in both apps, and a paid subscription unlocks premium features in both.",
+    "q3_question": "What is my AllDocs account for?",
+    "q3_answer": "Your account identifies you in AllDocs: it's how you see and end sessions on other devices and how you unlock the premium plan. Your documents are stored on your phone and in the backups you choose, not on the server.",
     "q4_question": "How do plans work?",
     "q4_answer": "The free plan includes document organization and scanning. A paid plan unlocks extra features across both All apps — subscription management is coming soon.",
     "q5_question": "How do expiry reminders work?",
     "q5_answer": "When AllDocs detects a validity date on a document (like an ID card or an insurance policy), it can schedule a local reminder before that date expires.",
     "q6_question": "What do the PIN and biometrics protect?",
-    "q6_answer": "The PIN/biometrics lock access to the app on your device. It's independent from your AllID account password — losing one doesn't affect the other.",
+    "q6_answer": "The PIN/biometrics lock access to the app on your device. It's independent from your account password — losing one doesn't affect the other.",
     "q7_question": "How do I export or remove my documents?",
     "q7_answer": "You can export all your documents to a folder of your choice from Settings > Export documents. To remove a specific document, long-press it in the archive."
   },
@@ -321,6 +320,8 @@
     "add_tag": "Add a tag (e.g. Client A, 2026)"
   },
   "actions": {
+    "in_albums": "In: {albums}",
+    "in_no_album": "Not in any album yet — it stays in the gallery.",
     "share": "Share",
     "edit_details": "Name, albums and tags",
     "albums": "Add to albums",
@@ -369,6 +370,7 @@
     "save": "Save PDF"
   },
   "albums": {
+    "default_shelf": "Personal",
     "title": "Albums",
     "edit_album": "Edit album",
     "rename_shelf": "Rename shelf",
@@ -471,6 +473,7 @@
   },
   "connections": {
     "title": "Connections",
+    "manage": "Manage connections",
     "subtitle": "OneDrive, Google Drive, Dropbox and backup"
   },
   "viewer": {

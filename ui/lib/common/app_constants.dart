@@ -27,7 +27,6 @@ class AppConstants {
   static const authSignup = 'auth.signup';
   static const authToggleToSignup = 'auth.toggle_to_signup';
   static const authToggleToLogin = 'auth.toggle_to_login';
-  static const authContinueWithAllId = 'auth.continue_with_allid';
   static const authContinueWithGoogle = 'auth.continue_with_google';
   static const authOrDivider = 'auth.or_divider';
   static const authOffline = 'auth.offline';
@@ -326,6 +325,9 @@ class AppConstants {
   static const actionsUnarchive = 'actions.unarchive';
   static const actionsArchived = 'actions.archived';
   static const actionsUnarchived = 'actions.unarchived';
+  static const actionsInAlbums = 'actions.in_albums';
+  static const actionsInNoAlbum = 'actions.in_no_album';
+  static const albumsDefaultShelf = 'albums.default_shelf';
   static const actionsMoveToTrash = 'actions.move_to_trash';
   static const actionsMovedToTrash = 'actions.moved_to_trash';
   static const actionsUndo = 'actions.undo';
@@ -447,6 +449,7 @@ class AppConstants {
   // Gallery, albums, cloud, archive and settings (v3 redesign).
   static const connectionsTitle = 'connections.title';
   static const connectionsSubtitle = 'connections.subtitle';
+  static const connectionsManage = 'connections.manage';
   static const albumsModernView = 'albums.modern_view';
   static const albumsClassicView = 'albums.classic_view';
   static const albumsSortByName = 'albums.sort_by_name';

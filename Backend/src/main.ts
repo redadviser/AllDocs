@@ -4,6 +4,7 @@ import cors from 'cors'
 import express from 'express'
 import swaggerUi from 'swagger-ui-express'
 import { openApiSpec } from './docs/openapi'
+import { ensureSchema } from './lib/schema'
 import { authRouter } from './modules/auth/auth.routes'
 import { configRouter } from './modules/config/config.routes'
 import { devicesRouter } from './modules/devices/devices.routes'
@@ -57,6 +58,14 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 })
 
 const port = Number(process.env.PORT || 3000)
-app.listen(port, () => {
-  console.log(`Server running on port ${port}`)
-})
+ensureSchema()
+  .catch((error) => {
+    // Keep serving: the tables may already exist and the DB be briefly
+    // unreachable; requests will surface a real problem.
+    console.error('ensureSchema failed:', error)
+  })
+  .finally(() => {
+    app.listen(port, () => {
+      console.log(`Server running on port ${port}`)
+    })
+  })

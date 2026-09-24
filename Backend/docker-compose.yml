@@ -15,9 +15,7 @@ services:
       - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./scripts/init-accounts-db.sh:/docker-entrypoint-initdb.d/001-init-accounts-db.sh:ro
-      - ./scripts/accounts-schema.sql:/docker-entrypoint-initdb.d/accounts-schema.sql:ro
-      - ./scripts/schema.sql:/docker-entrypoint-initdb.d/002-schema.sql:ro
+      - ./scripts/schema.sql:/docker-entrypoint-initdb.d/001-schema.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U alldocs -d alldocs"]
       interval: 5s

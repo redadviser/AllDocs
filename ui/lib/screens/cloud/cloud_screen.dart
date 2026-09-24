@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../common/app_constants.dart';
 import '../../common/album_dialog.dart';
+import '../../common/app_sheet.dart';
 import '../../common/backup_flow.dart';
 import '../../common/document_actions.dart';
 import '../../common/document_import_flow.dart';
@@ -370,9 +371,8 @@ class CloudScreenState extends State<CloudScreen> {
     // reinstall nothing is connected yet, and that's exactly when a restore
     // is needed.
     final clouds = _cloud.providers.where((p) => p.isConfigured).toList();
-    final source = await showModalBottomSheet<Object>(
+    final source = await showOptionsSheet<Object>(
       context: context,
-      showDragHandle: true,
       builder: (context) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -433,12 +433,11 @@ class CloudScreenState extends State<CloudScreen> {
           a.modifiedAt ?? DateTime(1970),
         ),
       );
-      final chosen = await showModalBottomSheet<CloudItem>(
+      final chosen = await showOptionsSheet<CloudItem>(
         context: context,
-        showDragHandle: true,
         builder: (context) => SafeArea(
-          child: ListView(
-            shrinkWrap: true,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
               for (final backup in backups)
                 ListTile(

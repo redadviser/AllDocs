@@ -11,8 +11,8 @@
     "cloud": "Cloud"
   },
   "auth": {
-    "title": "AllID",
-    "subtitle": "A tua conta para a AllPhotos e a AllDocs.",
+    "title": "AllDocs",
+    "subtitle": "Entra na tua conta AllDocs.",
     "display_name": "Nome a apresentar",
     "email": "Email",
     "password": "Palavra-passe",
@@ -20,13 +20,12 @@
     "forgot_hint": "A recuperação de password ainda não está disponível.",
     "login": "Entrar",
     "signup": "Criar conta",
-    "toggle_to_signup": "Ainda não tens conta? Cria a tua AllID",
-    "toggle_to_login": "Já tens AllID? Entrar",
+    "toggle_to_signup": "Ainda não tens conta? Cria uma",
+    "toggle_to_login": "Já tens conta? Entrar",
     "continue_with_google": "Continuar com Google",
     "or_divider": "ou",
     "login_error": "Não foi possível iniciar sessão. Verifica os dados e tenta novamente.",
-    "offline": "Modo local ativo",
-    "continue_with_allid": "Continuar com AllID"
+    "offline": "Modo local ativo"
   },
   "security": {
     "greeting_morning": "Bom dia, {name}",
@@ -47,7 +46,7 @@
     "biometric_reason": "Desbloquear a AllDocs",
     "biometric_unavailable": "Não foi possível autenticar por biometria.",
     "devices_title": "Dispositivos",
-    "devices_subtitle": "Dispositivos com sessão iniciada na tua conta AllID.",
+    "devices_subtitle": "Dispositivos com sessão iniciada na tua conta.",
     "devices_current": "Este dispositivo",
     "devices_last_seen": "Visto em {date}",
     "devices_empty": "Não foram encontrados dispositivos.",
@@ -214,7 +213,7 @@
     "link_open_error": "Não foi possível abrir este link.",
     "logout": "Sair",
     "logout_confirm_title": "Sair da AllDocs?",
-    "logout_confirm_message": "Vais precisar do teu email e password da AllID (ou da conta Google) para entrares novamente neste dispositivo."
+    "logout_confirm_message": "Vais precisar do teu email e password (ou da conta Google) para entrares novamente neste dispositivo."
   },
   "permission": {
     "storage_title": "Permitir acesso aos ficheiros",
@@ -250,14 +249,14 @@
     "q1_answer": "A AllDocs usa reconhecimento de texto (OCR) diretamente no teu dispositivo para digitalizar e tornar os documentos pesquisáveis. As imagens e o texto nunca saem do telemóvel durante este processo.",
     "q2_question": "Os meus documentos ficam guardados na cloud?",
     "q2_answer": "Por agora, os documentos ficam apenas no teu dispositivo. O sincronismo entre dispositivos está a ser desenvolvido e vai manter o mesmo princípio: o conteúdo é sempre cifrado antes de sair do telemóvel.",
-    "q3_question": "O que é a conta AllID?",
-    "q3_answer": "A AllID é a conta partilhada entre a AllDocs e a AllPhotos. Usas o mesmo email e password (ou o mesmo login Google) nas duas apps, e uma subscrição paga desbloqueia as funcionalidades premium em ambas.",
+    "q3_question": "Para que serve a conta AllDocs?",
+    "q3_answer": "A conta identifica-te na AllDocs: é com ela que vês e terminas sessões noutros dispositivos e que ativas o plano premium. Os teus documentos ficam guardados no telemóvel e nas cópias de segurança que escolheres, não no servidor.",
     "q4_question": "Como funcionam os planos?",
     "q4_answer": "O plano gratuito inclui a organização e digitalização de documentos. Um plano pago desbloqueia funcionalidades adicionais nas duas apps da família All — a gestão da subscrição vai ficar disponível brevemente.",
     "q5_question": "Como funcionam os lembretes de validade?",
     "q5_answer": "Quando a AllDocs deteta uma data de validade num documento (por exemplo, num cartão de identificação ou seguro), pode agendar um lembrete local antes dessa data expirar.",
     "q6_question": "O PIN e a biometria protegem o quê?",
-    "q6_answer": "O PIN/biometria bloqueia o acesso à app no teu dispositivo. É independente da password da conta AllID — perder um não afeta o outro.",
+    "q6_answer": "O PIN/biometria bloqueia o acesso à app no teu dispositivo. É independente da password da tua conta — perder um não afeta o outro.",
     "q7_question": "Como exporto ou removo os meus documentos?",
     "q7_answer": "Podes exportar todos os documentos numa pasta à tua escolha em Definições > Exportar documentos. Para remover um documento específico, mantém premido o documento no arquivo."
   },
@@ -321,6 +320,8 @@
     "add_tag": "Adicionar tag (ex.: Cliente A, 2026)"
   },
   "actions": {
+    "in_albums": "Em: {albums}",
+    "in_no_album": "Ainda não está em nenhum álbum — fica na galeria.",
     "share": "Partilhar",
     "edit_details": "Nome, álbuns e tags",
     "albums": "Adicionar a álbuns",
@@ -369,6 +370,7 @@
     "save": "Guardar PDF"
   },
   "albums": {
+    "default_shelf": "Pessoal",
     "title": "Álbuns",
     "edit_album": "Editar álbum",
     "rename_shelf": "Mudar nome da estante",
@@ -400,17 +402,17 @@
   "cloud": {
     "title": "Cloud",
     "subtitle": "Importar da cloud guarda uma cópia no telemóvel; o documento fica disponível mesmo sem internet.",
-    "connect": "Ligar",
-    "disconnect": "Desligar",
+    "connect": "Conectar",
+    "disconnect": "Desconectar",
     "browse": "Ver ficheiros",
-    "connected": "{provider} ligado",
-    "connected_short": "Ligado",
-    "not_connected": "Não ligado",
-    "tap_to_connect": "Toca para ligar",
+    "connected": "{provider} conectado",
+    "connected_short": "Conectado",
+    "not_connected": "Não conectado",
+    "tap_to_connect": "Toca para conectar",
     "not_configured": "Esta integração ainda não foi configurada nesta versão da app.",
     "not_configured_short": "Disponível em breve",
-    "connect_failed": "Não foi possível ligar a conta.",
-    "disconnect_title": "Desligar {provider}?",
+    "connect_failed": "Não foi possível conectar a conta.",
+    "disconnect_title": "Desconectar {provider}?",
     "disconnect_message": "Os documentos já importados ficam no AllDocs.",
     "quick_import": "Importação rápida",
     "quick_import_hint": "Usa o seletor do sistema — inclui Drive, OneDrive e outras apps de cloud instaladas.",
@@ -437,7 +439,7 @@
     "this_device": "Neste telemóvel",
     "auto": "Backup automático diário",
     "auto_hint": "Feito ao abrir a app, no máximo uma vez por dia.",
-    "auto_needs_cloud": "Escolhe uma conta cloud ligada como destino.",
+    "auto_needs_cloud": "Escolhe uma conta cloud conectada como destino.",
     "last": "Último backup",
     "never": "Nunca",
     "now": "Fazer backup agora",
@@ -471,6 +473,7 @@
   },
   "connections": {
     "title": "Conexões",
+    "manage": "Gerir conexões",
     "subtitle": "OneDrive, Google Drive, Dropbox e cópia de segurança"
   },
   "viewer": {

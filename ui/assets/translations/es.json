@@ -11,8 +11,8 @@
     "cloud": "Nube"
   },
   "auth": {
-    "title": "AllID",
-    "subtitle": "Tu cuenta para AllPhotos y AllDocs.",
+    "title": "AllDocs",
+    "subtitle": "Entra en tu cuenta de AllDocs.",
     "display_name": "Nombre a mostrar",
     "email": "Email",
     "password": "Contraseña",
@@ -20,13 +20,12 @@
     "forgot_hint": "La recuperación de contraseña aún no está disponible.",
     "login": "Entrar",
     "signup": "Crear cuenta",
-    "toggle_to_signup": "¿Aún no tienes cuenta? Crea tu AllID",
-    "toggle_to_login": "¿Ya tienes AllID? Entrar",
+    "toggle_to_signup": "¿Aún no tienes cuenta? Crea una",
+    "toggle_to_login": "¿Ya tienes cuenta? Entrar",
     "continue_with_google": "Continuar con Google",
     "or_divider": "o",
     "login_error": "No se pudo iniciar sesión. Comprueba tus datos e inténtalo de nuevo.",
-    "offline": "Modo local activo",
-    "continue_with_allid": "Continuar con AllID"
+    "offline": "Modo local activo"
   },
   "security": {
     "greeting_morning": "Buenos días, {name}",
@@ -47,7 +46,7 @@
     "biometric_reason": "Desbloquear AllDocs",
     "biometric_unavailable": "No se pudo autenticar con biometría.",
     "devices_title": "Dispositivos",
-    "devices_subtitle": "Dispositivos con sesión iniciada en tu cuenta AllID.",
+    "devices_subtitle": "Dispositivos con sesión iniciada en tu cuenta.",
     "devices_current": "Este dispositivo",
     "devices_last_seen": "Visto el {date}",
     "devices_empty": "No se encontraron dispositivos.",
@@ -214,7 +213,7 @@
     "link_open_error": "No se pudo abrir este enlace.",
     "logout": "Cerrar sesión",
     "logout_confirm_title": "¿Cerrar sesión en AllDocs?",
-    "logout_confirm_message": "Necesitarás tu email y contraseña de AllID (o tu cuenta de Google) para volver a iniciar sesión en este dispositivo."
+    "logout_confirm_message": "Necesitarás tu email y contraseña (o tu cuenta de Google) para volver a iniciar sesión en este dispositivo."
   },
   "permission": {
     "storage_title": "Permitir acceso a archivos",
@@ -250,14 +249,14 @@
     "q1_answer": "AllDocs usa reconocimiento de texto (OCR) directamente en tu dispositivo para escanear y hacer que los documentos sean buscables. Las imágenes y el texto nunca salen de tu teléfono durante este proceso.",
     "q2_question": "¿Mis documentos se guardan en la nube?",
     "q2_answer": "Por ahora, tus documentos se guardan solo en tu dispositivo. La sincronización entre dispositivos se está desarrollando y seguirá el mismo principio: el contenido siempre se cifra antes de salir de tu teléfono.",
-    "q3_question": "¿Qué es la cuenta AllID?",
-    "q3_answer": "AllID es la cuenta compartida entre AllDocs y AllPhotos. Usas el mismo email y contraseña (o el mismo inicio de sesión de Google) en ambas apps, y una suscripción de pago desbloquea las funciones premium en las dos.",
+    "q3_question": "¿Para qué sirve la cuenta de AllDocs?",
+    "q3_answer": "La cuenta te identifica en AllDocs: con ella ves y cierras sesiones en otros dispositivos y activas el plan premium. Tus documentos se guardan en el teléfono y en las copias de seguridad que elijas, no en el servidor.",
     "q4_question": "¿Cómo funcionan los planes?",
     "q4_answer": "El plan gratuito incluye la organización y el escaneo de documentos. Un plan de pago desbloquea funciones adicionales en ambas apps de la familia All — la gestión de la suscripción estará disponible próximamente.",
     "q5_question": "¿Cómo funcionan los recordatorios de caducidad?",
     "q5_answer": "Cuando AllDocs detecta una fecha de caducidad en un documento (como un DNI o un seguro), puede programar un recordatorio local antes de que esa fecha expire.",
     "q6_question": "¿Qué protegen el PIN y la biometría?",
-    "q6_answer": "El PIN/biometría bloquea el acceso a la app en tu dispositivo. Es independiente de la contraseña de tu cuenta AllID: perder uno no afecta al otro.",
+    "q6_answer": "El PIN/biometría bloquea el acceso a la app en tu dispositivo. Es independiente de la contraseña de tu cuenta: perder uno no afecta al otro.",
     "q7_question": "¿Cómo exporto o elimino mis documentos?",
     "q7_answer": "Puedes exportar todos tus documentos a una carpeta a tu elección desde Ajustes > Exportar documentos. Para eliminar un documento concreto, mantén pulsado el documento en el archivo."
   },
@@ -321,6 +320,8 @@
     "add_tag": "Añadir etiqueta (ej.: Cliente A, 2026)"
   },
   "actions": {
+    "in_albums": "En: {albums}",
+    "in_no_album": "Aún no está en ningún álbum: se queda en la galería.",
     "share": "Compartir",
     "edit_details": "Nombre, álbumes y etiquetas",
     "albums": "Añadir a álbumes",
@@ -369,6 +370,7 @@
     "save": "Guardar PDF"
   },
   "albums": {
+    "default_shelf": "Personal",
     "title": "Álbumes",
     "edit_album": "Editar álbum",
     "rename_shelf": "Renombrar estante",
@@ -471,6 +473,7 @@
   },
   "connections": {
     "title": "Conexiones",
+    "manage": "Gestionar conexiones",
     "subtitle": "OneDrive, Google Drive, Dropbox y copia de seguridad"
   },
   "viewer": {

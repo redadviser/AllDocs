@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
@@ -30,6 +31,9 @@ class LocalDocumentsStore {
   /// How long a document stays in the recycle bin before it's removed for
   /// good on the next load.
   static const trashRetention = Duration(days: 30);
+
+  /// Longest "search the whole device" runs before showing what it found.
+  static const wholeDeviceScanLimit = Duration(seconds: 12);
 
   static Directory? _debugDirectory;
 
@@ -596,6 +600,10 @@ class LocalDocumentsStore {
       limit: 1800,
       preferDocuments: true,
       allowedExtensions: [..._documentExtensions, 'zip'],
+      // A whole phone can hold tens of thousands of folders. Roots are
+      // walked documents/downloads first, so stopping after this long
+      // still returns the likely files instead of making the user wait.
+      timeLimit: wholeDeviceScanLimit,
     );
     documents.sort(_newestFirst);
 
@@ -642,6 +650,47 @@ class LocalDocumentsStore {
   // ---------------------------------------------------------------------
   // Shelves and albums
   // ---------------------------------------------------------------------
+
+  /// Gives a new library a starting shelf with a few albums, so a new
+  /// account isn't an empty screen. Runs once per library (remembered in
+  /// the state, so deleting the shelf doesn't bring it back) and never
+  /// touches a library that already has shelves. Returns whether it added
+  /// anything.
+  Future<bool> ensureStarterShelf(
+    String shelfName,
+    List<({String name, String iconName})> albums,
+  ) async {
+    final state = await _readState();
+    if (state['starter_shelf_created'] == true) return false;
+    state['starter_shelf_created'] = true;
+    final shelves = _shelvesRaw(state);
+    if (shelves.isNotEmpty) {
+      await _writeState(state);
+      return false;
+    }
+    final shelfId = _newId('shelf');
+    shelves.add(
+      DocumentShelf(
+        id: shelfId,
+        name: shelfName,
+        position: 0,
+        albums: [
+          for (final (index, album) in albums.indexed)
+            DocumentAlbum(
+              id: '${_newId('album')}$index',
+              shelfId: shelfId,
+              name: album.name,
+              colorValue: _albumColorFor(index),
+              iconName: album.iconName,
+              position: index,
+              documentIds: const [],
+            ),
+        ],
+      ).toJson(),
+    );
+    await _writeState(state);
+    return true;
+  }
 
   Future<void> createShelf(String name) async {
     final normalized = name.trim();
@@ -2075,6 +2124,7 @@ class LocalDocumentsStore {
     required int limit,
     bool preferDocuments = false,
     required List<String> allowedExtensions,
+    Duration? timeLimit,
   }) async {
     final rootPaths = roots.map((directory) => directory.path).toList();
     final jsonDocuments = await Isolate.run(() {
@@ -2083,6 +2133,7 @@ class LocalDocumentsStore {
         limit: limit,
         preferDocuments: preferDocuments,
         allowedExtensions: allowedExtensions,
+        timeLimit: timeLimit,
       );
     });
 
@@ -2173,11 +2224,15 @@ List<Map<String, Object?>> _scanDirectoryPaths({
   required int limit,
   required bool preferDocuments,
   required List<String> allowedExtensions,
+  Duration? timeLimit,
 }) {
+  final clock = Stopwatch()..start();
   final documents = <Map<String, Object?>>[];
   final seenFiles = <String>{};
   final seenDirectories = <String>{};
-  final queue = [for (final path in rootPaths) Directory(path)];
+  final queue = ListQueue<Directory>.of([
+    for (final path in rootPaths) Directory(path),
+  ]);
   final typeCounts = <String, int>{};
   final typeCaps = preferDocuments
       ? const {
@@ -2194,8 +2249,9 @@ List<Map<String, Object?>> _scanDirectoryPaths({
 
   while (queue.isNotEmpty &&
       documents.length < limit &&
-      scannedDirectories < directoryLimit) {
-    final directory = queue.removeAt(0);
+      scannedDirectories < directoryLimit &&
+      (timeLimit == null || clock.elapsed < timeLimit)) {
+    final directory = queue.removeFirst();
     final directoryPath = directory.path;
     if (!seenDirectories.add(directoryPath)) continue;
     if (_scanShouldSkipDirectory(directoryPath)) continue;
@@ -2278,11 +2334,11 @@ int _countSupportedFilesInPath(
 }) {
   var count = 0;
   var scannedDirectories = 0;
-  final queue = <Directory>[Directory(rootPath)];
+  final queue = ListQueue<Directory>.of([Directory(rootPath)]);
   final seenDirectories = <String>{};
 
   while (queue.isNotEmpty && count < limit && scannedDirectories < 2400) {
-    final directory = queue.removeAt(0);
+    final directory = queue.removeFirst();
     final directoryPath = directory.path;
     if (!seenDirectories.add(directoryPath)) continue;
     if (_scanShouldSkipDirectory(directoryPath)) continue;
@@ -2414,13 +2470,17 @@ List<Map<String, Object?>> _searchDevicePaths({
   required String excludePath,
   required List<String> allowedExtensions,
   required int limit,
+  Duration timeLimit = const Duration(seconds: 20),
 }) {
+  final clock = Stopwatch()..start();
   const maxContentChecks = 400;
   const maxContentBytes = 4 * 1024 * 1024;
   final results = <Map<String, Object?>>[];
   final seenFiles = <String>{};
   final seenDirectories = <String>{};
-  final queue = [for (final path in rootPaths) Directory(path)];
+  final queue = ListQueue<Directory>.of([
+    for (final path in rootPaths) Directory(path),
+  ]);
   final normalizedExclude = excludePath.replaceAll(r'\', '/').toLowerCase();
   var scannedDirectories = 0;
   var contentChecks = 0;
@@ -2430,8 +2490,9 @@ List<Map<String, Object?>> _searchDevicePaths({
 
   while (queue.isNotEmpty &&
       results.length < limit &&
-      scannedDirectories < 9000) {
-    final directory = queue.removeAt(0);
+      scannedDirectories < 9000 &&
+      clock.elapsed < timeLimit) {
+    final directory = queue.removeFirst();
     final directoryPath = directory.path;
     if (!seenDirectories.add(directoryPath)) continue;
     if (_scanShouldSkipDirectory(directoryPath)) continue;

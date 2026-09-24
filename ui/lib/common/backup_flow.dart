@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../services/services.dart';
 import '../theme/app_theme.dart';
 import 'app_constants.dart';
+import 'app_sheet.dart';
 import 'document_actions.dart';
 
 /// Connects [provider] (OAuth in the browser / Google account picker),
@@ -56,9 +57,8 @@ Future<void> showBackupSheet(
   final current = AppSettings.backupProvider.value;
   // Wrapped so "this phone" (null) is distinguishable from a dismissed
   // sheet.
-  final choice = await showModalBottomSheet<({CloudProvider? provider})>(
+  final choice = await showOptionsSheet<({CloudProvider? provider})>(
     context: context,
-    showDragHandle: true,
     builder: (context) {
       Widget tile({
         required IconData icon,

@@ -55,8 +55,7 @@ class _SecureAuthTokenStore implements AuthTokenStore {
 /// Account-level sign-in, kept separate from [SecurityLockService]'s device
 /// PIN/biometric lock. While [LocalModeConfig.isLocalOnly] is true this
 /// never leaves the device. Once flipped, login calls the AllDocs backend,
-/// which authenticates against the `users` table shared with AllPhotos (see
-/// docs/architecture.md) — same account, same password, across both apps.
+/// which keeps AllDocs' own accounts (see docs/architecture.md).
 class AuthService {
   // Swappable in tests; production code should never need to touch this.
   static AuthTokenStore tokenStore = const _SecureAuthTokenStore();
@@ -86,9 +85,8 @@ class AuthService {
     return prefs.getString(_emailKey);
   }
 
-  /// The shared "All" subscription plan (free/premium/pro), read from the
-  /// profiles row shared with AllPhotos — a purchase in either app unlocks
-  /// premium in both. Null until a real login/signup response has reported
+  /// The account's subscription plan (free/premium/pro), from its profile
+  /// on the backend. Null until a real login/signup response has reported
   /// one (always the case in local-only mode).
   static Future<String?> plan() async {
     final prefs = await SharedPreferences.getInstance();
@@ -348,8 +346,8 @@ class AuthService {
   }
 
   /// Persists the session cookie plus whatever profile info the server
-  /// returned (email/displayName/plan, shared with AllPhotos via the
-  /// `profiles` table), falling back to locally-known values if the
+  /// returned (email/displayName/plan, from the account's profile), falling
+  /// back to locally-known values if the
   /// response doesn't include them.
   static Future<String> _persistSession(
     http.Response res, {

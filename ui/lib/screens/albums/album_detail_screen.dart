@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../common/add_document_sheet.dart';
 import '../../common/album_dialog.dart';
 import '../../common/app_constants.dart';
+import '../../common/app_sheet.dart';
 import '../../common/document_actions.dart';
 import '../../common/document_preview_card.dart';
 import '../../common/snapshot_builder.dart';
@@ -232,9 +233,8 @@ class AlbumDetailScreen extends StatelessWidget {
     DocumentsSnapshot snapshot,
     DocumentAlbum album,
   ) async {
-    final choice = await showModalBottomSheet<String>(
+    final choice = await showOptionsSheet<String>(
       context: context,
-      showDragHandle: true,
       builder: (context) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -261,11 +261,8 @@ class AlbumDetailScreen extends StatelessWidget {
     final candidates = snapshot.documents
         .where((document) => !document.albumIds.contains(album.id))
         .toList();
-    final picked = await showModalBottomSheet<List<String>>(
+    final picked = await showAppSheet<List<String>>(
       context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      showDragHandle: true,
       builder: (context) => _PickDocumentsSheet(documents: candidates),
     );
     if (picked == null || picked.isEmpty) return;

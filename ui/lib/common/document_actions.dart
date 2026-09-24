@@ -6,9 +6,12 @@ import '../services/services.dart';
 import '../theme/app_theme.dart';
 import 'album_dialog.dart';
 import 'app_constants.dart';
+import 'app_sheet.dart';
+import 'bookshelf.dart';
 import 'document_details_sheet.dart';
 import 'document_file_icon.dart';
 import 'document_preview_card.dart';
+import 'sheet_quick_action.dart';
 
 void showSnack(BuildContext context, String message) {
   ScaffoldMessenger.of(context)
@@ -23,11 +26,8 @@ Future<void> showDocumentActions(
   DocumentFile document, {
   String? albumContextId,
 }) {
-  return showModalBottomSheet<void>(
+  return showOptionsSheet<void>(
     context: context,
-    useSafeArea: true,
-    showDragHandle: true,
-    isScrollControlled: true,
     builder: (sheetContext) {
       void run(Future<void> Function() action) {
         Navigator.of(sheetContext).pop();
@@ -35,7 +35,7 @@ Future<void> showDocumentActions(
       }
 
       final deleted = document.isDeleted;
-      return SingleChildScrollView(
+      return Padding(
         padding: const EdgeInsets.only(bottom: 12),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -120,16 +120,70 @@ Future<void> showDocumentActions(
                 ),
               ),
             ] else ...[
+              // The most used actions — and "move to trash" — as one row
+              // right under the title, so they're visible without scrolling.
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SheetQuickAction(
+                      icon: Icons.ios_share_rounded,
+                      label: AppConstants.actionsShare.tr(),
+                      onTap: () => run(
+                        () => documentsService.shareDocuments([document]),
+                      ),
+                    ),
+                    SheetQuickAction(
+                      icon: document.isFavorite
+                          ? Icons.star_rounded
+                          : Icons.star_outline_rounded,
+                      label: document.isFavorite
+                          ? AppConstants.commonRemoveFavorite.tr()
+                          : AppConstants.commonFavorite.tr(),
+                      onTap: () => run(
+                        () => documentsService.toggleFavorite(document.id),
+                      ),
+                    ),
+                    SheetQuickAction(
+                      icon: document.isArchived
+                          ? Icons.unarchive_outlined
+                          : Icons.archive_outlined,
+                      label: document.isArchived
+                          ? AppConstants.actionsUnarchive.tr()
+                          : AppConstants.archiveArchive.tr(),
+                      onTap: () => run(() async {
+                        await documentsService.setArchived([
+                          document.id,
+                        ], !document.isArchived);
+                        if (context.mounted) {
+                          showSnack(
+                            context,
+                            document.isArchived
+                                ? AppConstants.actionsUnarchived.tr()
+                                : AppConstants.actionsArchived.tr(),
+                          );
+                        }
+                      }),
+                    ),
+                    SheetQuickAction(
+                      icon: Icons.delete_outline_rounded,
+                      label: AppConstants.trashTitle.tr(),
+                      destructive: true,
+                      onTap: () => run(
+                        () => moveToTrashWithUndo(context, documentsService, [
+                          document,
+                        ]),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(),
               _Action(
                 icon: Icons.open_in_new_rounded,
                 label: AppConstants.viewerOpenElsewhere.tr(),
                 onTap: () => run(() => documentsService.openDocument(document)),
-              ),
-              _Action(
-                icon: Icons.ios_share_rounded,
-                label: AppConstants.actionsShare.tr(),
-                onTap: () =>
-                    run(() => documentsService.shareDocuments([document])),
               ),
               _Action(
                 icon: Icons.edit_outlined,
@@ -162,47 +216,6 @@ Future<void> showDocumentActions(
                     ),
                   ),
                 ),
-              _Action(
-                icon: document.isFavorite
-                    ? Icons.star_rounded
-                    : Icons.star_outline_rounded,
-                label: document.isFavorite
-                    ? AppConstants.commonRemoveFavorite.tr()
-                    : AppConstants.commonFavorite.tr(),
-                onTap: () =>
-                    run(() => documentsService.toggleFavorite(document.id)),
-              ),
-              _Action(
-                icon: document.isArchived
-                    ? Icons.unarchive_outlined
-                    : Icons.archive_outlined,
-                label: document.isArchived
-                    ? AppConstants.actionsUnarchive.tr()
-                    : AppConstants.archiveArchive.tr(),
-                onTap: () => run(() async {
-                  await documentsService.setArchived([
-                    document.id,
-                  ], !document.isArchived);
-                  if (context.mounted) {
-                    showSnack(
-                      context,
-                      document.isArchived
-                          ? AppConstants.actionsUnarchived.tr()
-                          : AppConstants.actionsArchived.tr(),
-                    );
-                  }
-                }),
-              ),
-              _Action(
-                icon: Icons.delete_outline_rounded,
-                label: AppConstants.actionsMoveToTrash.tr(),
-                destructive: true,
-                onTap: () => run(
-                  () => moveToTrashWithUndo(context, documentsService, [
-                    document,
-                  ]),
-                ),
-              ),
             ],
           ],
         ),
@@ -266,11 +279,8 @@ Future<void> showAlbumMembershipSheet(
   if (!context.mounted) return;
   final ids = documents.map((document) => document.id).toSet();
 
-  await showModalBottomSheet<void>(
+  await showAppSheet<void>(
     context: context,
-    useSafeArea: true,
-    showDragHandle: true,
-    isScrollControlled: true,
     builder: (sheetContext) {
       return StatefulBuilder(
         builder: (context, setSheetState) {
@@ -351,41 +361,78 @@ Future<void> showAlbumMembershipSheet(
                     ),
                   )
                 else
+                  // Same bookshelf as the Albums tab: each shelf with its
+                  // albums as books; tap a book to put the document(s) in it
+                  // (it lifts and gets a tick) or take them out.
                   Flexible(
                     child: ListView(
                       shrinkWrap: true,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
                       children: [
-                        for (final album in snapshot.albums)
-                          CheckboxListTile(
-                            value: inAlbum(album.id),
-                            secondary: Icon(
-                              albumIconFor(album.iconName),
-                              color: Color(album.colorValue),
-                            ),
-                            title: Text(album.name),
-                            subtitle: Text(
-                              AppConstants.docshelfDocumentCount.tr(
-                                namedArgs: {
-                                  'count':
-                                      '${snapshot.documentsForAlbum(album.id).length}',
-                                },
+                        for (final shelf in snapshot.shelves)
+                          if (shelf.albums.isNotEmpty) ...[
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
+                              child: Text(
+                                shelf.name.toUpperCase(),
+                                style: const TextStyle(
+                                  color: AppTheme.mutedText,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 12.5,
+                                  letterSpacing: 1.05,
+                                ),
                               ),
                             ),
-                            onChanged: (value) async {
-                              if (value == true) {
-                                await documentsService.addDocumentsToAlbum(
-                                  ids.toList(),
-                                  album.id,
-                                );
-                              } else {
-                                for (final id in ids) {
-                                  await documentsService
-                                      .removeDocumentFromAlbum(id, album.id);
-                                }
-                              }
-                              await refresh();
-                            },
+                            BookshelfLane(
+                              child: ListView(
+                                scrollDirection: Axis.horizontal,
+                                padding: const EdgeInsets.fromLTRB(8, 14, 8, 0),
+                                children: [
+                                  for (final album in shelf.albums)
+                                    GestureDetector(
+                                      behavior: HitTestBehavior.opaque,
+                                      onTap: () async {
+                                        if (!inAlbum(album.id)) {
+                                          await documentsService
+                                              .addDocumentsToAlbum(
+                                                ids.toList(),
+                                                album.id,
+                                              );
+                                        } else {
+                                          for (final id in ids) {
+                                            await documentsService
+                                                .removeDocumentFromAlbum(
+                                                  id,
+                                                  album.id,
+                                                );
+                                          }
+                                        }
+                                        await refresh();
+                                      },
+                                      child: Tooltip(
+                                        message: album.name,
+                                        child: AlbumSpine(
+                                          album: album,
+                                          count: snapshot
+                                              .documentsForAlbum(album.id)
+                                              .length,
+                                          selected: inAlbum(album.id),
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(4, 14, 4, 0),
+                          child: _SelectedAlbums(
+                            names: [
+                              for (final album in snapshot.albums)
+                                if (inAlbum(album.id)) album.name,
+                            ],
                           ),
+                        ),
                       ],
                     ),
                   ),
@@ -422,6 +469,39 @@ class _Action extends StatelessWidget {
       ),
       title: Text(label, style: TextStyle(color: color, fontSize: 15)),
       onTap: onTap,
+    );
+  }
+}
+
+/// Plain-text summary under the shelves — the book spines' vertical titles
+/// are small, so this says clearly where the document(s) are now.
+class _SelectedAlbums extends StatelessWidget {
+  const _SelectedAlbums({required this.names});
+
+  final List<String> names;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(
+          names.isEmpty ? Icons.inbox_outlined : Icons.check_circle_rounded,
+          size: 18,
+          color: names.isEmpty ? AppTheme.mutedText : AppTheme.accent,
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            names.isEmpty
+                ? AppConstants.actionsInNoAlbum.tr()
+                : AppConstants.actionsInAlbums.tr(
+                    namedArgs: {'albums': names.join(', ')},
+                  ),
+            style: const TextStyle(color: AppTheme.text, fontSize: 13.5),
+          ),
+        ),
+      ],
     );
   }
 }

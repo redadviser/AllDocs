@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../common/album_dialog.dart';
 import '../../common/app_constants.dart';
+import '../../common/bookshelf.dart';
 import '../../common/document_preview_card.dart';
 import '../../common/snapshot_builder.dart';
 import '../../models/models.dart';
@@ -11,12 +12,10 @@ import '../../services/services.dart';
 import '../../theme/app_theme.dart';
 import 'album_detail_screen.dart';
 
-const double _albumSpineWidth = 34;
 const double _addAlbumSpineWidth = 30;
 const double _modernAlbumCardWidth = 132;
 const double _classicLaneHeight = 130;
 const double _modernLaneHeight = 176;
-const int _maxSpineTitleLength = 25;
 
 enum _AlbumDisplayMode { classic, modern }
 
@@ -481,7 +480,7 @@ class _ShelfWidgetState extends State<_ShelfWidget> {
                                           album: album,
                                           documents: documents,
                                         )
-                                      : _AlbumSpine(
+                                      : AlbumSpine(
                                           album: album,
                                           count: documents.length,
                                         ),
@@ -563,113 +562,6 @@ class _ShelfIcon extends StatelessWidget {
       tooltip: tooltip,
       splashRadius: 20,
       onPressed: onTap,
-    );
-  }
-}
-
-class _AlbumSpine extends StatelessWidget {
-  const _AlbumSpine({required this.album, required this.count});
-
-  final DocumentAlbum album;
-  final int count;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = Color(album.colorValue);
-    final raw = album.name.trim().toUpperCase();
-    final name = raw.length > _maxSpineTitleLength
-        ? raw.substring(0, _maxSpineTitleLength)
-        : raw;
-    final fontSize = name.length <= 10
-        ? 8.0
-        : name.length <= 15
-        ? 7.6
-        : name.length <= 20
-        ? 7.2
-        : 6.8;
-
-    return Container(
-      width: _albumSpineWidth,
-      height: double.infinity,
-      margin: const EdgeInsets.symmetric(horizontal: 4),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(2),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.32),
-            blurRadius: 8,
-            offset: const Offset(2, 2),
-          ),
-        ],
-      ),
-      child: Stack(
-        fit: StackFit.expand,
-        clipBehavior: Clip.none,
-        children: [
-          DecoratedBox(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(2),
-              gradient: LinearGradient(
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-                colors: [
-                  Color.lerp(color, Colors.white, 0.06)!,
-                  color,
-                  Color.lerp(color, Colors.black, 0.18)!,
-                ],
-                stops: const [0, 0.5, 1],
-              ),
-            ),
-          ),
-          Positioned(
-            top: 14,
-            left: 9,
-            right: 9,
-            child: Container(
-              height: 1.2,
-              color: Colors.white.withValues(alpha: 0.7),
-            ),
-          ),
-          Positioned(
-            bottom: 12,
-            left: 9,
-            right: 9,
-            child: Container(
-              height: 1.2,
-              color: Colors.white.withValues(alpha: 0.7),
-            ),
-          ),
-          Center(
-            child: RotatedBox(
-              quarterTurns: 3,
-              child: Text(
-                name,
-                maxLines: 1,
-                overflow: TextOverflow.clip,
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.94),
-                  fontSize: fontSize,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: name.length > 18 ? 0.28 : 0.42,
-                  shadows: const [
-                    Shadow(
-                      color: Color(0x55000000),
-                      offset: Offset(0.8, 0.8),
-                      blurRadius: 1.6,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          if (count > 0)
-            Positioned(
-              top: -6,
-              right: -6,
-              child: _CountBadge(count: count, height: 18, fontSize: 9),
-            ),
-        ],
-      ),
     );
   }
 }
@@ -769,7 +661,7 @@ class _ModernAlbumCard extends StatelessWidget {
                   Positioned(
                     top: 7,
                     right: 7,
-                    child: _CountBadge(
+                    child: AlbumCountBadge(
                       count: documents.length,
                       height: 22,
                       fontSize: 10,
@@ -778,48 +670,6 @@ class _ModernAlbumCard extends StatelessWidget {
               ],
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _CountBadge extends StatelessWidget {
-  const _CountBadge({
-    required this.count,
-    required this.height,
-    required this.fontSize,
-  });
-
-  final int count;
-  final double height;
-  final double fontSize;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: height,
-      constraints: BoxConstraints(minWidth: height),
-      padding: const EdgeInsets.symmetric(horizontal: 5),
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: AppTheme.accent,
-        borderRadius: BorderRadius.circular(height / 2),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.9)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.22),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Text(
-        count > 999 ? '999+' : '$count',
-        style: TextStyle(
-          color: Colors.white,
-          fontSize: fontSize,
-          fontWeight: FontWeight.w700,
         ),
       ),
     );

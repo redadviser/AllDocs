@@ -7,14 +7,10 @@ import '../../theme/app_theme.dart';
 
 enum _AuthMode { login, signup }
 
-/// AllID: the shared account screen for the AllPhotos/AllDocs suite. Signing
-/// in or creating an account here works on both apps, since they
-/// authenticate against the same shared `users`/`profiles` tables (see
-/// docs/architecture.md). Starts as a two-button landing (AllID / Google);
-/// tapping AllID expands the card into the email/password (+ display name
-/// for signup) form.
-class AllIdScreen extends StatefulWidget {
-  const AllIdScreen({
+/// AllDocs account screen: the email/password form (+ display name when
+/// creating an account) straight away, with "Continue with Google" below.
+class AuthScreen extends StatefulWidget {
+  const AuthScreen({
     super.key,
     required this.onLogin,
     required this.onSignup,
@@ -27,16 +23,15 @@ class AllIdScreen extends StatefulWidget {
   final Future<void> Function() onGoogleSignIn;
 
   @override
-  State<AllIdScreen> createState() => _AllIdScreenState();
+  State<AuthScreen> createState() => _AuthScreenState();
 }
 
-class _AllIdScreenState extends State<AllIdScreen> {
+class _AuthScreenState extends State<AuthScreen> {
   final TextEditingController _displayNameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
   _AuthMode _mode = _AuthMode.login;
-  bool _showForm = false;
   bool _submitting = false;
 
   @override
@@ -100,7 +95,7 @@ class _AllIdScreenState extends State<AllIdScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const _AllIdHero(),
+                    const _AuthHero(),
                     const SizedBox(height: 32),
                     Container(
                       padding: const EdgeInsets.all(20),
@@ -112,12 +107,17 @@ class _AllIdScreenState extends State<AllIdScreen> {
                         ),
                       ),
                       child: AnimatedSize(
-                        duration: const Duration(milliseconds: 320),
+                        duration: const Duration(milliseconds: 240),
                         curve: Curves.easeOutCubic,
                         alignment: Alignment.topCenter,
-                        child: AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 220),
-                          child: _showForm ? _buildForm() : _buildLanding(),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _buildForm(),
+                            _buildGoogle(),
+                            _buildModeToggle(),
+                          ],
                         ),
                       ),
                     ),
@@ -131,39 +131,11 @@ class _AllIdScreenState extends State<AllIdScreen> {
     );
   }
 
-  Widget _buildLanding() {
+  Widget _buildGoogle() {
     return Column(
-      key: const ValueKey('landing'),
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: AppTheme.accent.withValues(alpha: 0.28),
-                blurRadius: 18,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: FilledButton.icon(
-            onPressed: () => setState(() => _showForm = true),
-            icon: const Icon(Icons.fingerprint_rounded),
-            label: Text(AppConstants.authContinueWithAllId.tr()),
-            style: FilledButton.styleFrom(
-              minimumSize: const Size.fromHeight(50),
-              textStyle: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-            ),
-          ),
-        ),
         const SizedBox(height: 20),
         Row(
           children: [
@@ -208,37 +180,34 @@ class _AllIdScreenState extends State<AllIdScreen> {
     );
   }
 
+  Widget _buildModeToggle() {
+    final isLogin = _mode == _AuthMode.login;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const SizedBox(height: 14),
+        Center(
+          child: TextButton(
+            onPressed: _submitting ? null : _toggleMode,
+            child: Text(
+              (isLogin
+                      ? AppConstants.authToggleToSignup
+                      : AppConstants.authToggleToLogin)
+                  .tr(),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildForm() {
     final isLogin = _mode == _AuthMode.login;
 
     return Column(
-      key: const ValueKey('form'),
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          children: [
-            IconButton(
-              onPressed: _submitting
-                  ? null
-                  : () => setState(() => _showForm = false),
-              icon: const Icon(Icons.arrow_back_rounded),
-            ),
-            Expanded(
-              child: Text(
-                AppConstants.authTitle.tr(),
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: AppTheme.text,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            const SizedBox(width: 48),
-          ],
-        ),
-        const SizedBox(height: 16),
         if (!isLogin) ...[
           TextField(
             controller: _displayNameController,
@@ -313,18 +282,6 @@ class _AllIdScreenState extends State<AllIdScreen> {
             ),
           ),
         ),
-        const SizedBox(height: 14),
-        Center(
-          child: TextButton(
-            onPressed: _submitting ? null : _toggleMode,
-            child: Text(
-              (isLogin
-                      ? AppConstants.authToggleToSignup
-                      : AppConstants.authToggleToLogin)
-                  .tr(),
-            ),
-          ),
-        ),
       ],
     );
   }
@@ -359,8 +316,8 @@ class _GoogleMark extends StatelessWidget {
   }
 }
 
-class _AllIdHero extends StatelessWidget {
-  const _AllIdHero();
+class _AuthHero extends StatelessWidget {
+  const _AuthHero();
 
   @override
   Widget build(BuildContext context) {

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../../common/add_document_sheet.dart';
 import '../../common/album_dialog.dart';
 import '../../common/app_constants.dart';
+import '../../common/cloud_quick_sheet.dart';
 import '../../common/device_scan_sheet.dart';
 import '../../common/document_actions.dart';
 import '../../common/document_details_sheet.dart';
@@ -24,15 +25,11 @@ class GalleryScreen extends StatefulWidget {
     super.key,
     required this.documentsService,
     required this.onOpenArchive,
-    required this.onOpenAlbums,
-    required this.onOpenAlbum,
     required this.onOpenCloud,
   });
 
   final DocumentsService documentsService;
   final VoidCallback onOpenArchive;
-  final VoidCallback onOpenAlbums;
-  final void Function(DocumentAlbum album) onOpenAlbum;
   final void Function(CloudProviderId? provider) onOpenCloud;
 
   @override
@@ -140,6 +137,11 @@ class _GalleryScreenState extends State<GalleryScreen> {
                               snapshot.archivedDocuments.length +
                               snapshot.trashDocuments.length,
                           onOpenArchive: widget.onOpenArchive,
+                          onOpenClouds: () => showCloudQuickSheet(
+                            context,
+                            _service,
+                            onOpenCloud: widget.onOpenCloud,
+                          ),
                         ),
                 ),
               ),
@@ -273,55 +275,6 @@ class _GalleryScreenState extends State<GalleryScreen> {
                 itemBuilder: (context, index) {
                   return SizedBox(width: 124, child: _card(recents[index]));
                 },
-              ),
-            ),
-          ),
-        ],
-        if (snapshot.albums.isNotEmpty) ...[
-          _sectionHeader(
-            AppConstants.galleryAlbums.tr(),
-            action: AppConstants.commonViewAll.tr(),
-            onAction: widget.onOpenAlbums,
-          ),
-          SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            sliver: SliverToBoxAdapter(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: AppTheme.surface,
-                  borderRadius: BorderRadius.circular(AppTheme.radius),
-                ),
-                child: Column(
-                  children: [
-                    for (final album in snapshot.albums.take(4))
-                      ListTile(
-                        leading: Container(
-                          width: 36,
-                          height: 36,
-                          decoration: BoxDecoration(
-                            color: Color(
-                              album.colorValue,
-                            ).withValues(alpha: 0.16),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Icon(
-                            albumIconFor(album.iconName),
-                            size: 19,
-                            color: Color(album.colorValue),
-                          ),
-                        ),
-                        title: Text(album.name),
-                        trailing: Text(
-                          '${snapshot.documentsForAlbum(album.id).length}',
-                          style: const TextStyle(
-                            color: AppTheme.mutedText,
-                            fontSize: 14,
-                          ),
-                        ),
-                        onTap: () => widget.onOpenAlbum(album),
-                      ),
-                  ],
-                ),
               ),
             ),
           ),
@@ -601,11 +554,13 @@ class _Header extends StatelessWidget {
     required this.profile,
     required this.archivedCount,
     required this.onOpenArchive,
+    required this.onOpenClouds,
   });
 
   final UserProfile profile;
   final int archivedCount;
   final VoidCallback onOpenArchive;
+  final VoidCallback onOpenClouds;
 
   @override
   Widget build(BuildContext context) {
@@ -638,6 +593,16 @@ class _Header extends StatelessWidget {
             ],
           ),
         ),
+        IconButton.filledTonal(
+          tooltip: AppConstants.navCloud.tr(),
+          onPressed: onOpenClouds,
+          style: IconButton.styleFrom(
+            backgroundColor: AppTheme.surfaceStrong,
+            foregroundColor: AppTheme.text,
+          ),
+          icon: const Icon(Icons.cloud_outlined),
+        ),
+        const SizedBox(width: 8),
         IconButton.filledTonal(
           tooltip: AppConstants.archiveTitle.tr(),
           onPressed: onOpenArchive,

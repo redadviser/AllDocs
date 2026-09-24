@@ -11,10 +11,9 @@ export interface DeviceInfo {
 // AllDocs-specific: tracks which devices are signed into an account so the
 // "sessions and devices" security surface has real data, and so later
 // phases (push reminders) have somewhere to store a push token per device.
-// Lives in AllDocs' own database, never AllPhotos'.
 //
 // Best-effort by design: this must never fail login/signup/Google sign-in.
-// The account (users/profiles, shared with AllPhotos) is the source of
+// The account (users/profiles) is the source of
 // truth; device tracking is secondary bookkeeping. A schema drift or a
 // transient issue here (e.g. this table missing a migration on a fresh
 // deploy) should degrade to "no device recorded", not "couldn't sign in" —

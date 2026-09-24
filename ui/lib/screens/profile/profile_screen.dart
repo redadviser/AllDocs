@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../common/app_constants.dart';
+import '../../common/app_sheet.dart';
 import '../../common/backup_flow.dart';
 import '../../common/glass_panel.dart';
 import '../../common/snapshot_builder.dart';
@@ -138,7 +139,18 @@ class _ProfileOverviewPage extends StatelessWidget {
         const SizedBox(height: 14),
         _StatsPanel(profile: profile),
         const SizedBox(height: 14),
+        GlassPanel(
+          child: _SettingsTile(
+            icon: Icons.language_rounded,
+            title: AppConstants.profileLanguage.tr(),
+            value: _languageName(context),
+            onTap: () => _showLanguageSheet(context),
+          ),
+        ),
+        const SizedBox(height: 14),
         const _SupportPanel(),
+        const SizedBox(height: 14),
+        const _LogoutButton(),
       ],
     );
   }
@@ -368,8 +380,6 @@ class _ProfileSettingsPage extends StatelessWidget {
         ),
         const SizedBox(height: 14),
         _PremiumPanel(profile: profile),
-        const SizedBox(height: 14),
-        const _LogoutButton(),
       ],
     );
   }
@@ -1065,13 +1075,6 @@ class _SettingsPanel extends StatelessWidget {
             title: AppConstants.profileExportDocuments.tr(),
             onTap: () => _exportDocuments(context),
           ),
-          const Divider(height: 1),
-          _SettingsTile(
-            icon: Icons.language_rounded,
-            title: AppConstants.profileLanguage.tr(),
-            value: _languageName(context),
-            onTap: () => _showLanguageSheet(context),
-          ),
         ],
       ),
     );
@@ -1103,9 +1106,8 @@ String autoLockLabel(int minutes) {
 }
 
 void _showAutoLockSheet(BuildContext context) {
-  showModalBottomSheet<void>(
+  showOptionsSheet<void>(
     context: context,
-    showDragHandle: true,
     builder: (context) => SafeArea(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -1208,10 +1210,9 @@ void _showAlbumsSheet(BuildContext context, DocumentsSnapshot snapshot) {
       for (final album in shelf.albums) (shelf: shelf, album: album),
   ];
 
-  showModalBottomSheet<void>(
+  showOptionsSheet<void>(
     context: context,
     backgroundColor: AppTheme.surface,
-    showDragHandle: true,
     builder: (context) {
       return SafeArea(
         child: Padding(
@@ -1249,33 +1250,25 @@ void _showAlbumsSheet(BuildContext context, DocumentsSnapshot snapshot) {
                   ),
                 )
               else
-                Flexible(
-                  child: ListView.separated(
-                    shrinkWrap: true,
-                    itemCount: albums.length,
-                    separatorBuilder: (context, index) =>
-                        const Divider(height: 1),
-                    itemBuilder: (context, index) {
-                      final item = albums[index];
-                      final count = snapshot
-                          .documentsForAlbum(item.album.id)
-                          .length;
-                      return ListTile(
-                        leading: Icon(
-                          Icons.folder_rounded,
-                          color: Color(item.album.colorValue),
-                        ),
-                        title: Text(item.album.name),
-                        subtitle: Text(item.shelf.name),
-                        trailing: Text(
-                          AppConstants.docshelfDocumentCount.tr(
-                            namedArgs: {'count': '$count'},
-                          ),
-                        ),
-                      );
-                    },
+                for (final (index, item) in albums.indexed) ...[
+                  if (index > 0) const Divider(height: 1),
+                  ListTile(
+                    leading: Icon(
+                      Icons.folder_rounded,
+                      color: Color(item.album.colorValue),
+                    ),
+                    title: Text(item.album.name),
+                    subtitle: Text(item.shelf.name),
+                    trailing: Text(
+                      AppConstants.docshelfDocumentCount.tr(
+                        namedArgs: {
+                          'count':
+                              '${snapshot.documentsForAlbum(item.album.id).length}',
+                        },
+                      ),
+                    ),
                   ),
-                ),
+                ],
             ],
           ),
         ),
@@ -1363,6 +1356,23 @@ String _languageName(BuildContext context) {
   };
 }
 
+/// Most text uses `.tr()` without a context, so nothing depends on the
+/// locale and a language change only showed up as screens happened to
+/// rebuild (e.g. switching tabs). Marking every element dirty repaints the
+/// whole app in the new language at once while keeping all state (open
+/// tab, routes, unlocked session).
+Future<void> _rebuildWholeApp() async {
+  // The new translations are applied when MaterialApp's Localizations
+  // updates, which happens on the next frame.
+  await WidgetsBinding.instance.endOfFrame;
+  void markDirty(Element element) {
+    element.markNeedsBuild();
+    element.visitChildren(markDirty);
+  }
+
+  WidgetsBinding.instance.rootElement?.visitChildren(markDirty);
+}
+
 void _showLanguageSheet(BuildContext context) {
   final options = [
     (locale: const Locale('pt'), label: AppConstants.profilePortuguese.tr()),
@@ -1371,10 +1381,9 @@ void _showLanguageSheet(BuildContext context) {
     (locale: const Locale('fr'), label: AppConstants.profileFrench.tr()),
   ];
 
-  showModalBottomSheet<void>(
+  showOptionsSheet<void>(
     context: context,
     backgroundColor: AppTheme.surface,
-    showDragHandle: true,
     builder: (sheetContext) {
       return SafeArea(
         child: Padding(
@@ -1403,6 +1412,7 @@ void _showLanguageSheet(BuildContext context) {
                   onTap: () async {
                     await context.setLocale(option.locale);
                     if (sheetContext.mounted) Navigator.of(sheetContext).pop();
+                    await _rebuildWholeApp();
                   },
                 ),
             ],

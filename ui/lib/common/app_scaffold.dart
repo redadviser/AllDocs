@@ -7,8 +7,6 @@ import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 
 import 'app_constants.dart';
 import 'document_import_flow.dart';
-import '../models/models.dart';
-import '../screens/albums/album_detail_screen.dart';
 import '../screens/albums/albums_screen.dart';
 import '../screens/archive/archive_screen.dart';
 import '../screens/auth/security_gate.dart';
@@ -34,6 +32,15 @@ class _MainNavScreenState extends State<MainNavScreen> {
   void initState() {
     super.initState();
     _listenForSharedFiles();
+    // A new account starts with a "Personal" shelf (Contracts, Invoices)
+    // instead of an empty Albums tab.
+    unawaited(
+      _documentsService
+          .ensureStarterShelf(AppConstants.albumsDefaultShelf.tr(), [
+            (name: AppConstants.albumNameContract.tr(), iconName: 'work'),
+            (name: AppConstants.albumNameInvoice.tr(), iconName: 'receipt'),
+          ]),
+    );
     // Daily cloud backup when enabled (silent, best-effort).
     unawaited(
       _documentsService.backup.runAutoBackupIfDue(
@@ -103,8 +110,6 @@ class _MainNavScreenState extends State<MainNavScreen> {
           GalleryScreen(
             documentsService: _documentsService,
             onOpenArchive: _openArchive,
-            onOpenAlbums: () => _selectPage(1),
-            onOpenAlbum: _openAlbum,
             onOpenCloud: _openCloud,
           ),
           AlbumsScreen(documentsService: _documentsService),
@@ -173,17 +178,6 @@ class _MainNavScreenState extends State<MainNavScreen> {
               showBackButton: true,
             ),
           ),
-        ),
-      ),
-    );
-  }
-
-  void _openAlbum(DocumentAlbum album) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => AlbumDetailScreen(
-          documentsService: _documentsService,
-          albumId: album.id,
         ),
       ),
     );

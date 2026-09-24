@@ -192,6 +192,13 @@ class DocumentsService {
 
   Future<void> createShelf(String name) => _mutate(_store.createShelf(name));
 
+  Future<void> ensureStarterShelf(
+    String shelfName,
+    List<({String name, String iconName})> albums,
+  ) async {
+    if (await _store.ensureStarterShelf(shelfName, albums)) _notifyChanged();
+  }
+
   Future<void> renameShelf(String shelfId, String name) {
     return _mutate(_store.renameShelf(shelfId, name));
   }

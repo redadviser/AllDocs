@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../services/scan_image_filter.dart';
 import '../theme/app_theme.dart';
 import 'app_constants.dart';
+import 'app_sheet.dart';
 
 /// After capturing pages: pick the look (original, grayscale, black and
 /// white, high contrast), previewed on the first page. Null = cancelled.
@@ -16,12 +17,9 @@ Future<ScanFilter?> showScanFilterSheet(
   if (pages.isEmpty || !context.mounted) {
     return Future.value(ScanFilter.original);
   }
-  return showModalBottomSheet<ScanFilter>(
+  return showAppSheet<ScanFilter>(
     context: context,
-    useSafeArea: true,
-    isScrollControlled: true,
     isDismissible: false,
-    showDragHandle: true,
     builder: (context) => _ScanFilterSheet(pages: pages),
   );
 }

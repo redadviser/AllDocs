@@ -11,8 +11,8 @@
     "cloud": "Cloud"
   },
   "auth": {
-    "title": "AllID",
-    "subtitle": "Ton compte pour AllPhotos et AllDocs.",
+    "title": "AllDocs",
+    "subtitle": "Connecte-toi à ton compte AllDocs.",
     "display_name": "Nom affiché",
     "email": "Email",
     "password": "Mot de passe",
@@ -20,13 +20,12 @@
     "forgot_hint": "La récupération du mot de passe n'est pas encore disponible.",
     "login": "Se connecter",
     "signup": "Créer un compte",
-    "toggle_to_signup": "Nouveau ici ? Crée ton AllID",
-    "toggle_to_login": "Tu as déjà un AllID ? Se connecter",
+    "toggle_to_signup": "Nouveau ici ? Crée un compte",
+    "toggle_to_login": "Tu as déjà un compte ? Se connecter",
     "continue_with_google": "Continuer avec Google",
     "or_divider": "ou",
     "login_error": "Connexion impossible. Vérifie tes informations et réessaie.",
-    "offline": "Mode local actif",
-    "continue_with_allid": "Continuer avec AllID"
+    "offline": "Mode local actif"
   },
   "security": {
     "greeting_morning": "Bonjour, {name}",
@@ -47,7 +46,7 @@
     "biometric_reason": "Déverrouiller AllDocs",
     "biometric_unavailable": "Authentification biométrique impossible.",
     "devices_title": "Appareils",
-    "devices_subtitle": "Appareils connectés à ton compte AllID.",
+    "devices_subtitle": "Appareils connectés à ton compte.",
     "devices_current": "Cet appareil",
     "devices_last_seen": "Vu le {date}",
     "devices_empty": "Aucun appareil trouvé.",
@@ -214,7 +213,7 @@
     "link_open_error": "Impossible d'ouvrir ce lien.",
     "logout": "Se déconnecter",
     "logout_confirm_title": "Se déconnecter d'AllDocs ?",
-    "logout_confirm_message": "Tu auras besoin de ton email et mot de passe AllID (ou de ton compte Google) pour te reconnecter sur cet appareil."
+    "logout_confirm_message": "Tu auras besoin de ton email et mot de passe (ou de ton compte Google) pour te reconnecter sur cet appareil."
   },
   "permission": {
     "storage_title": "Autoriser l’accès aux fichiers",
@@ -250,14 +249,14 @@
     "q1_answer": "AllDocs utilise la reconnaissance de texte (OCR) directement sur ton appareil pour numériser et rendre les documents consultables. Les images et le texte ne quittent jamais ton téléphone pendant ce processus.",
     "q2_question": "Mes documents sont-ils stockés dans le cloud ?",
     "q2_answer": "Pour l'instant, tes documents sont stockés uniquement sur ton appareil. La synchronisation entre appareils est en cours de développement et suivra le même principe : le contenu est toujours chiffré avant de quitter ton téléphone.",
-    "q3_question": "Qu'est-ce que le compte AllID ?",
-    "q3_answer": "AllID est le compte partagé entre AllDocs et AllPhotos. Tu utilises le même email et le même mot de passe (ou la même connexion Google) dans les deux apps, et un abonnement payant débloque les fonctionnalités premium dans les deux.",
+    "q3_question": "À quoi sert le compte AllDocs ?",
+    "q3_answer": "Le compte t'identifie dans AllDocs : il permet de voir et de fermer les sessions sur d'autres appareils et d'activer le plan premium. Tes documents sont stockés sur ton téléphone et dans les sauvegardes que tu choisis, pas sur le serveur.",
     "q4_question": "Comment fonctionnent les forfaits ?",
     "q4_answer": "Le forfait gratuit inclut l'organisation et la numérisation des documents. Un forfait payant débloque des fonctionnalités supplémentaires dans les deux apps de la famille All — la gestion de l'abonnement sera bientôt disponible.",
     "q5_question": "Comment fonctionnent les rappels d'expiration ?",
     "q5_answer": "Quand AllDocs détecte une date de validité sur un document (comme une carte d'identité ou une assurance), l'app peut programmer un rappel local avant l'expiration de cette date.",
     "q6_question": "Que protègent le code PIN et la biométrie ?",
-    "q6_answer": "Le code PIN/la biométrie verrouille l'accès à l'app sur ton appareil. C'est indépendant du mot de passe de ton compte AllID — perdre l'un n'affecte pas l'autre.",
+    "q6_answer": "Le code PIN/la biométrie verrouille l'accès à l'app sur ton appareil. C'est indépendant du mot de passe de ton compte — perdre l'un n'affecte pas l'autre.",
     "q7_question": "Comment exporter ou supprimer mes documents ?",
     "q7_answer": "Tu peux exporter tous tes documents vers un dossier de ton choix depuis Paramètres > Exporter les documents. Pour supprimer un document précis, appuie longuement dessus dans les archives."
   },
@@ -321,6 +320,8 @@
     "add_tag": "Ajouter un tag (ex. : Client A, 2026)"
   },
   "actions": {
+    "in_albums": "Dans : {albums}",
+    "in_no_album": "Dans aucun album pour l'instant — il reste dans la galerie.",
     "share": "Partager",
     "edit_details": "Nom, albums et tags",
     "albums": "Ajouter aux albums",
@@ -369,6 +370,7 @@
     "save": "Enregistrer le PDF"
   },
   "albums": {
+    "default_shelf": "Personnel",
     "title": "Albums",
     "edit_album": "Modifier l'album",
     "rename_shelf": "Renommer l'étagère",
@@ -471,6 +473,7 @@
   },
   "connections": {
     "title": "Connexions",
+    "manage": "Gérer les connexions",
     "subtitle": "OneDrive, Google Drive, Dropbox et sauvegarde"
   },
   "viewer": {

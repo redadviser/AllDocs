@@ -29,8 +29,8 @@ export const openApiSpec = {
     title: 'AllDocs API',
     version: '0.1.0',
     description: [
-      'Backend of the AllDocs app. Accounts are shared with AllPhotos (same',
-      '`users`/`profiles`), everything else lives in AllDocs\' own database.',
+      'Backend of the AllDocs app: accounts, sessions/devices and app',
+      'configuration. Documents themselves stay on the phone.',
       '',
       'Authentication is a `session_token` cookie. In this page, calling a',
       'login endpoint with **Try it out** sets the cookie in the browser, so',
@@ -51,7 +51,7 @@ export const openApiSpec = {
   },
   servers: [{ url: '/', description: 'This server' }],
   tags: [
-    { name: 'Auth', description: 'AllID accounts and sessions' },
+    { name: 'Auth', description: 'AllDocs accounts and sessions' },
     { name: 'Devices', description: 'Signed-in devices (sessions) of the current user' },
     { name: 'Config', description: 'Public app configuration' },
     { name: 'Health' },
@@ -198,7 +198,7 @@ export const openApiSpec = {
     '/api/auth/google/signin': {
       post: {
         tags: ['Auth'],
-        summary: 'Sign in with Google (AllID)',
+        summary: 'Sign in with Google',
         description: [
           'This is the Google login endpoint; there is no redirect callback.',
           'The app signs in with the native Google Sign-In SDK and sends the',

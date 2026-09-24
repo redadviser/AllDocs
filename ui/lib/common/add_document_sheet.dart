@@ -5,9 +5,10 @@ import '../models/models.dart';
 import '../services/services.dart';
 import '../theme/app_theme.dart';
 import 'app_constants.dart';
-import 'document_actions.dart';
+import 'app_sheet.dart';
 import 'device_scan_sheet.dart';
 import 'document_import_flow.dart';
+import 'sheet_quick_action.dart';
 
 /// The "+ Add" menu: every way a document can get into AllDocs.
 Future<void> showAddDocumentSheet(
@@ -16,18 +17,15 @@ Future<void> showAddDocumentSheet(
   String? albumId,
   void Function(CloudProviderId? provider)? onOpenCloud,
 }) {
-  return showModalBottomSheet<void>(
+  return showOptionsSheet<void>(
     context: context,
-    useSafeArea: true,
-    showDragHandle: true,
-    isScrollControlled: true,
     builder: (sheetContext) {
       void run(Future<void> Function() action) {
         Navigator.of(sheetContext).pop();
         action();
       }
 
-      return SingleChildScrollView(
+      return Padding(
         padding: const EdgeInsets.only(bottom: 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -44,18 +42,62 @@ Future<void> showAddDocumentSheet(
                 ),
               ),
             ),
-            _Option(
-              icon: Icons.insert_drive_file_outlined,
-              title: AppConstants.addFile.tr(),
-              onTap: () => run(
-                () => pickAndImportDocuments(
-                  context,
-                  documentsService,
-                  albumId: albumId,
-                  allowMultiple: false,
-                ),
+            // The usual ways in as one row, the rest as a list below.
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SheetQuickAction(
+                    icon: Icons.document_scanner_outlined,
+                    label: AppConstants.archiveScanDocumentTitle.tr(),
+                    onTap: () => run(
+                      () => scanAndImport(
+                        context,
+                        documentsService,
+                        albumId: albumId,
+                      ),
+                    ),
+                  ),
+                  SheetQuickAction(
+                    icon: Icons.insert_drive_file_outlined,
+                    label: AppConstants.addFile.tr(),
+                    onTap: () => run(
+                      () => pickAndImportDocuments(
+                        context,
+                        documentsService,
+                        albumId: albumId,
+                        allowMultiple: false,
+                      ),
+                    ),
+                  ),
+                  SheetQuickAction(
+                    icon: Icons.image_outlined,
+                    label: AppConstants.addImage.tr(),
+                    onTap: () => run(
+                      () => pickAndImportDocuments(
+                        context,
+                        documentsService,
+                        albumId: albumId,
+                        kind: ImportPickKind.images,
+                      ),
+                    ),
+                  ),
+                  SheetQuickAction(
+                    icon: Icons.phone_android_outlined,
+                    label: AppConstants.addFromDevice.tr(),
+                    onTap: () => run(
+                      () => showDeviceFoldersSheet(
+                        context,
+                        documentsService,
+                        albumId: albumId,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
+            const Divider(),
             _Option(
               icon: Icons.file_copy_outlined,
               title: AppConstants.addManyFiles.tr(),
@@ -78,40 +120,6 @@ Future<void> showAddDocumentSheet(
                   albumId: albumId,
                   kind: ImportPickKind.zip,
                   allowMultiple: false,
-                ),
-              ),
-            ),
-            const Divider(indent: 20, endIndent: 20),
-            _Option(
-              icon: Icons.document_scanner_outlined,
-              title: AppConstants.archiveScanDocumentTitle.tr(),
-              subtitle: AppConstants.addScanHint.tr(),
-              onTap: () => run(
-                () =>
-                    scanAndImport(context, documentsService, albumId: albumId),
-              ),
-            ),
-            _Option(
-              icon: Icons.image_outlined,
-              title: AppConstants.addImage.tr(),
-              onTap: () => run(
-                () => pickAndImportDocuments(
-                  context,
-                  documentsService,
-                  albumId: albumId,
-                  kind: ImportPickKind.images,
-                ),
-              ),
-            ),
-            _Option(
-              icon: Icons.phone_android_outlined,
-              title: AppConstants.addFromDevice.tr(),
-              subtitle: AppConstants.addFromDeviceHint.tr(),
-              onTap: () => run(
-                () => showDeviceFoldersSheet(
-                  context,
-                  documentsService,
-                  albumId: albumId,
                 ),
               ),
             ),
@@ -152,33 +160,15 @@ Future<void> showDeviceFoldersSheet(
 }) async {
   final snapshot = await documentsService.loadSnapshot();
   if (!context.mounted) return;
-  await showModalBottomSheet<void>(
+  await showOptionsSheet<void>(
     context: context,
-    useSafeArea: true,
-    showDragHandle: true,
-    isScrollControlled: true,
     builder: (sheetContext) {
-      Future<void> open(Future<DeviceFolderScan?> Function() load) async {
+      void open(Future<DeviceFolderScan?> Function() load) {
         Navigator.of(sheetContext).pop();
-        showSnack(context, AppConstants.archiveSearchingDevice.tr());
-        try {
-          final scan = await load();
-          if (!context.mounted || scan == null) return;
-          ScaffoldMessenger.of(context).hideCurrentSnackBar();
-          await showDeviceScanSheet(
-            context,
-            documentsService,
-            scan,
-            albumId: albumId,
-          );
-        } catch (_) {
-          if (context.mounted) {
-            showSnack(context, AppConstants.archiveFolderOpenFailed.tr());
-          }
-        }
+        scanDeviceAndShow(context, documentsService, load, albumId: albumId);
       }
 
-      return SingleChildScrollView(
+      return Padding(
         padding: const EdgeInsets.only(bottom: 16),
         child: Column(
           mainAxisSize: MainAxisSize.min,

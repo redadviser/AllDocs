@@ -7,6 +7,7 @@ import '../services/services.dart';
 import '../theme/app_theme.dart';
 import 'album_dialog.dart';
 import 'app_constants.dart';
+import 'app_sheet.dart';
 import 'document_file_icon.dart';
 
 class ZipSelection {
@@ -28,11 +29,8 @@ Future<ZipSelection?> showZipPreviewSheet(
 }) async {
   final snapshot = await documentsService.loadSnapshot();
   if (!context.mounted) return null;
-  return showModalBottomSheet<ZipSelection>(
+  return showAppSheet<ZipSelection>(
     context: context,
-    useSafeArea: true,
-    isScrollControlled: true,
-    showDragHandle: true,
     builder: (context) => _ZipPreviewSheet(
       entries: entries,
       zipName: zipName,

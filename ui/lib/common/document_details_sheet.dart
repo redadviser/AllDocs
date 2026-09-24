@@ -6,6 +6,7 @@ import '../services/services.dart';
 import '../theme/app_theme.dart';
 import 'album_dialog.dart';
 import 'app_constants.dart';
+import 'app_sheet.dart';
 import 'document_preview_card.dart';
 
 /// Name, albums, tags and favorite for one or more documents. Shown right
@@ -21,11 +22,8 @@ Future<void> showDocumentDetailsSheet(
   if (documents.isEmpty) return;
   final snapshot = await documentsService.loadSnapshot();
   if (!context.mounted) return;
-  await showModalBottomSheet<void>(
+  await showAppSheet<void>(
     context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    showDragHandle: true,
     builder: (context) => _DocumentDetailsSheet(
       documentsService: documentsService,
       documents: documents,

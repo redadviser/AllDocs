@@ -5,6 +5,8 @@ import '../models/models.dart';
 import '../services/services.dart';
 import '../theme/app_theme.dart';
 import 'app_constants.dart';
+import 'app_sheet.dart';
+import 'document_actions.dart';
 import 'document_file_icon.dart';
 import 'document_import_flow.dart';
 
@@ -17,17 +19,79 @@ Future<void> showDeviceScanSheet(
   DeviceFolderScan scan, {
   String? albumId,
 }) {
-  return showModalBottomSheet<void>(
+  return showAppSheet<void>(
     context: context,
-    useSafeArea: true,
-    isScrollControlled: true,
-    showDragHandle: true,
     builder: (context) => _DeviceScanSheet(
       scan: scan,
       documentsService: documentsService,
       albumId: albumId,
     ),
   );
+}
+
+/// Runs a device scan ([load]) behind a "Searching documents…" dialog that
+/// stays up until it's done (a whole-device search can take several
+/// seconds), then shows the results — or says nothing was found.
+/// Cancelling just drops the result.
+Future<void> scanDeviceAndShow(
+  BuildContext context,
+  DocumentsService documentsService,
+  Future<DeviceFolderScan?> Function() load, {
+  String? albumId,
+}) async {
+  final navigator = Navigator.of(context, rootNavigator: true);
+  var cancelled = false;
+  var dialogOpen = true;
+  showDialog<void>(
+    context: context,
+    barrierDismissible: false,
+    useRootNavigator: true,
+    builder: (dialogContext) => AlertDialog(
+      backgroundColor: AppTheme.surface,
+      content: Row(
+        children: [
+          const SizedBox(
+            width: 22,
+            height: 22,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          const SizedBox(width: 16),
+          Expanded(child: Text(AppConstants.archiveSearchingDevice.tr())),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () {
+            cancelled = true;
+            dialogOpen = false;
+            Navigator.of(dialogContext).pop();
+          },
+          child: Text(AppConstants.commonCancel.tr()),
+        ),
+      ],
+    ),
+  );
+
+  DeviceFolderScan? scan;
+  Object? failure;
+  try {
+    scan = await load();
+  } catch (error) {
+    failure = error;
+  }
+  if (dialogOpen) navigator.pop();
+  if (cancelled || !context.mounted) return;
+
+  if (failure != null) {
+    showSnack(context, AppConstants.archiveFolderOpenFailed.tr());
+    return;
+  }
+  if (scan == null) return; // folder picker dismissed
+  if (scan.documents.isEmpty) {
+    showSnack(context, AppConstants.galleryDeviceNothing.tr());
+    return;
+  }
+  await showDeviceScanSheet(context, documentsService, scan, albumId: albumId);
 }
 
 class _DeviceScanSheet extends StatefulWidget {
