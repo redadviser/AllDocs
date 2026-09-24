@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
 import '../../common/app_constants.dart';
+import '../../services/auth_service.dart';
 import '../../services/local_mode_config.dart';
 import '../../theme/app_theme.dart';
 
@@ -68,6 +69,26 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   Future<void> _submitGoogle() => _run(widget.onGoogleSignIn);
+
+  /// "Forgot": asks for the email (pre-filled with what's typed) and has the
+  /// backend email a link to a page where a new password is set.
+  Future<void> _showForgotPassword() async {
+    final sent = await showDialog<bool>(
+      context: context,
+      builder: (context) =>
+          _ForgotPasswordDialog(initialEmail: _emailController.text.trim()),
+    );
+    if (sent == null || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          (sent ? AppConstants.authForgotSent : AppConstants.authForgotFailed)
+              .tr(),
+        ),
+        duration: const Duration(seconds: 6),
+      ),
+    );
+  }
 
   void _toggleMode() {
     setState(() {
@@ -244,11 +265,7 @@ class _AuthScreenState extends State<AuthScreen> {
           Align(
             alignment: Alignment.centerRight,
             child: TextButton(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(AppConstants.authForgotHint.tr())),
-                );
-              },
+              onPressed: _submitting ? null : _showForgotPassword,
               child: Text(AppConstants.authForgot.tr()),
             ),
           ),
@@ -281,6 +298,92 @@ class _AuthScreenState extends State<AuthScreen> {
               (isLogin ? AppConstants.authLogin : AppConstants.authSignup).tr(),
             ),
           ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ForgotPasswordDialog extends StatefulWidget {
+  const _ForgotPasswordDialog({required this.initialEmail});
+
+  final String initialEmail;
+
+  @override
+  State<_ForgotPasswordDialog> createState() => _ForgotPasswordDialogState();
+}
+
+class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
+  late final TextEditingController _email = TextEditingController(
+    text: widget.initialEmail,
+  );
+  bool _sending = false;
+
+  @override
+  void dispose() {
+    _email.dispose();
+    super.dispose();
+  }
+
+  bool get _valid => _email.text.trim().contains('@');
+
+  Future<void> _send() async {
+    if (!_valid || _sending) return;
+    setState(() => _sending = true);
+    var sent = true;
+    try {
+      await AuthService.requestPasswordReset(
+        _email.text,
+        languageCode: context.locale.languageCode,
+      );
+    } catch (_) {
+      sent = false;
+    }
+    if (mounted) Navigator.of(context).pop(sent);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: AppTheme.surface,
+      title: Text(AppConstants.authForgotTitle.tr()),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            AppConstants.authForgotMessage.tr(),
+            style: const TextStyle(color: AppTheme.mutedText, height: 1.35),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _email,
+            autofocus: widget.initialEmail.isEmpty,
+            keyboardType: TextInputType.emailAddress,
+            textInputAction: TextInputAction.send,
+            onChanged: (_) => setState(() {}),
+            onSubmitted: (_) => _send(),
+            decoration: InputDecoration(
+              labelText: AppConstants.authEmail.tr(),
+              prefixIcon: const Icon(Icons.email_outlined),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: _sending ? null : () => Navigator.of(context).pop(),
+          child: Text(AppConstants.commonCancel.tr()),
+        ),
+        FilledButton(
+          onPressed: _valid && !_sending ? _send : null,
+          child: _sending
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Text(AppConstants.authForgotSend.tr()),
         ),
       ],
     );

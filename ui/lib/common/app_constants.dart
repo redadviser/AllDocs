@@ -22,7 +22,11 @@ class AppConstants {
   static const authEmail = 'auth.email';
   static const authPassword = 'auth.password';
   static const authForgot = 'auth.forgot';
-  static const authForgotHint = 'auth.forgot_hint';
+  static const authForgotTitle = 'auth.forgot_title';
+  static const authForgotMessage = 'auth.forgot_message';
+  static const authForgotSend = 'auth.forgot_send';
+  static const authForgotSent = 'auth.forgot_sent';
+  static const authForgotFailed = 'auth.forgot_failed';
   static const authLogin = 'auth.login';
   static const authSignup = 'auth.signup';
   static const authToggleToSignup = 'auth.toggle_to_signup';

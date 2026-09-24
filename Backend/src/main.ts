@@ -7,6 +7,7 @@ import { openApiSpec } from './docs/openapi'
 import { ensureSchema } from './lib/schema'
 import { authRouter } from './modules/auth/auth.routes'
 import { configRouter } from './modules/config/config.routes'
+import { passwordRouter, resetPageRouter } from './modules/password/password.routes'
 import { devicesRouter } from './modules/devices/devices.routes'
 
 const app = express()
@@ -44,7 +45,9 @@ if (process.env.DOCS_ENABLED !== 'false') {
   )
 }
 
+app.use('/api/auth/password', passwordRouter)
 app.use('/api/auth', authRouter)
+app.use(resetPageRouter)
 app.use('/api/config', configRouter)
 app.use('/api/devices', devicesRouter)
 

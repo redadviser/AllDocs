@@ -237,6 +237,80 @@ export const openApiSpec = {
         },
       },
     },
+    '/api/auth/password/forgot': {
+      post: {
+        tags: ['Auth'],
+        summary: 'Forgot password: email a reset link',
+        description: [
+          'If an account has this email, sends it a link to',
+          '`/reset-password?token=...` (valid 1 hour, single use). Always',
+          'answers 200, so it can\'t reveal which emails have an account.',
+          'At most one email per address per minute.',
+        ].join('\n'),
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['email'],
+                properties: {
+                  email: { type: 'string', format: 'email' },
+                  lang: { type: 'string', enum: ['pt', 'en', 'es', 'fr'], description: 'Language of the email and page' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: { description: 'Request accepted', content: { 'application/json': { schema: success } } },
+          400: { description: 'email missing', content: { 'application/json': { schema: error } } },
+        },
+      },
+    },
+    '/api/auth/password/reset': {
+      post: {
+        tags: ['Auth'],
+        summary: 'Set a new password with a reset token',
+        description:
+          'Used by the /reset-password page. Also ends every session of the account (all devices).',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['token', 'password'],
+                properties: {
+                  token: { type: 'string' },
+                  password: { type: 'string', minLength: 6 },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: { description: 'Password changed', content: { 'application/json': { schema: success } } },
+          400: {
+            description: 'Missing fields, short password, or invalid/expired/used token',
+            content: { 'application/json': { schema: error } },
+          },
+        },
+      },
+    },
+    '/reset-password': {
+      get: {
+        tags: ['Auth'],
+        summary: 'Reset password page (HTML, opened from the email)',
+        parameters: [
+          { name: 'token', in: 'query', required: true, schema: { type: 'string' } },
+          { name: 'lang', in: 'query', required: false, schema: { type: 'string', enum: ['pt', 'en', 'es', 'fr'] } },
+        ],
+        responses: {
+          200: { description: 'The form, or an "invalid or expired link" message', content: { 'text/html': {} } },
+        },
+      },
+    },
     '/api/auth/logout': {
       post: {
         tags: ['Auth'],

@@ -137,6 +137,24 @@ class AuthService {
     return _persistSession(res, fallbackEmail: email);
   }
 
+  /// "Forgot password": asks the backend to email [email] a link to set a
+  /// new password (in [languageCode]). The server answers the same whether
+  /// or not the account exists, so this only fails when it can't be
+  /// reached.
+  static Future<void> requestPasswordReset(
+    String email, {
+    required String languageCode,
+  }) async {
+    final res = await ApiHelpers.post(
+      '/api/auth/password/forgot',
+      headers: ApiHelpers.headersWithToken(),
+      body: jsonEncode({'email': email.trim(), 'lang': languageCode}),
+    );
+    if (res.statusCode != 200) {
+      throw Exception(ApiHelpers.errorMessage(res, 'Password reset failed'));
+    }
+  }
+
   static Future<String> signup(
     String email,
     String password, {
