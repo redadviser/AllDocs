@@ -675,4 +675,36 @@ class AppConstants {
   static const assistantApplied = 'assistant.applied';
   static const assistantCopied = 'assistant.copied';
   static const assistantNothingFound = 'assistant.nothing_found';
+
+  // Document requests (Vault).
+  static const requestsAsk = 'requests.ask';
+  static const requestsAskHint = 'requests.ask_hint';
+  static const requestsTitle = 'requests.title';
+  static const requestsNew = 'requests.new';
+  static const requestsEmpty = 'requests.empty';
+  static const requestsWhat = 'requests.what';
+  static const requestsWhatHint = 'requests.what_hint';
+  static const requestsMessage = 'requests.message';
+  static const requestsValidFor = 'requests.valid_for';
+  static const requestsDays = 'requests.days';
+  static const requestsSaveTo = 'requests.save_to';
+  static const requestsGallery = 'requests.gallery';
+  static const requestsCreate = 'requests.create';
+  static const requestsShareText = 'requests.share_text';
+  static const requestsStatusOpen = 'requests.status_open';
+  static const requestsStatusExpired = 'requests.status_expired';
+  static const requestsStatusClosed = 'requests.status_closed';
+  static const requestsReceived = 'requests.received';
+  static const requestsUntil = 'requests.until';
+  static const requestsShare = 'requests.share';
+  static const requestsCopy = 'requests.copy';
+  static const requestsCopied = 'requests.copied';
+  static const requestsClose = 'requests.close';
+  static const requestsDelete = 'requests.delete';
+  static const requestsDeleteMessage = 'requests.delete_message';
+  static const requestsLinkUnknown = 'requests.link_unknown';
+  static const requestsArrived = 'requests.arrived';
+  static const requestsView = 'requests.view';
+  static const requestsFailed = 'requests.failed';
+  static const requestsLocked = 'requests.locked';
 }

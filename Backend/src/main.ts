@@ -11,6 +11,8 @@ import { passwordRouter, resetPageRouter } from './modules/password/password.rou
 import { devicesRouter } from './modules/devices/devices.routes'
 import { adaptyWebhookRouter, plansRouter } from './modules/plans/plans.routes'
 import { assistantRouter } from './modules/assistant/assistant.routes'
+import { requestPageRouter, requestsRouter } from './modules/requests/requests.routes'
+import { purgeOld as purgeOldRequests } from './modules/requests/requests.service'
 
 const app = express()
 
@@ -24,6 +26,9 @@ app.use(
 )
 
 app.use(cookieParser())
+// Before the JSON/form parsers: an upload's body is the raw file, whatever
+// content type the browser gives it.
+app.use(requestPageRouter)
 app.use(express.json({ limit: '20mb' }))
 app.use(express.urlencoded({ extended: true, limit: '20mb' }))
 
@@ -55,6 +60,7 @@ app.use('/api/devices', devicesRouter)
 app.use('/api/plans', plansRouter)
 app.use('/api/adapty', adaptyWebhookRouter)
 app.use('/api/assistant', assistantRouter)
+app.use('/api/requests', requestsRouter)
 
 app.use((_req, res) => {
   res.status(404).json({ error: 'Not found' })
@@ -76,4 +82,9 @@ ensureSchema()
     app.listen(port, () => {
       console.log(`Server running on port ${port}`)
     })
+    // Uploaded files nobody collected, and long-expired requests.
+    const purge = () =>
+      purgeOldRequests().catch((error) => console.error('purgeOldRequests failed:', error))
+    purge()
+    setInterval(purge, 60 * 60 * 1000).unref()
   })

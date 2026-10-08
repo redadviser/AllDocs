@@ -13,6 +13,7 @@ import '../screens/auth/security_gate.dart';
 import '../screens/cloud/cloud_screen.dart';
 import '../screens/gallery/gallery_screen.dart';
 import '../screens/profile/profile_screen.dart';
+import '../screens/requests/requests_screen.dart';
 import '../services/services.dart';
 import '../theme/app_theme.dart';
 
@@ -67,6 +68,10 @@ class _MainNavScreenState extends State<MainNavScreen> {
         _documentsService.cloud.providerNamed,
       ),
     );
+    // Documents people sent through requests, waiting on the server.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) collectRequestedDocuments(context, _documentsService);
+    });
   }
 
   @override

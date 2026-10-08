@@ -72,6 +72,37 @@ CREATE TABLE IF NOT EXISTS subscription_events (
 
 CREATE INDEX IF NOT EXISTS idx_subscription_events_user ON subscription_events (user_id, received_at DESC);
 
+-- Document requests (Vault): a link someone else uses to send files. Only
+-- a hash of the link's token is kept. Files wait encrypted on disk
+-- (stored_name) until the requester's app collects them, then are deleted.
+CREATE TABLE IF NOT EXISTS document_requests (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token_hash TEXT NOT NULL UNIQUE,
+  title TEXT NOT NULL,
+  message TEXT,
+  language TEXT NOT NULL DEFAULT 'pt',
+  album_id TEXT,
+  expires_at TIMESTAMPTZ NOT NULL,
+  closed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_document_requests_user ON document_requests (user_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS document_request_files (
+  id TEXT PRIMARY KEY,
+  request_id TEXT NOT NULL REFERENCES document_requests(id) ON DELETE CASCADE,
+  original_name TEXT NOT NULL,
+  content_type TEXT,
+  size_bytes BIGINT NOT NULL,
+  stored_name TEXT,
+  uploaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  received_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_document_request_files_request ON document_request_files (request_id);
+
 -- Document assistant (Vault): requests per account per month (YYYY-MM),
 -- for the fair-use allowance. No question or document text is stored.
 CREATE TABLE IF NOT EXISTS assistant_usage (

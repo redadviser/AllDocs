@@ -55,6 +55,7 @@ export const openApiSpec = {
     { name: 'Devices', description: 'Signed-in devices (sessions) of the current user' },
     { name: 'Plans', description: 'Subscription plans (Pocket, Folio, Vault), bought through Adapty' },
     { name: 'Assistant', description: 'Document assistant (Vault plan), powered by Claude' },
+    { name: 'Requests', description: 'Ask someone else for documents through a link (Vault plan)' },
     { name: 'Config', description: 'Public app configuration' },
     { name: 'Health' },
   ],
@@ -601,6 +602,193 @@ export const openApiSpec = {
           },
         },
         responses: { 200: { description: 'Summary' } },
+      },
+    },
+    '/api/requests': {
+      get: {
+        tags: ['Requests'],
+        summary: "The user's document requests and the files sent to them",
+        security: [{ sessionCookie: [] }],
+        responses: {
+          200: {
+            description: 'Requests, newest first',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    requests: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          id: { type: 'string', format: 'uuid' },
+                          title: { type: 'string' },
+                          message: { type: 'string', nullable: true },
+                          albumId: { type: 'string', nullable: true },
+                          status: { type: 'string', enum: ['open', 'expired', 'closed'] },
+                          createdAt: { type: 'string', format: 'date-time' },
+                          expiresAt: { type: 'string', format: 'date-time' },
+                          files: {
+                            type: 'array',
+                            items: {
+                              type: 'object',
+                              properties: {
+                                id: { type: 'string', format: 'uuid' },
+                                name: { type: 'string' },
+                                contentType: { type: 'string', nullable: true },
+                                sizeBytes: { type: 'integer' },
+                                uploadedAt: { type: 'string', format: 'date-time' },
+                                receivedAt: {
+                                  type: 'string',
+                                  format: 'date-time',
+                                  nullable: true,
+                                  description: 'Set once the app collected it; the server copy is then deleted',
+                                },
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      post: {
+        tags: ['Requests'],
+        summary: 'Create a request and get the link to share',
+        description: [
+          'Vault only (403 otherwise). The link is returned once: only a hash of',
+          'its token is stored. Anyone with the link can send up to 10 files',
+          '(25 MB each, 100 MB in total) until it expires or is closed.',
+        ].join('\n'),
+        security: [{ sessionCookie: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['title'],
+                properties: {
+                  title: { type: 'string', example: 'Declaração de IRS 2025' },
+                  message: { type: 'string', nullable: true },
+                  days: { type: 'integer', minimum: 1, maximum: 30, default: 7 },
+                  albumId: { type: 'string', nullable: true, description: 'Album in the app where the files go' },
+                  language: { type: 'string', enum: ['pt', 'en', 'es', 'fr'], description: 'Language of the upload page' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: 'Created',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string', format: 'uuid' },
+                    url: { type: 'string', example: 'https://all-docs-backend.triplanai.eupasoft.com/r/abc123' },
+                    expiresAt: { type: 'string', format: 'date-time' },
+                  },
+                },
+              },
+            },
+          },
+          403: { description: 'Not on the Vault plan', content: { 'application/json': { schema: error } } },
+        },
+      },
+    },
+    '/api/requests/{id}/close': {
+      post: {
+        tags: ['Requests'],
+        summary: 'Stop accepting files through the link',
+        security: [{ sessionCookie: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { 200: { description: 'Closed' }, 404: { description: 'Not found' } },
+      },
+    },
+    '/api/requests/{id}': {
+      delete: {
+        tags: ['Requests'],
+        summary: 'Delete a request and any files still on the server',
+        security: [{ sessionCookie: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { 200: { description: 'Deleted' }, 404: { description: 'Not found' } },
+      },
+    },
+    '/api/requests/{id}/files/{fileId}': {
+      get: {
+        tags: ['Requests'],
+        summary: 'Download a file that was sent (decrypted)',
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'fileId', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          200: { description: 'The file', content: { 'application/octet-stream': { schema: { type: 'string', format: 'binary' } } } },
+          404: { description: 'Not found' },
+          410: { description: 'Already collected (deleted from the server)' },
+        },
+      },
+    },
+    '/api/requests/{id}/files/{fileId}/received': {
+      post: {
+        tags: ['Requests'],
+        summary: 'The app has the file: delete the server copy',
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'fileId', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        responses: { 200: { description: 'Marked as received' }, 404: { description: 'Not found' } },
+      },
+    },
+    '/r/{token}': {
+      get: {
+        tags: ['Requests'],
+        summary: 'Public upload page for the person asked (HTML)',
+        parameters: [
+          { name: 'token', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          200: { description: 'Upload page', content: { 'text/html': {} } },
+          404: { description: 'Link invalid, expired or closed (HTML page saying so)', content: { 'text/html': {} } },
+        },
+      },
+    },
+    '/r/{token}/files': {
+      post: {
+        tags: ['Requests'],
+        summary: 'Send one file (raw body), used by the upload page',
+        description: [
+          'No account needed: the link token is the permission. The body is the',
+          'file itself; it is stored encrypted (AES-256-GCM) until the app collects it,',
+          'and deleted after 30 days if it never does. PDF, images, Office and text only.',
+          'Error codes: invalid (404), tooBig (413), badType (415), tooMany (429), failed (400).',
+        ].join('\n'),
+        parameters: [
+          { name: 'token', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'name', in: 'query', required: true, schema: { type: 'string', example: 'recibo.pdf' } },
+        ],
+        requestBody: {
+          required: true,
+          content: { 'application/octet-stream': { schema: { type: 'string', format: 'binary' } } },
+        },
+        responses: {
+          200: {
+            description: 'Received',
+            content: { 'application/json': { schema: { type: 'object', properties: { success: { type: 'boolean' } } } } },
+          },
+          413: { description: 'File too large', content: { 'application/json': { schema: error } } },
+        },
       },
     },
     '/api/config/cloud': {

@@ -10,7 +10,6 @@ import '../../common/snapshot_builder.dart';
 import '../../models/models.dart';
 import '../../services/services.dart';
 import '../../theme/app_theme.dart';
-import '../assistant/assistant_screen.dart';
 import '../profile/plans_screen.dart';
 import 'album_detail_screen.dart';
 import 'hidden_albums_screen.dart';
@@ -142,10 +141,6 @@ class _AlbumsScreenState extends State<AlbumsScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            _AssistantBar(
-                              onTap: () => openAssistant(context, _service),
-                            ),
-                            const SizedBox(height: 12),
                             _Collections(
                               snapshot: snapshot,
                               onOpen: _openCollection,
@@ -871,54 +866,6 @@ class _Greeting extends StatelessWidget {
           style: const TextStyle(color: AppTheme.mutedText, fontSize: 13),
         ),
       ],
-    );
-  }
-}
-
-/// The way into the document assistant, shaped like a search field: the
-/// first thing under the greeting.
-class _AssistantBar extends StatelessWidget {
-  const _AssistantBar({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: AppTheme.surface,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: onTap,
-        child: Container(
-          height: 50,
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppTheme.accent.withValues(alpha: 0.35)),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                Icons.auto_awesome_rounded,
-                color: AppTheme.accent,
-                size: 20,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  AppConstants.assistantBar.tr(),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: AppTheme.mutedText),
-                ),
-              ),
-              // Vault's medal, so it's clear where the feature comes from.
-              PlanMedal(plan: PlanCatalog.builtIn.byId(AppPlan.pro), size: 18),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

@@ -39,11 +39,12 @@ class ApiHelpers {
   static Future<http.Response> get(
     String path, {
     Map<String, String>? headers,
+    Duration timeout = ApiBaseUrl.requestTimeout,
   }) {
     return _guardRequest(
       () => http
           .get(Uri.parse('${ApiBaseUrl.baseUrl}$path'), headers: headers)
-          .timeout(ApiBaseUrl.requestTimeout),
+          .timeout(timeout),
       path,
     );
   }

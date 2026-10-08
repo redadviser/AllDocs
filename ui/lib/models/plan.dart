@@ -151,11 +151,7 @@ class PlanCatalog {
         },
       ),
     ],
-    comingSoon: {
-      PlanFeature.deviceSync,
-      PlanFeature.secureSharing,
-      PlanFeature.documentRequests,
-    },
+    comingSoon: {PlanFeature.deviceSync, PlanFeature.secureSharing},
   );
 
   /// The plan with [id], or the free plan for an unknown id.

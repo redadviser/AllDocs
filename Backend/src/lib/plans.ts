@@ -93,7 +93,6 @@ export const PLANS: Plan[] = [
 export const COMING_SOON_FEATURES: PlanFeature[] = [
   'deviceSync',
   'secureSharing',
-  'documentRequests',
 ]
 
 export function isPlanId(value: unknown): value is PlanId {

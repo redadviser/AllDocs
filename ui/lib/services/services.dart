@@ -9,6 +9,7 @@ export 'cloud/cloud_provider.dart';
 export 'cloud/cloud_service.dart';
 export 'current_user.dart';
 export 'document_classifier.dart';
+export 'document_requests_service.dart';
 export 'document_scanner_service.dart';
 export 'document_search.dart';
 export 'document_text_indexer.dart';

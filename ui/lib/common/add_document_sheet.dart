@@ -8,6 +8,7 @@ import 'app_constants.dart';
 import 'app_sheet.dart';
 import 'device_scan_sheet.dart';
 import 'document_import_flow.dart';
+import '../screens/requests/requests_screen.dart';
 import 'sheet_quick_action.dart';
 
 /// The "+ Add" menu: every way a document can get into AllDocs.
@@ -120,6 +121,18 @@ Future<void> showAddDocumentSheet(
                   albumId: albumId,
                   kind: ImportPickKind.zip,
                   allowMultiple: false,
+                ),
+              ),
+            ),
+            _Option(
+              icon: Icons.forward_to_inbox_outlined,
+              title: AppConstants.requestsAsk.tr(),
+              subtitle: AppConstants.requestsAskHint.tr(),
+              onTap: () => run(
+                () => openDocumentRequests(
+                  context,
+                  documentsService,
+                  albumId: albumId,
                 ),
               ),
             ),
