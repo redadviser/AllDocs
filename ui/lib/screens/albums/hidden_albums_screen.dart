@@ -10,10 +10,14 @@ import '../../models/models.dart';
 import '../../services/services.dart';
 import '../../theme/app_theme.dart';
 import '../auth/security_gate.dart';
-import 'album_detail_screen.dart';
+import 'albums_screen.dart';
+
+/// A shelf's name as shown: "Hidden" is named in the app's language.
+String shelfDisplayName(DocumentShelf shelf) =>
+    shelf.isDefaultHidden ? AppConstants.hiddenDefaultShelf.tr() : shelf.name;
 
 /// Asks for the hidden albums' PIN (or has one chosen, the first time),
-/// then opens them.
+/// then opens the hidden shelves.
 Future<void> openHiddenAlbums(
   BuildContext context,
   DocumentsService documentsService,
@@ -26,15 +30,21 @@ Future<void> openHiddenAlbums(
   if (unlocked != true || !context.mounted) return;
   await Navigator.of(context).push(
     MaterialPageRoute(
-      builder: (_) => HiddenAlbumsScreen(documentsService: documentsService),
+      builder: (_) => Scaffold(
+        backgroundColor: AppTheme.background,
+        body: SafeArea(
+          child: AlbumsScreen(documentsService: documentsService, hidden: true),
+        ),
+      ),
     ),
   );
 }
 
-/// Hides [album] behind the hidden-albums PIN (Folio and up; the PIN is
-/// chosen the first time), or puts it back on its shelf. Returns whether it
-/// changed. Showing it again is never gated: nobody loses their albums by
-/// changing plan.
+/// Hides [album] (Folio and up; the PIN is chosen the first time) — onto
+/// the hidden shelf it came from, or "Hidden" — or shows it again: back on
+/// the shelf it came from, or one the user picks if it was made hidden.
+/// Returns whether it moved. Showing is never gated: nobody loses their
+/// albums by changing plan.
 Future<bool> setAlbumHiddenFlow(
   BuildContext context,
   DocumentsService documentsService,
@@ -59,22 +69,72 @@ Future<bool> setAlbumHiddenFlow(
       );
       if (created != true) return false;
     }
+    await documentsService.hideAlbum(album.id);
+    if (context.mounted) {
+      showSnack(context, AppConstants.hiddenHiddenDone.tr());
+    }
+    return true;
   }
-  await documentsService.setAlbumHidden(album.id, hidden);
+
+  var shelfId = await documentsService.unhideDestination(album.id);
+  if (shelfId == null) {
+    if (!context.mounted) return false;
+    shelfId = await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        builder: (_) => _ShelfChooserScreen(
+          documentsService: documentsService,
+          album: album,
+        ),
+      ),
+    );
+    if (shelfId == null) return false;
+  }
+  await documentsService.moveAlbumToShelf(album.id, shelfId);
+  final shelf = (await documentsService.loadSnapshot()).shelfById(shelfId);
   if (context.mounted) {
     showSnack(
       context,
-      (hidden ? AppConstants.hiddenHiddenDone : AppConstants.hiddenUnhiddenDone)
-          .tr(),
+      shelf == null
+          ? AppConstants.hiddenUnhiddenDone.tr()
+          : AppConstants.hiddenMovedTo.tr(
+              namedArgs: {'shelf': shelfDisplayName(shelf)},
+            ),
     );
   }
   return true;
 }
 
-class HiddenAlbumsScreen extends StatelessWidget {
-  const HiddenAlbumsScreen({super.key, required this.documentsService});
+/// Picks the visible shelf an album made on the hidden side goes to (or
+/// starts a new one). Pops with the shelf id.
+class _ShelfChooserScreen extends StatelessWidget {
+  const _ShelfChooserScreen({
+    required this.documentsService,
+    required this.album,
+  });
 
   final DocumentsService documentsService;
+  final DocumentAlbum album;
+
+  Future<void> _newShelf(BuildContext context) async {
+    final name = await showNameDialog(
+      context,
+      title: AppConstants.docshelfNewShelf.tr(),
+      label: AppConstants.docshelfShelfName.tr(),
+      actionLabel: AppConstants.commonCreate.tr(),
+    );
+    if (name == null) return;
+    final before = {
+      for (final shelf in (await documentsService.loadSnapshot()).shelves)
+        shelf.id,
+    };
+    await documentsService.createShelf(name);
+    final created = (await documentsService.loadSnapshot()).shelves
+        .where((shelf) => !before.contains(shelf.id))
+        .firstOrNull;
+    if (created != null && context.mounted) {
+      Navigator.of(context).pop(created.id);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -83,126 +143,102 @@ class HiddenAlbumsScreen extends StatelessWidget {
       body: SafeArea(
         child: SnapshotBuilder(
           documentsService: documentsService,
-          builder: (context, snapshot) {
-            final albums = snapshot.hiddenAlbums;
-            return CustomScrollView(
-              slivers: [
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(4, 8, 16, 8),
-                    child: Row(
-                      children: [
-                        const BackButton(),
-                        const Icon(
-                          Icons.visibility_off_rounded,
-                          color: AppTheme.premium,
-                          size: 22,
-                        ),
-                        const SizedBox(width: 10),
-                        Text(
-                          AppConstants.hiddenTitle.tr(),
-                          style: const TextStyle(
-                            color: AppTheme.text,
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
+          builder: (context, snapshot) => ListView(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+            children: [
+              Row(
+                children: [
+                  const BackButton(),
+                  Expanded(
+                    child: Text(
+                      AppConstants.hiddenChooseShelf.tr(),
+                      style: const TextStyle(
+                        color: AppTheme.text,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
-                ),
-                if (albums.isEmpty)
-                  SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(32),
-                        child: Text(
-                          AppConstants.hiddenEmpty.tr(),
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: AppTheme.mutedText,
-                            height: 1.4,
-                          ),
+                ],
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 4, 8, 16),
+                child: Row(
+                  children: [
+                    Icon(
+                      albumIconFor(album.iconName),
+                      color: Color(album.colorValue),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        AppConstants.hiddenChooseShelfHint.tr(),
+                        style: const TextStyle(
+                          color: AppTheme.mutedText,
+                          height: 1.4,
                         ),
                       ),
                     ),
-                  )
-                else
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-                    sliver: SliverList.separated(
-                      itemCount: albums.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 10),
-                      itemBuilder: (context, index) {
-                        final album = albums[index];
-                        final count = snapshot
-                            .documentsForAlbum(album.id)
-                            .length;
-                        return _HiddenAlbumTile(
-                          album: album,
-                          count: count,
-                          onTap: () => Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => AlbumDetailScreen(
-                                documentsService: documentsService,
-                                albumId: album.id,
-                              ),
-                            ),
-                          ),
-                          onUnhide: () => setAlbumHiddenFlow(
-                            context,
-                            documentsService,
-                            album,
-                            hidden: false,
-                          ),
-                        );
-                      },
-                    ),
-                  ),
+                  ],
+                ),
+              ),
+              for (final shelf in snapshot.shelves) ...[
+                _ShelfOption(
+                  icon: Icons.shelves,
+                  title: shelfDisplayName(shelf),
+                  subtitle: [
+                    for (final album in shelf.albums) album.name,
+                  ].join(' · '),
+                  onTap: () => Navigator.of(context).pop(shelf.id),
+                ),
+                const SizedBox(height: 10),
               ],
-            );
-          },
+              _ShelfOption(
+                icon: Icons.add_rounded,
+                title: AppConstants.docshelfNewShelf.tr(),
+                accent: true,
+                onTap: () => _newShelf(context),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _HiddenAlbumTile extends StatelessWidget {
-  const _HiddenAlbumTile({
-    required this.album,
-    required this.count,
+class _ShelfOption extends StatelessWidget {
+  const _ShelfOption({
+    required this.icon,
+    required this.title,
     required this.onTap,
-    required this.onUnhide,
+    this.subtitle = '',
+    this.accent = false,
   });
 
-  final DocumentAlbum album;
-  final int count;
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool accent;
   final VoidCallback onTap;
-  final VoidCallback onUnhide;
 
   @override
   Widget build(BuildContext context) {
-    final color = Color(album.colorValue);
     return Material(
-      color: AppTheme.surface,
+      color: accent
+          ? AppTheme.accent.withValues(alpha: 0.12)
+          : AppTheme.surface,
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 12, 6, 12),
+          padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
           child: Row(
             children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.18),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(albumIconFor(album.iconName), color: color),
+              Icon(
+                icon,
+                color: accent ? AppTheme.accent : AppTheme.primarySoft,
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -210,28 +246,26 @@ class _HiddenAlbumTile extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      album.name,
-                      style: const TextStyle(
-                        color: AppTheme.text,
+                      title,
+                      style: TextStyle(
+                        color: accent ? AppTheme.accent : AppTheme.text,
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      AppConstants.hiddenCount.tr(
-                        namedArgs: {'count': '$count'},
+                    if (subtitle.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: AppTheme.mutedText),
                       ),
-                      style: const TextStyle(color: AppTheme.mutedText),
-                    ),
+                    ],
                   ],
                 ),
               ),
-              IconButton(
-                tooltip: AppConstants.hiddenUnhide.tr(),
-                icon: const Icon(Icons.visibility_outlined),
-                onPressed: onUnhide,
-              ),
+              const Icon(Icons.chevron_right_rounded, color: AppTheme.dimText),
             ],
           ),
         ),

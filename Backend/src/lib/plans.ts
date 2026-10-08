@@ -94,7 +94,6 @@ export const COMING_SOON_FEATURES: PlanFeature[] = [
   'deviceSync',
   'secureSharing',
   'documentRequests',
-  'aiAssistant',
 ]
 
 export function isPlanId(value: unknown): value is PlanId {

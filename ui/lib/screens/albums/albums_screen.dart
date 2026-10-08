@@ -10,8 +10,10 @@ import '../../common/snapshot_builder.dart';
 import '../../models/models.dart';
 import '../../services/services.dart';
 import '../../theme/app_theme.dart';
+import '../assistant/assistant_screen.dart';
 import '../profile/plans_screen.dart';
 import 'album_detail_screen.dart';
+import 'hidden_albums_screen.dart';
 import 'tags_section.dart';
 
 const double _addAlbumSpineWidth = 30;
@@ -25,9 +27,17 @@ enum _AlbumDisplayMode { classic, modern }
 /// book spines (classic) or cover cards (modern). Long-press a shelf to drag
 /// it, long-press an album and slide sideways to move it along the shelf.
 class AlbumsScreen extends StatefulWidget {
-  const AlbumsScreen({super.key, required this.documentsService});
+  const AlbumsScreen({
+    super.key,
+    required this.documentsService,
+    this.hidden = false,
+  });
 
   final DocumentsService documentsService;
+
+  /// The hidden side (behind its PIN): the same shelves and spines, its own
+  /// shelves and albums, without the greeting and collections.
+  final bool hidden;
 
   @override
   State<AlbumsScreen> createState() => _AlbumsScreenState();
@@ -68,14 +78,37 @@ class _AlbumsScreenState extends State<AlbumsScreen> {
     return SnapshotBuilder(
       documentsService: _service,
       builder: (context, snapshot) {
-        final shelves = snapshot.shelves;
+        final shelves = widget.hidden
+            ? snapshot.hiddenShelves
+            : snapshot.shelves;
         return Column(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 8, 4),
+              padding: EdgeInsets.fromLTRB(widget.hidden ? 4 : 20, 12, 8, 4),
               child: Row(
                 children: [
-                  Expanded(child: _Greeting(profile: snapshot.profile)),
+                  if (widget.hidden) ...[
+                    const BackButton(),
+                    const Icon(
+                      Icons.visibility_off_rounded,
+                      color: AppTheme.premium,
+                      size: 22,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        AppConstants.hiddenTitle.tr(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppTheme.text,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ] else
+                    Expanded(child: _Greeting(profile: snapshot.profile)),
                   IconButton(
                     tooltip: _mode == _AlbumDisplayMode.modern
                         ? AppConstants.albumsClassicView.tr()
@@ -102,24 +135,33 @@ class _AlbumsScreenState extends State<AlbumsScreen> {
               child: ReorderableListView.builder(
                 padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
                 buildDefaultDragHandles: false,
-                header: Padding(
-                  padding: const EdgeInsets.only(bottom: 14),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _Collections(snapshot: snapshot, onOpen: _openCollection),
-                      const SizedBox(height: 14),
-                      TagsSection(
-                        snapshot: snapshot,
-                        documentsService: _service,
-                        onOpenTag: (tag) => _openCollection(
-                          '#$tag',
-                          (snapshot) => documentsWithTag(snapshot, tag),
+                header: widget.hidden
+                    ? null
+                    : Padding(
+                        padding: const EdgeInsets.only(bottom: 14),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _AssistantBar(
+                              onTap: () => openAssistant(context, _service),
+                            ),
+                            const SizedBox(height: 12),
+                            _Collections(
+                              snapshot: snapshot,
+                              onOpen: _openCollection,
+                            ),
+                            const SizedBox(height: 14),
+                            TagsSection(
+                              snapshot: snapshot,
+                              documentsService: _service,
+                              onOpenTag: (tag) => _openCollection(
+                                '#$tag',
+                                (snapshot) => documentsWithTag(snapshot, tag),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ],
-                  ),
-                ),
                 footer: shelves.isEmpty
                     ? Padding(
                         padding: const EdgeInsets.only(top: 48),
@@ -151,9 +193,14 @@ class _AlbumsScreenState extends State<AlbumsScreen> {
                       isFirst: index == 0,
                       isLast: index == shelves.length - 1,
                       onAddAlbum: () => _createAlbum(shelf.id),
-                      onRename: () => _renameShelf(shelf),
+                      // "Hidden" keeps its translated name and stays.
+                      onRename: shelf.isDefaultHidden
+                          ? null
+                          : () => _renameShelf(shelf),
                       onSort: () => _service.sortAlbumsByName(shelf.id),
-                      onDelete: () => _deleteShelf(shelf),
+                      onDelete: shelf.isDefaultHidden
+                          ? null
+                          : () => _deleteShelf(shelf),
                       onOpenAlbum: _openAlbum,
                       onAlbumsReordered: (albumIds) =>
                           _service.reorderAlbums(shelf.id, albumIds),
@@ -211,7 +258,7 @@ class _AlbumsScreenState extends State<AlbumsScreen> {
       actionLabel: AppConstants.commonCreate.tr(),
     );
     if (name == null) return;
-    await _service.createShelf(name);
+    await _service.createShelf(name, hidden: widget.hidden);
   }
 
   Future<void> _renameShelf(DocumentShelf shelf) async {
@@ -229,7 +276,11 @@ class _AlbumsScreenState extends State<AlbumsScreen> {
     final confirmed = await showConfirmDialog(
       context,
       title: AppConstants.docshelfDeleteShelfTitle.tr(),
-      message: AppConstants.docshelfDeleteShelfMessage.tr(),
+      message:
+          (shelf.hidden
+                  ? AppConstants.hiddenDeleteShelfMessage
+                  : AppConstants.docshelfDeleteShelfMessage)
+              .tr(),
       actionLabel: AppConstants.commonDelete.tr(),
     );
     if (confirmed) await _service.deleteShelf(shelf.id);
@@ -257,9 +308,9 @@ class _ShelfWidget extends StatefulWidget {
   final bool isFirst;
   final bool isLast;
   final VoidCallback onAddAlbum;
-  final VoidCallback onRename;
+  final VoidCallback? onRename;
   final VoidCallback onSort;
-  final VoidCallback onDelete;
+  final VoidCallback? onDelete;
   final ValueChanged<DocumentAlbum> onOpenAlbum;
   final ValueChanged<List<String>> onAlbumsReordered;
 
@@ -375,7 +426,7 @@ class _ShelfWidgetState extends State<_ShelfWidget> {
                       children: [
                         Expanded(
                           child: Text(
-                            widget.shelf.name.toUpperCase(),
+                            shelfDisplayName(widget.shelf).toUpperCase(),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
@@ -387,22 +438,24 @@ class _ShelfWidgetState extends State<_ShelfWidget> {
                             ),
                           ),
                         ),
-                        _ShelfIcon(
-                          icon: Icons.edit_outlined,
-                          tooltip: AppConstants.albumsRenameShelf.tr(),
-                          onTap: widget.onRename,
-                        ),
+                        if (widget.onRename case final onRename?)
+                          _ShelfIcon(
+                            icon: Icons.edit_outlined,
+                            tooltip: AppConstants.albumsRenameShelf.tr(),
+                            onTap: onRename,
+                          ),
                         _ShelfIcon(
                           icon: Icons.sort_by_alpha,
                           tooltip: AppConstants.albumsSortByName.tr(),
                           onTap: widget.onSort,
                         ),
-                        _ShelfIcon(
-                          icon: Icons.delete_outline,
-                          tooltip: AppConstants.docshelfDeleteShelf.tr(),
-                          color: AppTheme.destructive,
-                          onTap: widget.onDelete,
-                        ),
+                        if (widget.onDelete case final onDelete?)
+                          _ShelfIcon(
+                            icon: Icons.delete_outline,
+                            tooltip: AppConstants.docshelfDeleteShelf.tr(),
+                            color: AppTheme.destructive,
+                            onTap: onDelete,
+                          ),
                       ],
                     ),
                   ),
@@ -818,6 +871,54 @@ class _Greeting extends StatelessWidget {
           style: const TextStyle(color: AppTheme.mutedText, fontSize: 13),
         ),
       ],
+    );
+  }
+}
+
+/// The way into the document assistant, shaped like a search field: the
+/// first thing under the greeting.
+class _AssistantBar extends StatelessWidget {
+  const _AssistantBar({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppTheme.surface,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Container(
+          height: 50,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppTheme.accent.withValues(alpha: 0.35)),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.auto_awesome_rounded,
+                color: AppTheme.accent,
+                size: 20,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  AppConstants.assistantBar.tr(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: AppTheme.mutedText),
+                ),
+              ),
+              // Vault's medal, so it's clear where the feature comes from.
+              PlanMedal(plan: PlanCatalog.builtIn.byId(AppPlan.pro), size: 18),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

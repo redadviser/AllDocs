@@ -10,6 +10,7 @@ import 'app_sheet.dart';
 import 'bookshelf.dart';
 import 'document_details_sheet.dart';
 import 'document_file_icon.dart';
+import 'assistant_flow.dart';
 import 'document_preview_card.dart';
 import 'pdf_tools_flow.dart';
 import 'sheet_quick_action.dart';
@@ -206,6 +207,25 @@ Future<void> showDocumentActions(
                   ]),
                 ),
               ),
+              if (AssistantService.canRead(document)) ...[
+                _Action(
+                  icon: Icons.auto_awesome_outlined,
+                  label: AppConstants.assistantSummarize.tr(),
+                  onTap: () =>
+                      run(() => summarizeWithAssistant(context, document)),
+                ),
+                _Action(
+                  icon: Icons.fact_check_outlined,
+                  label: AppConstants.assistantExtract.tr(),
+                  onTap: () => run(
+                    () => extractWithAssistant(
+                      context,
+                      documentsService,
+                      document,
+                    ),
+                  ),
+                ),
+              ],
               if (isPdfDocument(document) ||
                   document.type == DocumentType.image)
                 _Action(

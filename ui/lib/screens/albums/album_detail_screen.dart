@@ -299,9 +299,13 @@ class AlbumDetailScreen extends StatelessWidget {
     final confirmed = await showConfirmDialog(
       context,
       title: AppConstants.docshelfDeleteAlbumTitle.tr(),
-      message: AppConstants.docshelfDeleteAlbumMessage.tr(
-        namedArgs: {'name': album.name},
-      ),
+      // Deleting a hidden album puts its documents back in plain sight;
+      // say so before it happens.
+      message:
+          (album.hidden
+                  ? AppConstants.hiddenDeleteAlbumMessage
+                  : AppConstants.docshelfDeleteAlbumMessage)
+              .tr(namedArgs: {'name': album.name}),
       actionLabel: AppConstants.commonDelete.tr(),
     );
     if (confirmed) await documentsService.deleteAlbum(album.id);

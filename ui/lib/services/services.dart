@@ -2,6 +2,7 @@ export 'adapty_service.dart';
 export 'api_base_url.dart';
 export 'api_helpers.dart';
 export 'app_settings.dart';
+export 'assistant_service.dart';
 export 'auth_service.dart';
 export 'backup_service.dart';
 export 'cloud/cloud_provider.dart';

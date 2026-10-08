@@ -16,10 +16,13 @@ class ApiHelpers {
     };
   }
 
+  /// [timeout] for the few calls that take longer than the usual
+  /// request (the document assistant thinks before it answers).
   static Future<http.Response> post(
     String path, {
     Map<String, String>? headers,
     Object? body,
+    Duration timeout = ApiBaseUrl.requestTimeout,
   }) {
     return _guardRequest(
       () => http
@@ -28,7 +31,7 @@ class ApiHelpers {
             headers: headers,
             body: body,
           )
-          .timeout(ApiBaseUrl.requestTimeout),
+          .timeout(timeout),
       path,
     );
   }

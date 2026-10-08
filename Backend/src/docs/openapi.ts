@@ -54,6 +54,7 @@ export const openApiSpec = {
     { name: 'Auth', description: 'AllDocs accounts and sessions' },
     { name: 'Devices', description: 'Signed-in devices (sessions) of the current user' },
     { name: 'Plans', description: 'Subscription plans (Pocket, Folio, Vault), bought through Adapty' },
+    { name: 'Assistant', description: 'Document assistant (Vault plan), powered by Claude' },
     { name: 'Config', description: 'Public app configuration' },
     { name: 'Health' },
   ],
@@ -464,6 +465,142 @@ export const openApiSpec = {
           401: { description: 'Wrong or missing Authorization header', content: { 'application/json': { schema: error } } },
           500: { description: 'Processing failed (Adapty retries)', content: { 'application/json': { schema: error } } },
         },
+      },
+    },
+    '/api/assistant/usage': {
+      get: {
+        tags: ['Assistant'],
+        summary: "This month's assistant requests and allowance",
+        security: [{ sessionCookie: [] }],
+        responses: {
+          200: {
+            description: 'Usage',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    used: { type: 'integer' },
+                    limit: { type: 'integer' },
+                    month: { type: 'string', example: '2026-10' },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    '/api/assistant/ask': {
+      post: {
+        tags: ['Assistant'],
+        summary: 'Answer a question from a few documents',
+        description: [
+          'The app picks the documents that match the question on the phone and',
+          'sends only their text (at most 6 documents, 24,000 characters each,',
+          '80,000 in total). Only the monthly request count is stored.',
+          'Errors: 403 not on Vault, 429 allowance used up, 413 too much text,',
+          '422 the model declined, 502/503 the assistant is unavailable.',
+        ].join('\n'),
+        security: [{ sessionCookie: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['question', 'documents'],
+                properties: {
+                  question: { type: 'string', example: 'Quando expira o seguro do carro?' },
+                  language: { type: 'string', enum: ['pt', 'en', 'es', 'fr'] },
+                  documents: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      required: ['id', 'text'],
+                      properties: {
+                        id: { type: 'string' },
+                        title: { type: 'string' },
+                        text: { type: 'string' },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: 'Answer',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    answer: { type: 'string' },
+                    source_ids: { type: 'array', items: { type: 'string' } },
+                    found: { type: 'boolean' },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    '/api/assistant/extract': {
+      post: {
+        tags: ['Assistant'],
+        summary: "A document's details (type, title, tags, holder, dates, NIF, IBAN, policy, amount)",
+        security: [{ sessionCookie: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['document'],
+                properties: {
+                  language: { type: 'string', enum: ['pt', 'en', 'es', 'fr'] },
+                  document: {
+                    type: 'object',
+                    required: ['id', 'text'],
+                    properties: { id: { type: 'string' }, title: { type: 'string' }, text: { type: 'string' } },
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: { 200: { description: 'Fields; null where the document does not say' } },
+      },
+    },
+    '/api/assistant/summarize': {
+      post: {
+        tags: ['Assistant'],
+        summary: 'A contract in plain words: summary, key points, what to watch out for, dates',
+        security: [{ sessionCookie: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['document'],
+                properties: {
+                  language: { type: 'string', enum: ['pt', 'en', 'es', 'fr'] },
+                  document: {
+                    type: 'object',
+                    required: ['id', 'text'],
+                    properties: { id: { type: 'string' }, title: { type: 'string' }, text: { type: 'string' } },
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: { 200: { description: 'Summary' } },
       },
     },
     '/api/config/cloud': {

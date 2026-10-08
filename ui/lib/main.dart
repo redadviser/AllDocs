@@ -12,10 +12,9 @@ import 'services/cloud_keys.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   LicenseRegistry.addLicense(() async* {
-    yield LicenseEntryWithLineBreaks(
-      const ['Figtree'],
-      await rootBundle.loadString('assets/fonts/figtree/OFL.txt'),
-    );
+    yield LicenseEntryWithLineBreaks(const [
+      'Figtree',
+    ], await rootBundle.loadString('assets/fonts/figtree/OFL.txt'));
   });
   await EasyLocalization.ensureInitialized();
   await AppSettings.load();

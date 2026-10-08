@@ -72,4 +72,14 @@ CREATE TABLE IF NOT EXISTS subscription_events (
 
 CREATE INDEX IF NOT EXISTS idx_subscription_events_user ON subscription_events (user_id, received_at DESC);
 
+-- Document assistant (Vault): requests per account per month (YYYY-MM),
+-- for the fair-use allowance. No question or document text is stored.
+CREATE TABLE IF NOT EXISTS assistant_usage (
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  month TEXT NOT NULL,
+  requests INTEGER NOT NULL DEFAULT 0,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (user_id, month)
+);
+
 COMMIT;

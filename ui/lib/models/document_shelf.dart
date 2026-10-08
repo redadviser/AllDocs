@@ -6,12 +6,21 @@ class DocumentShelf {
     required this.name,
     required this.position,
     required this.albums,
+    this.hidden = false,
+    this.isDefaultHidden = false,
   });
 
   final String id;
   final String name;
   final int position;
   final List<DocumentAlbum> albums;
+
+  /// On the hidden side, behind the hidden albums' PIN.
+  final bool hidden;
+
+  /// The hidden side's own shelf ("Hidden"): always there, can't be renamed
+  /// or deleted, and its name follows the app's language.
+  final bool isDefaultHidden;
 
   DocumentShelf copyWith({
     String? id,
@@ -24,6 +33,8 @@ class DocumentShelf {
       name: name ?? this.name,
       position: position ?? this.position,
       albums: albums ?? this.albums,
+      hidden: hidden,
+      isDefaultHidden: isDefaultHidden,
     );
   }
 
@@ -40,6 +51,8 @@ class DocumentShelf {
                 .map(DocumentAlbum.fromJson)
                 .toList()
           : [],
+      hidden: json['hidden'] == true,
+      isDefaultHidden: json['default_hidden'] == true,
     );
   }
 
@@ -49,6 +62,8 @@ class DocumentShelf {
       'name': name,
       'position': position,
       'albums': albums.map((album) => album.toJson()).toList(),
+      if (hidden) 'hidden': true,
+      if (isDefaultHidden) 'default_hidden': true,
     };
   }
 }

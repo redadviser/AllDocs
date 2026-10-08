@@ -254,7 +254,9 @@ class DocumentsService {
 
   // Organization ----------------------------------------------------------
 
-  Future<void> createShelf(String name) => _mutate(_store.createShelf(name));
+  Future<void> createShelf(String name, {bool hidden = false}) {
+    return _mutate(_store.createShelf(name, hidden: hidden));
+  }
 
   Future<void> ensureStarterShelf(
     String shelfName,
@@ -299,8 +301,14 @@ class DocumentsService {
     );
   }
 
-  Future<void> setAlbumHidden(String albumId, bool hidden) {
-    return _mutate(_store.setAlbumHidden(albumId, hidden));
+  Future<void> hideAlbum(String albumId) => _mutate(_store.hideAlbum(albumId));
+
+  Future<String?> unhideDestination(String albumId) {
+    return _store.unhideDestination(albumId);
+  }
+
+  Future<void> moveAlbumToShelf(String albumId, String shelfId) {
+    return _mutate(_store.moveAlbumToShelf(albumId, shelfId));
   }
 
   Future<void> reorderShelves(List<String> shelfIds) {
@@ -359,6 +367,7 @@ class DocumentsService {
     List<String>? tags,
     bool? isFavorite,
     List<String>? albumIds,
+    DateTime? validityDate,
   }) {
     return _mutate(
       _store.updateDocument(
@@ -367,6 +376,7 @@ class DocumentsService {
         tags: tags,
         isFavorite: isFavorite,
         albumIds: albumIds,
+        validityDate: validityDate,
       ),
     );
   }

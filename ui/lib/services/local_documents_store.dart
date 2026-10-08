@@ -719,7 +719,11 @@ class LocalDocumentsStore {
     } else {
       final key = normalizeForSearch(shelfName);
       final shelf = _shelvesList(state)
-          .where((s) => normalizeForSearch(s['name']?.toString() ?? '') == key)
+          .where(
+            (s) =>
+                s['hidden'] != true &&
+                normalizeForSearch(s['name']?.toString() ?? '') == key,
+          )
           .firstOrNull;
       if (shelf != null) {
         final existing = {
@@ -754,7 +758,7 @@ class LocalDocumentsStore {
     );
   }
 
-  Future<void> createShelf(String name) async {
+  Future<void> createShelf(String name, {bool hidden = false}) async {
     final normalized = name.trim();
     if (normalized.isEmpty) return;
 
@@ -766,6 +770,7 @@ class LocalDocumentsStore {
         name: normalized,
         position: shelves.length,
         albums: const [],
+        hidden: hidden,
       ).toJson(),
     );
     await _writeState(state);
@@ -776,7 +781,7 @@ class LocalDocumentsStore {
     if (normalized.isEmpty) return;
     final state = await _readState();
     final shelf = _findShelf(state, shelfId);
-    if (shelf == null) return;
+    if (shelf == null || shelf['default_hidden'] == true) return;
     shelf['name'] = normalized;
     await _writeState(state);
   }
@@ -795,8 +800,15 @@ class LocalDocumentsStore {
 
     final state = await _readState();
     var shelf = shelfId == null ? null : _findShelf(state, shelfId);
+    if (shelf == null && shelfId == defaultHiddenShelfId) {
+      shelf = _defaultHiddenShelf(state);
+    }
     if (shelf == null) {
-      final shelves = _shelvesList(state);
+      // Only ever a visible shelf: an album made without saying where must
+      // not end up hidden.
+      final shelves = _shelvesList(
+        state,
+      ).where((shelf) => shelf['hidden'] != true).toList();
       if (shelves.isNotEmpty) {
         shelf = shelves.first;
       } else {
@@ -843,28 +855,109 @@ class LocalDocumentsStore {
     await _writeState(state);
   }
 
-  /// Moves an album behind (or back out from) the hidden-albums PIN.
-  Future<void> setAlbumHidden(String albumId, bool hidden) async {
+  /// The hidden side's own shelf; every hidden album without a better
+  /// place goes here.
+  static const defaultHiddenShelfId = 'shelf-hidden';
+
+  Map<String, dynamic> _defaultHiddenShelf(Map<String, dynamic> state) {
+    final existing = _findShelf(state, defaultHiddenShelfId);
+    if (existing != null) return existing;
+    final shelf = DocumentShelf(
+      id: defaultHiddenShelfId,
+      name: '',
+      position: _shelvesRaw(state).length,
+      albums: const [],
+      hidden: true,
+      isDefaultHidden: true,
+    ).toJson();
+    _shelvesRaw(state).add(shelf);
+    return shelf;
+  }
+
+  /// Moves an album to [target]. Crossing between the visible and hidden
+  /// side, it remembers the shelf it left, to go back there next time.
+  void _moveAlbum(
+    Map<String, dynamic> state,
+    String albumId,
+    Map<String, dynamic> target,
+  ) {
+    for (final source in _shelvesList(state)) {
+      final albums = _albumsRaw(source);
+      final index = albums.indexWhere(
+        (album) => album is Map && album['id']?.toString() == albumId,
+      );
+      if (index < 0) continue;
+      if (identical(source, target)) return;
+      final album = Map<String, dynamic>.from(albums.removeAt(index) as Map);
+      if ((source['hidden'] == true) != (target['hidden'] == true)) {
+        album['return_shelf_id'] = source['id'];
+      }
+      album['shelf_id'] = target['id'];
+      _albumsRaw(target).add(album);
+      _reindexAlbums(source);
+      _reindexAlbums(target);
+      return;
+    }
+  }
+
+  /// Hides an album: back onto the hidden shelf it came from if that still
+  /// exists, otherwise onto "Hidden".
+  Future<void> hideAlbum(String albumId) async {
     final state = await _readState();
     final album = _findAlbum(state, albumId);
     if (album == null) return;
-    if (hidden) {
-      album['hidden'] = true;
-    } else {
-      album.remove('hidden');
+    final back = album['return_shelf_id']?.toString();
+    var target = back == null ? null : _findShelf(state, back);
+    if (target == null || target['hidden'] != true) {
+      target = _defaultHiddenShelf(state);
     }
+    _moveAlbum(state, albumId, target);
     await _writeState(state);
   }
 
+  /// Where a hidden album goes when shown again: the visible shelf it came
+  /// from, if it still exists. Null when it has none (it was made on the
+  /// hidden side) — the user picks one.
+  Future<String?> unhideDestination(String albumId) async {
+    final state = await _readState();
+    final back = _findAlbum(state, albumId)?['return_shelf_id']?.toString();
+    final shelf = back == null ? null : _findShelf(state, back);
+    if (shelf == null || shelf['hidden'] == true) return null;
+    return back;
+  }
+
+  Future<void> moveAlbumToShelf(String albumId, String shelfId) async {
+    final state = await _readState();
+    final target = shelfId == defaultHiddenShelfId
+        ? _defaultHiddenShelf(state)
+        : _findShelf(state, shelfId);
+    if (target == null) return;
+    _moveAlbum(state, albumId, target);
+    await _writeState(state);
+  }
+
+  /// Reorders the shelves in [shelfIds] among themselves; shelves not
+  /// listed (the other side's) keep their places.
   Future<void> reorderShelves(List<String> shelfIds) async {
     final state = await _readState();
     final shelves = _shelvesRaw(state);
-    int rank(dynamic shelf) {
-      final index = shelfIds.indexOf((shelf as Map)['id']?.toString() ?? '');
-      return index < 0 ? shelfIds.length : index;
+    final slots = <int>[];
+    final moving = <dynamic>[];
+    for (var i = 0; i < shelves.length; i++) {
+      final id = (shelves[i] as Map)['id']?.toString() ?? '';
+      if (shelfIds.contains(id)) {
+        slots.add(i);
+        moving.add(shelves[i]);
+      }
     }
-
-    shelves.sort((a, b) => rank(a).compareTo(rank(b)));
+    moving.sort((a, b) {
+      final aId = (a as Map)['id']?.toString() ?? '';
+      final bId = (b as Map)['id']?.toString() ?? '';
+      return shelfIds.indexOf(aId).compareTo(shelfIds.indexOf(bId));
+    });
+    for (var i = 0; i < slots.length; i++) {
+      shelves[slots[i]] = moving[i];
+    }
     _reindexShelves(state);
     await _writeState(state);
   }
@@ -904,12 +997,29 @@ class LocalDocumentsStore {
       return shelf is Map && shelf['id']?.toString() == shelfId;
     });
     if (index < 0) return;
+    final raw = shelves[index] as Map;
+    if (raw['default_hidden'] == true) return;
 
-    final shelf = Map<String, dynamic>.from(shelves.removeAt(index) as Map);
-    final albumIds = _albumsList(shelf)
-        .map((album) => album['id']?.toString() ?? '')
-        .where((id) => id.isNotEmpty)
-        .toSet();
+    // A hidden shelf's albums stay hidden, on "Hidden": deleting the shelf
+    // must never put their documents back in the gallery.
+    if (raw['hidden'] == true) {
+      final fallback = _defaultHiddenShelf(state);
+      for (final album in _albumsList(Map<String, dynamic>.from(raw))) {
+        album['shelf_id'] = defaultHiddenShelfId;
+        _albumsRaw(fallback).add(album);
+      }
+      _reindexAlbums(fallback);
+    }
+
+    final shelf = Map<String, dynamic>.from(
+      shelves.removeAt(shelves.indexOf(raw)) as Map,
+    );
+    final albumIds = shelf['hidden'] == true
+        ? <String>{}
+        : _albumsList(shelf)
+              .map((album) => album['id']?.toString() ?? '')
+              .where((id) => id.isNotEmpty)
+              .toSet();
     _moveAlbumDocumentsToInbox(state, albumIds);
     _reindexShelves(state);
     await _writeState(state);
@@ -1032,6 +1142,7 @@ class LocalDocumentsStore {
     List<String>? tags,
     bool? isFavorite,
     List<String>? albumIds,
+    DateTime? validityDate,
   }) async {
     final state = await _readState();
     if (albumIds != null) _setAlbums(state, documentId, albumIds);
@@ -1040,9 +1151,16 @@ class LocalDocumentsStore {
         title: title == null || title.trim().isEmpty ? null : title.trim(),
         tags: tags == null ? null : _normalizeTags(tags),
         isFavorite: isFavorite,
+        validityDate: validityDate,
       );
     });
     if (changed || albumIds != null) await _writeState(state);
+    if (validityDate != null) {
+      final raw = _findDocument(state, documentId);
+      if (raw != null) {
+        unawaited(_syncReminderBestEffort(DocumentFile.fromJson(raw)));
+      }
+    }
   }
 
   Future<void> renameDocument(String documentId, String title) {
@@ -1796,15 +1914,41 @@ class LocalDocumentsStore {
             .toList()
           ..sort((a, b) => a.position.compareTo(b.position));
 
-    // Hidden albums and every document in one (even if it's also in a
-    // visible album) are left out of everything below — shelves, gallery,
-    // search, recents, suggestions — and only offered behind their PIN.
-    final hiddenAlbums = [
+    // Hidden shelves, their albums and every document in one (even if it's
+    // also in a visible album) are left out of everything below — shelves,
+    // gallery, search, recents, suggestions — and only offered behind
+    // their PIN. "Hidden" is always there, first, even before it's stored.
+    final hiddenShelves = [
       for (final shelf in allShelves)
-        for (final album in shelf.albums)
-          if (album.hidden) album,
+        if (shelf.hidden)
+          shelf.copyWith(
+            albums: [
+              for (final album in shelf.albums) album.copyWith(hidden: true),
+            ],
+          ),
     ];
-    final hiddenAlbumIds = {for (final album in hiddenAlbums) album.id};
+    if (!hiddenShelves.any((shelf) => shelf.isDefaultHidden)) {
+      hiddenShelves.add(
+        const DocumentShelf(
+          id: defaultHiddenShelfId,
+          name: '',
+          position: 0,
+          albums: [],
+          hidden: true,
+          isDefaultHidden: true,
+        ),
+      );
+    }
+    hiddenShelves.sort((a, b) {
+      if (a.isDefaultHidden != b.isDefaultHidden) {
+        return a.isDefaultHidden ? -1 : 1;
+      }
+      return a.position.compareTo(b.position);
+    });
+    final hiddenAlbumIds = {
+      for (final shelf in hiddenShelves)
+        for (final album in shelf.albums) album.id,
+    };
     bool isHidden(DocumentFile document) =>
         document.albumIds.any(hiddenAlbumIds.contains);
     final allDocuments = everyDocument.where((d) => !isHidden(d)).toList();
@@ -1820,9 +1964,7 @@ class LocalDocumentsStore {
 
     final shelves = [
       for (final shelf in allShelves)
-        shelf.copyWith(
-          albums: shelf.albums.where((album) => !album.hidden).toList(),
-        ),
+        if (!shelf.hidden) shelf,
     ];
 
     // One pass to count documents per album, instead of the album loop
@@ -1909,7 +2051,7 @@ class LocalDocumentsStore {
       trashDocuments: trashDocuments,
       tags: tags,
       suggestions: suggestions,
-      hiddenAlbums: hiddenAlbums,
+      hiddenShelves: hiddenShelves,
       hiddenDocuments: hiddenDocuments,
       // Overwritten with the real signed-in user's name/email/plan by
       // DocumentsService.loadSnapshot() — these are just the fallback values

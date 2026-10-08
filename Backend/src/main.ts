@@ -10,6 +10,7 @@ import { configRouter } from './modules/config/config.routes'
 import { passwordRouter, resetPageRouter } from './modules/password/password.routes'
 import { devicesRouter } from './modules/devices/devices.routes'
 import { adaptyWebhookRouter, plansRouter } from './modules/plans/plans.routes'
+import { assistantRouter } from './modules/assistant/assistant.routes'
 
 const app = express()
 
@@ -53,6 +54,7 @@ app.use('/api/config', configRouter)
 app.use('/api/devices', devicesRouter)
 app.use('/api/plans', plansRouter)
 app.use('/api/adapty', adaptyWebhookRouter)
+app.use('/api/assistant', assistantRouter)
 
 app.use((_req, res) => {
   res.status(404).json({ error: 'Not found' })

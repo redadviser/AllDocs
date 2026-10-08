@@ -9,6 +9,7 @@ class DocumentAlbum {
     required this.documentIds,
     this.coverDocumentId,
     this.hidden = false,
+    this.returnShelfId,
   });
 
   final String id;
@@ -20,9 +21,14 @@ class DocumentAlbum {
   final List<String> documentIds;
   final String? coverDocumentId;
 
-  /// Kept out of the shelves, gallery and search; opened from "Hidden
-  /// albums" with its own PIN.
+  /// On a hidden shelf: kept out of the shelves, gallery and search, and
+  /// opened from "Hidden albums" with its own PIN. Set from the shelf when
+  /// the library is read; not stored.
   final bool hidden;
+
+  /// The shelf it was on before last crossing between the visible and the
+  /// hidden side — where it goes back to when it crosses again.
+  final String? returnShelfId;
 
   int get documentCount => documentIds.length;
 
@@ -36,6 +42,7 @@ class DocumentAlbum {
     List<String>? documentIds,
     String? coverDocumentId,
     bool? hidden,
+    String? returnShelfId,
   }) {
     return DocumentAlbum(
       id: id ?? this.id,
@@ -47,6 +54,7 @@ class DocumentAlbum {
       documentIds: documentIds ?? this.documentIds,
       coverDocumentId: coverDocumentId ?? this.coverDocumentId,
       hidden: hidden ?? this.hidden,
+      returnShelfId: returnShelfId ?? this.returnShelfId,
     );
   }
 
@@ -64,7 +72,7 @@ class DocumentAlbum {
       position: json['position'] is int ? json['position'] as int : 0,
       documentIds: ids is List ? ids.map((id) => id.toString()).toList() : [],
       coverDocumentId: json['cover_document_id']?.toString(),
-      hidden: json['hidden'] == true,
+      returnShelfId: json['return_shelf_id']?.toString(),
     );
   }
 
@@ -78,7 +86,7 @@ class DocumentAlbum {
       'position': position,
       'document_ids': documentIds,
       'cover_document_id': coverDocumentId,
-      if (hidden) 'hidden': true,
+      if (returnShelfId != null) 'return_shelf_id': returnShelfId,
     };
   }
 }

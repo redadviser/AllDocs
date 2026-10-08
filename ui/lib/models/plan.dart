@@ -155,7 +155,6 @@ class PlanCatalog {
       PlanFeature.deviceSync,
       PlanFeature.secureSharing,
       PlanFeature.documentRequests,
-      PlanFeature.aiAssistant,
     },
   );
 
