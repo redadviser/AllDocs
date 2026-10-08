@@ -70,7 +70,7 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-	<!-- OAuth redirects: OneDrive/Dropbox sign-in (flutter_appauth, must
+	<!-- OAuth redirects: Dropbox sign-in (flutter_appauth, must
 	     match CloudConfig.redirectUri) and Google Sign-In / Drive (the
 	     reversed iOS client id, set in Flutter/CloudKeys.xcconfig). -->
 	<key>CFBundleURLTypes</key>
@@ -88,5 +88,7 @@
 			</array>
 		</dict>
 	</array>
+	<key>UIStatusBarHidden</key>
+	<false/>
 </dict>
 </plist>

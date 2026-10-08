@@ -132,7 +132,6 @@ class _GalleryScreenState extends State<GalleryScreen> {
                           ),
                         )
                       : _Header(
-                          profile: snapshot.profile,
                           archivedCount:
                               snapshot.archivedDocuments.length +
                               snapshot.trashDocuments.length,
@@ -551,46 +550,27 @@ class _GalleryScreenState extends State<GalleryScreen> {
 
 class _Header extends StatelessWidget {
   const _Header({
-    required this.profile,
     required this.archivedCount,
     required this.onOpenArchive,
     required this.onOpenClouds,
   });
 
-  final UserProfile profile;
   final int archivedCount;
   final VoidCallback onOpenArchive;
   final VoidCallback onOpenClouds;
 
   @override
   Widget build(BuildContext context) {
-    final firstName = profile.name.trim().split(RegExp(r'\s+')).first;
     return Row(
       children: [
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                firstName.isEmpty
-                    ? AppConstants.galleryHello.tr()
-                    : AppConstants.galleryHelloName.tr(
-                        namedArgs: {'name': firstName},
-                      ),
-                style: const TextStyle(
-                  color: AppTheme.text,
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                AppConstants.galleryDocumentsCount.tr(
-                  namedArgs: {'count': '${profile.documentsCount}'},
-                ),
-                style: const TextStyle(color: AppTheme.mutedText, fontSize: 13),
-              ),
-            ],
+          child: Text(
+            AppConstants.navGallery.tr(),
+            style: const TextStyle(
+              color: AppTheme.text,
+              fontSize: 24,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ),
         IconButton.filledTonal(

@@ -10,9 +10,11 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/device_session.dart';
+import 'adapty_service.dart';
 import 'api_helpers.dart';
 import 'google_auth_config.dart';
 import 'local_mode_config.dart';
+import 'plan_service.dart';
 
 class _GoogleIdToken {
   const _GoogleIdToken({
@@ -64,6 +66,7 @@ class AuthService {
   static const _displayNameKey = 'auth.display_name.v1';
   static const _emailKey = 'auth.email.v1';
   static const _planKey = 'auth.plan.v1';
+  static const _userIdKey = 'auth.user_id.v1';
   static const _avatarUrlKey = 'auth.avatar_url.v1';
   static const _deviceIdKey = 'auth.device_id.v1';
 
@@ -91,6 +94,49 @@ class AuthService {
   static Future<String?> plan() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_planKey);
+  }
+
+  /// Keeps the cached plan in step after the backend reports a new one
+  /// (a purchase, a renewal, an expiry).
+  static Future<void> setPlan(String plan) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_planKey, plan);
+  }
+
+  /// The AllDocs account id (what store purchases are tied to). Null in
+  /// local-only mode, and for sessions from before it was stored until
+  /// [refreshAccount] has run once.
+  static Future<String?> userId() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_userIdKey);
+  }
+
+  /// Re-reads the account from the backend (id, plan) — for sessions that
+  /// predate a cached field, and to pick up a plan changed elsewhere.
+  /// Returns false when the server can't be asked; the session stays.
+  static Future<bool> refreshAccount() async {
+    if (LocalModeConfig.isLocalOnly) return false;
+    final token = await tokenStore.read();
+    if (token == null) return false;
+    try {
+      final res = await ApiHelpers.get(
+        '/api/auth/me',
+        headers: ApiHelpers.headersWithToken(token),
+      );
+      if (res.statusCode != 200) return false;
+      final user = (jsonDecode(res.body) as Map<String, dynamic>)['user'];
+      if (user is! Map<String, dynamic>) return false;
+      final prefs = await SharedPreferences.getInstance();
+      final id = user['id']?.toString();
+      final plan = user['plan']?.toString();
+      if (id != null && id.isNotEmpty) await prefs.setString(_userIdKey, id);
+      if (plan != null && plan.isNotEmpty) {
+        await prefs.setString(_planKey, plan);
+      }
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   /// The signed-in user's photo — the Google account picture for Google
@@ -275,11 +321,16 @@ class AuthService {
       await tokenStore.delete();
     }
 
+    // Purchases on this phone stop being tied to the account.
+    await AdaptyService.logout();
+    PlanService.onSignedOut();
+
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_signedInKey);
     await prefs.remove(_displayNameKey);
     await prefs.remove(_emailKey);
     await prefs.remove(_planKey);
+    await prefs.remove(_userIdKey);
     await prefs.remove(_avatarUrlKey);
   }
 
@@ -380,6 +431,7 @@ class AuthService {
     var email = fallbackEmail;
     var name = _resolveName(fallbackEmail, fallbackName);
     String? plan;
+    String? userId;
     var avatarUrl = fallbackAvatarUrl;
 
     try {
@@ -392,6 +444,7 @@ class AuthService {
           name = serverName.trim();
         }
         plan = user['plan']?.toString();
+        userId = user['id']?.toString();
         final serverAvatarUrl = user['avatarUrl']?.toString();
         if (serverAvatarUrl != null && serverAvatarUrl.isNotEmpty) {
           avatarUrl = serverAvatarUrl;
@@ -405,6 +458,9 @@ class AuthService {
     await prefs.setString(_displayNameKey, name);
     await prefs.setString(_emailKey, email);
     if (plan != null) await prefs.setString(_planKey, plan);
+    if (userId != null && userId.isNotEmpty) {
+      await prefs.setString(_userIdKey, userId);
+    }
     if (avatarUrl != null && avatarUrl.isNotEmpty) {
       await prefs.setString(_avatarUrlKey, avatarUrl);
     }

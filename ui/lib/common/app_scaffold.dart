@@ -26,20 +26,40 @@ class MainNavScreen extends StatefulWidget {
 class _MainNavScreenState extends State<MainNavScreen> {
   final DocumentsService _documentsService = DocumentsService.local();
   StreamSubscription<List<SharedMediaFile>>? _shareSubscription;
-  int _selectedIndex = 0;
+  // Tab order: the bookshelf first (the app opens on it), then the gallery
+  // and the profile.
+  static const _shelfTab = 0;
+  static const _galleryTab = 1;
+  int _selectedIndex = _shelfTab;
 
   @override
   void initState() {
     super.initState();
     _listenForSharedFiles();
-    // A new account starts with a "Personal" shelf (Contracts, Invoices)
-    // instead of an empty Albums tab.
+    // A new account starts with a "Personal" shelf (Contracts, Invoices,
+    // Identification) instead of an empty shelf tab.
     unawaited(
-      _documentsService
-          .ensureStarterShelf(AppConstants.albumsDefaultShelf.tr(), [
-            (name: AppConstants.albumNameContract.tr(), iconName: 'work'),
-            (name: AppConstants.albumNameInvoice.tr(), iconName: 'receipt'),
-          ]),
+      _documentsService.ensureStarterShelf(
+        AppConstants.albumsDefaultShelf.tr(),
+        [
+          (
+            name: AppConstants.albumNameContract.tr(),
+            iconName: 'work',
+            since: 1,
+          ),
+          (
+            name: AppConstants.albumNameInvoice.tr(),
+            iconName: 'receipt',
+            since: 1,
+          ),
+          // Passport, citizen card, driving licence...
+          (
+            name: AppConstants.albumNameIdentity.tr(),
+            iconName: 'person',
+            since: 2,
+          ),
+        ],
+      ),
     );
     // Daily cloud backup when enabled (silent, best-effort).
     unawaited(
@@ -90,7 +110,7 @@ class _MainNavScreenState extends State<MainNavScreen> {
     await SecurityGate.whenUnlocked();
     await WidgetsBinding.instance.endOfFrame;
     if (!mounted) return;
-    setState(() => _selectedIndex = 0);
+    setState(() => _selectedIndex = _galleryTab);
     await importIncomingFiles(context, _documentsService, paths);
   }
 
@@ -107,12 +127,12 @@ class _MainNavScreenState extends State<MainNavScreen> {
       ]),
       builder: (context, child) {
         final screens = [
+          AlbumsScreen(documentsService: _documentsService),
           GalleryScreen(
             documentsService: _documentsService,
             onOpenArchive: _openArchive,
             onOpenCloud: _openCloud,
           ),
-          AlbumsScreen(documentsService: _documentsService),
           ProfileScreen(documentsService: _documentsService),
         ];
 
@@ -132,20 +152,17 @@ class _MainNavScreenState extends State<MainNavScreen> {
             labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
             destinations: [
               NavigationDestination(
+                icon: const Icon(Icons.shelves),
+                selectedIcon: Icon(Icons.shelves, color: AppTheme.accent),
+                label: AppConstants.navShelf.tr(),
+              ),
+              NavigationDestination(
                 icon: const Icon(Icons.grid_view_outlined),
                 selectedIcon: Icon(
                   Icons.grid_view_rounded,
                   color: AppTheme.accent,
                 ),
                 label: AppConstants.navGallery.tr(),
-              ),
-              NavigationDestination(
-                icon: const Icon(Icons.folder_outlined),
-                selectedIcon: Icon(
-                  Icons.folder_rounded,
-                  color: AppTheme.accent,
-                ),
-                label: AppConstants.navAlbums.tr(),
               ),
               NavigationDestination(
                 icon: const Icon(Icons.person_outline_rounded),

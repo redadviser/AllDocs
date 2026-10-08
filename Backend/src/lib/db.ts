@@ -15,4 +15,7 @@ export const sql = postgres({
   username: user,
   password,
   ssl: false,
+  // Postgres NOTICEs ("relation already exists, skipping" on every start
+  // from schema.sql's IF NOT EXISTS) are not worth a log line each.
+  onnotice: () => {},
 })

@@ -5,17 +5,50 @@ import 'package:crypto/crypto.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'current_user.dart';
+
 class SecurityLockService {
   SecurityLockService({LocalAuthentication? localAuthentication})
     : _localAuthentication = localAuthentication ?? LocalAuthentication();
 
-  static const _legacyPinKey = 'security.pin.v1';
-  static const _pinHashKey = 'security.pin_hash.v1';
-  static const _pinSaltKey = 'security.pin_salt.v1';
-  static const _biometricEnabledKey = 'security.biometric_enabled.v1';
+  // Each account on the phone has its own PIN/biometrics setting (see
+  // CurrentUser), so a second account never needs the first one's PIN.
+  static const _baseKeys = [
+    'security.pin.v1',
+    'security.pin_hash.v1',
+    'security.pin_salt.v1',
+    'security.biometric_enabled.v1',
+  ];
+  static String get _legacyPinKey => CurrentUser.scoped(_baseKeys[0]);
+  static String get _pinHashKey => CurrentUser.scoped(_baseKeys[1]);
+  static String get _pinSaltKey => CurrentUser.scoped(_baseKeys[2]);
+  static String get _biometricEnabledKey => CurrentUser.scoped(_baseKeys[3]);
   static const _biometricProbeTimeout = Duration(seconds: 2);
 
   final LocalAuthentication _localAuthentication;
+
+  /// Preferences, after handing the PIN set before PINs were per account to
+  /// the first account that signs in (the one that set it).
+  static Future<SharedPreferences> _prefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (CurrentUser.key == null) return prefs;
+    final shared = [for (final key in _baseKeys) prefs.get(key)];
+    if (shared.every((value) => value == null)) return prefs;
+    final ownHash = prefs.getString(CurrentUser.scoped(_baseKeys[1]));
+    final ownLegacy = prefs.getString(CurrentUser.scoped(_baseKeys[0]));
+    if (ownHash == null && ownLegacy == null) {
+      for (var i = 0; i < _baseKeys.length; i++) {
+        final value = shared[i];
+        final key = CurrentUser.scoped(_baseKeys[i]);
+        if (value is String) await prefs.setString(key, value);
+        if (value is bool) await prefs.setBool(key, value);
+      }
+    }
+    for (final key in _baseKeys) {
+      await prefs.remove(key);
+    }
+    return prefs;
+  }
 
   static int _autoLockSuspensions = 0;
 
@@ -37,7 +70,7 @@ class SecurityLockService {
   }
 
   Future<bool> hasPin() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await _prefs();
     final pinHash = prefs.getString(_pinHashKey);
     if (pinHash != null && pinHash.isNotEmpty) return true;
     final legacyPin = prefs.getString(_legacyPinKey);
@@ -45,7 +78,7 @@ class SecurityLockService {
   }
 
   Future<void> setPin(String pin) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await _prefs();
     final salt = _newSalt();
     await prefs.setString(_pinSaltKey, salt);
     await prefs.setString(_pinHashKey, _hashPin(pin, salt));
@@ -53,7 +86,7 @@ class SecurityLockService {
   }
 
   Future<bool> verifyPin(String pin) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await _prefs();
     final pinHash = prefs.getString(_pinHashKey);
     if (pinHash != null && pinHash.isNotEmpty) {
       final salt = prefs.getString(_pinSaltKey);
@@ -73,12 +106,12 @@ class SecurityLockService {
   }
 
   Future<bool> isBiometricEnabled() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await _prefs();
     return prefs.getBool(_biometricEnabledKey) ?? false;
   }
 
   Future<void> setBiometricEnabled(bool enabled) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await _prefs();
     await prefs.setBool(_biometricEnabledKey, enabled);
   }
 

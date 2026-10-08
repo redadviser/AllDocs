@@ -3,7 +3,6 @@ import '../local_documents_store.dart';
 import 'cloud_provider.dart';
 import 'dropbox_provider.dart';
 import 'google_drive_provider.dart';
-import 'onedrive_provider.dart';
 
 /// A cloud document whose remote copy changed since it was imported.
 class CloudUpdate {
@@ -23,9 +22,7 @@ class CloudUpdate {
 /// documents stay available offline and don't depend on the cloud account.
 class CloudService {
   CloudService({List<CloudProvider>? providers, LocalDocumentsStore? store})
-    : providers =
-          providers ??
-          [OneDriveProvider(), GoogleDriveProvider(), DropboxProvider()],
+    : providers = providers ?? [GoogleDriveProvider(), DropboxProvider()],
       _store = store ?? const LocalDocumentsStore();
 
   final List<CloudProvider> providers;
@@ -96,7 +93,7 @@ class CloudService {
       if (!document.isFromCloud) continue;
       final providerId = cloudProviderIdForSource(document.source);
       final provider = providerId == null ? null : connected[providerId];
-      if (provider == null) continue;
+      if (provider == null || !provider.canBrowseFiles) continue;
       try {
         final remote = await provider.metadata(document.cloudFileId!);
         if (remote == null || remote.version == null) continue;

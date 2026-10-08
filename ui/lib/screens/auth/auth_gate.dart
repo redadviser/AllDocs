@@ -32,6 +32,8 @@ class _AuthGateState extends State<AuthGate> {
     final signedIn = await AuthService.isSignedIn();
     final name = await AuthService.displayName();
     final avatarUrl = await AuthService.avatarUrl();
+    await _useAccount(signedIn ? await AuthService.email() : null);
+    if (signedIn) await PlanService.onSignedIn();
     if (!mounted) return;
 
     setState(() {
@@ -45,12 +47,22 @@ class _AuthGateState extends State<AuthGate> {
   Future<void> _completeAuth(Future<String> Function() action) async {
     final name = await action();
     final avatarUrl = await AuthService.avatarUrl();
+    await _useAccount(await AuthService.email());
+    await PlanService.onSignedIn();
     if (!mounted) return;
     setState(() {
       _userName = name;
       _avatarUrl = avatarUrl;
       _signedIn = true;
     });
+  }
+
+  /// Everything kept per account on this phone (documents, PIN, cloud
+  /// connections, backup settings) switches to [email]'s account before
+  /// the PIN screen or the app is shown.
+  Future<void> _useAccount(String? email) async {
+    CurrentUser.setEmail(email);
+    await AppSettings.loadAccountSettings();
   }
 
   @override

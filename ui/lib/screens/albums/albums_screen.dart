@@ -10,7 +10,9 @@ import '../../common/snapshot_builder.dart';
 import '../../models/models.dart';
 import '../../services/services.dart';
 import '../../theme/app_theme.dart';
+import '../profile/plans_screen.dart';
 import 'album_detail_screen.dart';
+import 'tags_section.dart';
 
 const double _addAlbumSpineWidth = 30;
 const double _modernAlbumCardWidth = 132;
@@ -73,16 +75,7 @@ class _AlbumsScreenState extends State<AlbumsScreen> {
               padding: const EdgeInsets.fromLTRB(20, 12, 8, 4),
               child: Row(
                 children: [
-                  Expanded(
-                    child: Text(
-                      AppConstants.albumsTitle.tr(),
-                      style: const TextStyle(
-                        color: AppTheme.text,
-                        fontSize: 24,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
+                  Expanded(child: _Greeting(profile: snapshot.profile)),
                   IconButton(
                     tooltip: _mode == _AlbumDisplayMode.modern
                         ? AppConstants.albumsClassicView.tr()
@@ -111,9 +104,20 @@ class _AlbumsScreenState extends State<AlbumsScreen> {
                 buildDefaultDragHandles: false,
                 header: Padding(
                   padding: const EdgeInsets.only(bottom: 14),
-                  child: _Collections(
-                    snapshot: snapshot,
-                    onOpen: _openCollection,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _Collections(snapshot: snapshot, onOpen: _openCollection),
+                      const SizedBox(height: 14),
+                      TagsSection(
+                        snapshot: snapshot,
+                        documentsService: _service,
+                        onOpenTag: (tag) => _openCollection(
+                          '#$tag',
+                          (snapshot) => documentsWithTag(snapshot, tag),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 footer: shelves.isEmpty
@@ -770,6 +774,54 @@ class _DashedBorderPainter extends CustomPainter {
 }
 
 /// Favorites and "expiring soon", above the shelves.
+/// "Hello, Ana" and the account's document count — the app opens on the
+/// shelf, so the welcome lives here.
+class _Greeting extends StatelessWidget {
+  const _Greeting({required this.profile});
+
+  final UserProfile profile;
+
+  @override
+  Widget build(BuildContext context) {
+    final firstName = profile.name.trim().split(RegExp(r'\s+')).first;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Flexible(
+              child: Text(
+                firstName.isEmpty
+                    ? AppConstants.galleryHello.tr()
+                    : AppConstants.galleryHelloName.tr(
+                        namedArgs: {'name': firstName},
+                      ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppTheme.text,
+                  fontSize: 24,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            // The plan, one tap from the home screen.
+            PlanChip(summary: profile.storageSummary),
+          ],
+        ),
+        const SizedBox(height: 2),
+        Text(
+          AppConstants.galleryDocumentsCount.tr(
+            namedArgs: {'count': '${profile.documentsCount}'},
+          ),
+          style: const TextStyle(color: AppTheme.mutedText, fontSize: 13),
+        ),
+      ],
+    );
+  }
+}
+
 class _Collections extends StatelessWidget {
   const _Collections({required this.snapshot, required this.onOpen});
 

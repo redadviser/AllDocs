@@ -123,13 +123,13 @@ class AlbumSpine extends StatelessWidget {
                   color: AppTheme.accent,
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.9),
+                    color: AppTheme.onAccent.withValues(alpha: 0.9),
                   ),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.check_rounded,
                   size: 13,
-                  color: Colors.white,
+                  color: AppTheme.onAccent,
                 ),
               ),
             )
@@ -183,7 +183,7 @@ class AlbumCountBadge extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppTheme.accent,
         borderRadius: BorderRadius.circular(height / 2),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.9)),
+        border: Border.all(color: AppTheme.onAccent.withValues(alpha: 0.9)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.22),
@@ -195,7 +195,7 @@ class AlbumCountBadge extends StatelessWidget {
       child: Text(
         count > 999 ? '999+' : '$count',
         style: TextStyle(
-          color: Colors.white,
+          color: AppTheme.onAccent,
           fontSize: fontSize,
           fontWeight: FontWeight.w700,
         ),
@@ -276,6 +276,69 @@ class BookshelfLane extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Every shelf with its albums as books, for picking albums: tap a book to
+/// toggle it (picked books lift and get a tick). Used by the "add to
+/// albums" sheet and by the document details sheet.
+class AlbumShelfPicker extends StatelessWidget {
+  const AlbumShelfPicker({
+    super.key,
+    required this.shelves,
+    required this.isSelected,
+    required this.countFor,
+    required this.onToggle,
+  });
+
+  final List<DocumentShelf> shelves;
+  final bool Function(String albumId) isSelected;
+  final int Function(String albumId) countFor;
+  final ValueChanged<DocumentAlbum> onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final shelf in shelves)
+          if (shelf.albums.isNotEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
+              child: Text(
+                shelf.name.toUpperCase(),
+                style: const TextStyle(
+                  color: AppTheme.mutedText,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12.5,
+                  letterSpacing: 1.05,
+                ),
+              ),
+            ),
+            BookshelfLane(
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.fromLTRB(8, 14, 8, 0),
+                children: [
+                  for (final album in shelf.albums)
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => onToggle(album),
+                      child: Tooltip(
+                        message: album.name,
+                        child: AlbumSpine(
+                          album: album,
+                          count: countFor(album.id),
+                          selected: isSelected(album.id),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+      ],
     );
   }
 }

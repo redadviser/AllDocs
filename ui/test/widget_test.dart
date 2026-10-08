@@ -65,15 +65,16 @@ void main() {
     await tester.pump(const Duration(milliseconds: 800));
 
     expect(find.text('Galeria'), findsWidgets);
-    expect(find.text('Álbuns'), findsWidgets);
+    expect(find.text('Estante'), findsWidgets);
     expect(find.text('Perfil'), findsWidgets);
-    // The archive moved from the nav bar to the gallery header.
+    // The app opens on the shelf; the archive lives in the gallery header.
+    await tester.tap(find.text('Galeria').last);
     await _settleRealAsync(tester);
     expect(find.byTooltip('Arquivo'), findsOneWidget);
 
     // Creating a shelf used to crash when the name dialog closed
     // ("_dependents.isEmpty is not true").
-    await tester.tap(find.text('Álbuns').last);
+    await tester.tap(find.text('Estante').last);
     // The document store parses/encodes state on real isolates, which only
     // progress outside the fake test clock.
     await _settleRealAsync(tester);

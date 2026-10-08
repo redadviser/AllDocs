@@ -13,6 +13,7 @@ import 'album_dialog.dart';
 import 'app_constants.dart';
 import 'document_actions.dart';
 import 'document_details_sheet.dart';
+import 'plan_prompts.dart';
 import 'scan_filter_sheet.dart';
 import 'zip_preview_sheet.dart';
 import '../screens/viewer/document_viewer_screen.dart';
@@ -46,9 +47,9 @@ Future<ImportResult> pickAndImportDocuments(
 
   var result = ImportResult.empty;
   if (regularFiles.isNotEmpty) {
-    result += await documentsService.importPickedFiles(
-      regularFiles,
-      albumId: albumId,
+    result += await guardStorage(
+      context,
+      () => documentsService.importPickedFiles(regularFiles, albumId: albumId),
     );
   }
 
@@ -85,7 +86,10 @@ Future<ImportResult> importIncomingFiles(
   final zips = paths.where((path) => path.toLowerCase().endsWith('.zip'));
   final others = paths.where((path) => !path.toLowerCase().endsWith('.zip'));
   if (others.isNotEmpty) {
-    result += await documentsService.importFilePaths(others.toList());
+    result += await guardStorage(
+      context,
+      () => documentsService.importFilePaths(others.toList()),
+    );
   }
   for (final zip in zips) {
     if (!context.mounted) break;
@@ -218,9 +222,12 @@ Future<ImportResult> _extractPreviewAndImport(
     return ImportResult.empty;
   }
 
-  return documentsService.importExtractedZipEntries(
-    selection.entries,
-    albumId: selection.albumId,
+  return guardStorage(
+    context,
+    () => documentsService.importExtractedZipEntries(
+      selection.entries,
+      albumId: selection.albumId,
+    ),
   );
 }
 
@@ -243,6 +250,9 @@ Future<ImportResult> scanAndImport(
       );
     }
     return result;
+  } on StorageFullException catch (error) {
+    if (context.mounted) await showStorageFullDialog(context, error);
+    return ImportResult.empty;
   } catch (_) {
     if (context.mounted) {
       showSnack(context, AppConstants.archiveScanFailed.tr());

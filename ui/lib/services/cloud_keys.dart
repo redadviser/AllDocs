@@ -5,7 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api_helpers.dart';
 
-/// OAuth client ids for Google (sign-in + Drive), OneDrive and Dropbox.
+/// OAuth client ids for Google (sign-in + Drive) and Dropbox.
 ///
 /// The backend is the source of truth (its .env, served by
 /// `GET /api/config/cloud`), so a key can be added or rotated without a new
@@ -25,10 +25,6 @@ class CloudKeys {
   static String? get googleIosClientId => _value(
     'GOOGLE_IOS_CLIENT_ID',
     const String.fromEnvironment('GOOGLE_IOS_CLIENT_ID'),
-  );
-  static String? get oneDriveClientId => _value(
-    'ONEDRIVE_CLIENT_ID',
-    const String.fromEnvironment('ONEDRIVE_CLIENT_ID'),
   );
   static String? get dropboxAppKey => _value(
     'DROPBOX_APP_KEY',
@@ -68,7 +64,6 @@ class CloudKeys {
       final values = <String, String>{
         'GOOGLE_SERVER_CLIENT_ID': ?section('google')['webClientId'] as String?,
         'GOOGLE_IOS_CLIENT_ID': ?section('google')['iosClientId'] as String?,
-        'ONEDRIVE_CLIENT_ID': ?section('oneDrive')['clientId'] as String?,
         'DROPBOX_APP_KEY': ?section('dropbox')['appKey'] as String?,
       };
       _values = values;

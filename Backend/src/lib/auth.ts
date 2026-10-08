@@ -3,6 +3,7 @@ import crypto from 'crypto'
 import { SignJWT, jwtVerify } from 'jose'
 import type { Request } from 'express'
 import { sql } from './db'
+import { effectivePlanColumn } from './plans'
 
 // Session tokens are signed with this server's own secret.
 const JWT_SECRET = new TextEncoder().encode(
@@ -69,7 +70,7 @@ export async function signUp(
 
 export async function signIn(email: string, password: string, deviceId?: string) {
   const rows = await sql`
-    SELECT u.id, u.email, u.password_hash, p.display_name, p.plan, p.avatar_url
+    SELECT u.id, u.email, u.password_hash, p.display_name, ${effectivePlanColumn} AS plan, p.avatar_url
     FROM users u
     LEFT JOIN profiles p ON p.id = u.id
     WHERE u.email = ${email}
@@ -100,7 +101,7 @@ export async function findOrCreateUserByEmail(
   deviceId?: string
 ) {
   const existing = await sql`
-    SELECT u.id, u.email, p.display_name, p.plan, p.avatar_url
+    SELECT u.id, u.email, p.display_name, ${effectivePlanColumn} AS plan, p.avatar_url
     FROM users u
     LEFT JOIN profiles p ON p.id = u.id
     WHERE u.email = ${email}
@@ -170,7 +171,7 @@ export async function getCurrentUserFromToken(
     }
 
     const rows = await sql`
-      SELECT u.id, u.email, p.display_name, p.plan, p.avatar_url
+      SELECT u.id, u.email, p.display_name, ${effectivePlanColumn} AS plan, p.avatar_url
       FROM users u
       LEFT JOIN profiles p ON p.id = u.id
       WHERE u.id = ${userId}

@@ -5,6 +5,7 @@ import 'dart:typed_data';
 
 import 'package:flutter_appauth/flutter_appauth.dart';
 
+import '../backup_storage.dart';
 import 'cloud_config.dart';
 import 'cloud_provider.dart';
 import 'oauth_cloud_provider.dart';
@@ -69,13 +70,16 @@ class DropboxProvider extends OAuthCloudProvider {
   }
 
   @override
-  Future<List<CloudItem>> listFolder(String? folderId) async {
+  Future<List<CloudItem>> listFolder(
+    String? folderId, {
+    int maxPages = 10,
+  }) async {
     final items = <CloudItem>[];
     var json = await _rpc('/files/list_folder', {
       'path': folderId ?? '',
       'limit': 500,
     });
-    for (var page = 0; page < 10; page++) {
+    for (var page = 0; page < maxPages; page++) {
       for (final raw in (json['entries'] as List? ?? const [])) {
         final item = _item(Map<String, dynamic>.from(raw as Map));
         if (item != null) items.add(item);
@@ -142,9 +146,8 @@ class DropboxProvider extends OAuthCloudProvider {
     return (fileName: item.name, bytes: response.bodyBytes);
   }
 
-  @override
-  Future<CloudItem> uploadBackup(String fileName, File file) async {
-    final path = '$backupFolder/$fileName';
+  /// Uploads [file] to [path], replacing what's there.
+  Future<CloudItem> _uploadFile(String path, File file) async {
     final length = await file.length();
     final commit = {'path': path, 'mode': 'overwrite', 'mute': true};
 
@@ -224,18 +227,116 @@ class DropboxProvider extends OAuthCloudProvider {
   }
 
   @override
-  Future<List<CloudItem>> listBackups() async {
+  BackupStorage backupStorage() => _DropboxBackupStorage(this);
+
+  @override
+  Future<List<CloudItem>> listLegacyBackups() async {
     try {
       final items = await listFolder(backupFolder);
-      return items.where((item) => !item.isFolder).toList();
+      return items
+          .where((item) => !item.isFolder && item.name.endsWith('.zip'))
+          .toList();
     } on CloudRequestException catch (error) {
       if (error.statusCode == 409) return const []; // folder doesn't exist yet
       rethrow;
     }
   }
+}
+
+/// `/AllDocs Backups` in the user's Dropbox, addressed by path.
+class _DropboxBackupStorage extends BackupStorage {
+  _DropboxBackupStorage(this._dropbox);
+
+  final DropboxProvider _dropbox;
 
   @override
-  Future<void> deleteBackup(CloudItem backup) async {
-    await _rpc('/files/delete_v2', {'path': backup.id});
+  String get label => 'Dropbox · ${DropboxProvider.backupFolder}';
+
+  String _full(String path) => path.isEmpty
+      ? DropboxProvider.backupFolder
+      : '${DropboxProvider.backupFolder}/$path';
+
+  // Dropbox answers "not found" (and "already exists") with a 409.
+  bool _conflict(CloudRequestException error) => error.statusCode == 409;
+
+  @override
+  Future<List<BackupEntry>> list(String folder) async {
+    try {
+      final items = await _dropbox.listFolder(_full(folder), maxPages: 1 << 20);
+      return [
+        for (final item in items)
+          BackupEntry(
+            name: item.name,
+            isFolder: item.isFolder,
+            sizeBytes: item.sizeBytes,
+          ),
+      ];
+    } on CloudRequestException catch (error) {
+      if (_conflict(error)) return const [];
+      rethrow;
+    }
+  }
+
+  @override
+  Future<void> ensureFolder(String folder) async {
+    try {
+      await _dropbox._rpc('/files/create_folder_v2', {
+        'path': _full(folder),
+        'autorename': false,
+      });
+    } on CloudRequestException catch (error) {
+      if (!_conflict(error)) rethrow; // already there
+    }
+  }
+
+  @override
+  Future<void> upload(String path, File file) async {
+    await _dropbox._uploadFile(_full(path), file);
+  }
+
+  @override
+  Future<void> download(String path, File destination) async {
+    try {
+      final response = await _dropbox.send(
+        (token) => _dropbox.request(
+          'POST',
+          Uri.parse('${DropboxProvider._content}/files/download'),
+          token,
+          headers: {
+            'Dropbox-API-Arg': asciiJson({'path': _full(path)}),
+          },
+        ),
+      );
+      await destination.parent.create(recursive: true);
+      await destination.writeAsBytes(response.bodyBytes, flush: true);
+    } on CloudRequestException catch (error) {
+      if (_conflict(error)) throw BackupNotFoundException(path);
+      rethrow;
+    }
+  }
+
+  @override
+  Future<void> copy(String from, String to) async {
+    await _dropbox._rpc('/files/copy_v2', {
+      'from_path': _full(from),
+      'to_path': _full(to),
+    });
+  }
+
+  @override
+  Future<void> move(String from, String to) async {
+    await _dropbox._rpc('/files/move_v2', {
+      'from_path': _full(from),
+      'to_path': _full(to),
+    });
+  }
+
+  @override
+  Future<void> delete(String path) async {
+    try {
+      await _dropbox._rpc('/files/delete_v2', {'path': _full(path)});
+    } on CloudRequestException catch (error) {
+      if (!_conflict(error)) rethrow;
+    }
   }
 }

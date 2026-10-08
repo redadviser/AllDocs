@@ -5,7 +5,11 @@ import 'package:all_docs/models/document_semantic_type.dart';
 import 'package:all_docs/models/document_type.dart';
 import 'package:all_docs/services/reminder_scheduler.dart';
 
-DocumentFile _document({String id = 'doc1', DateTime? validityDate}) {
+DocumentFile _document({
+  String id = 'doc1',
+  DateTime? validityDate,
+  DateTime? deletedAt,
+}) {
   return DocumentFile(
     id: id,
     title: 'Test',
@@ -15,6 +19,7 @@ DocumentFile _document({String id = 'doc1', DateTime? validityDate}) {
     sizeLabel: '1 KB',
     semanticType: DocumentSemanticType.identityDocument,
     validityDate: validityDate,
+    deletedAt: deletedAt,
   );
 }
 
@@ -33,7 +38,10 @@ void main() {
     );
 
     expect(plan, isNotNull);
-    expect(plan!.scheduledFor, DateTime(2026, 3, 1).subtract(const Duration(days: 14)));
+    expect(
+      plan!.scheduledFor,
+      DateTime(2026, 3, 1).subtract(const Duration(days: 14)),
+    );
   });
 
   test('returns null once the lead time has already passed', () {
@@ -88,5 +96,31 @@ void main() {
 
     expect(plan, isNotNull);
     expect(plan!.scheduledFor, now.add(const Duration(days: 3)));
+  });
+
+  group('pick', () {
+    final documents = [
+      _document(id: 'march', validityDate: DateTime(2026, 3, 1)),
+      _document(id: 'none'),
+      _document(id: 'june', validityDate: DateTime(2026, 6, 1)),
+      _document(id: 'past', validityDate: DateTime(2026, 1, 5)),
+      _document(id: 'feb', validityDate: DateTime(2026, 2, 1)),
+      _document(
+        id: 'trashed',
+        validityDate: DateTime(2026, 2, 2),
+        deletedAt: DateTime(2026, 1, 1),
+      ),
+      _document(id: 'may', validityDate: DateTime(2026, 5, 1)),
+    ];
+
+    test('keeps every upcoming reminder, soonest first, without a cap', () {
+      final picked = scheduler.pick(documents, now: now);
+      expect(picked.map((d) => d.id), ['feb', 'march', 'may', 'june']);
+    });
+
+    test('keeps only the soonest ones when the plan caps them', () {
+      final picked = scheduler.pick(documents, limit: 3, now: now);
+      expect(picked.map((d) => d.id), ['feb', 'march', 'may']);
+    });
   });
 }

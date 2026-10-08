@@ -7,6 +7,9 @@ import '../../common/app_sheet.dart';
 import '../../common/backup_flow.dart';
 import '../../common/document_actions.dart';
 import '../../common/document_import_flow.dart';
+import '../../common/plan_prompts.dart';
+import '../../common/settings_grid.dart';
+import '../../models/models.dart';
 import '../../services/services.dart';
 import '../../theme/app_theme.dart';
 import 'cloud_browser_screen.dart';
@@ -101,7 +104,7 @@ class CloudScreenState extends State<CloudScreen> {
       final ok = await _connect(provider);
       if (!ok) return;
     }
-    if (!mounted) return;
+    if (!mounted || !provider.canBrowseFiles) return;
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => CloudBrowserScreen(
@@ -140,10 +143,11 @@ class CloudScreenState extends State<CloudScreen> {
     final connected = _cloud.providers
         .where((provider) => _status[provider.id]?.connected == true)
         .toList();
+    final updates = _updates;
 
     return ListView(
       key: const PageStorageKey('cloud'),
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
       children: [
         Row(
           children: [
@@ -168,124 +172,229 @@ class CloudScreenState extends State<CloudScreen> {
             style: const TextStyle(color: AppTheme.mutedText, height: 1.35),
           ),
         ),
-        const SizedBox(height: 18),
-        _Card(
-          children: [
-            for (final provider in _cloud.providers) ...[
-              _ProviderTile(
-                provider: provider,
-                status: _status[provider.id],
-                onConnect: () => _connect(provider),
-                onOpen: () => openProvider(provider.id),
-                onDisconnect: () => _disconnect(provider),
-              ),
-              if (provider != _cloud.providers.last) const Divider(indent: 64),
+        const SizedBox(height: 16),
+        SettingsSection(
+          icon: Icons.cloud_outlined,
+          title: AppConstants.cloudAccountsTitle.tr(),
+          child: SettingsGrid(
+            children: [
+              for (final provider in _cloud.providers) _providerTile(provider),
             ],
-          ],
+          ),
         ),
         const SizedBox(height: 12),
-        _Card(
-          children: [
-            ListTile(
-              leading: const Icon(Icons.bolt_outlined),
-              title: Text(AppConstants.cloudQuickImport.tr()),
-              subtitle: Text(
-                AppConstants.cloudQuickImportHint.tr(),
-                style: const TextStyle(
-                  color: AppTheme.mutedText,
-                  fontSize: 12.5,
-                ),
-              ),
-              trailing: const Icon(Icons.chevron_right_rounded),
-              onTap: () =>
-                  pickAndImportDocuments(context, widget.documentsService),
-            ),
-          ],
-        ),
-        const SizedBox(height: 24),
-        _SectionTitle(AppConstants.cloudUpdatesTitle.tr()),
-        const SizedBox(height: 8),
-        _Card(
-          children: [
-            ListTile(
-              leading: _checkingUpdates
-                  ? const SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.sync_rounded),
-              title: Text(AppConstants.cloudCheckUpdates.tr()),
-              subtitle: Text(
-                _updates == null
-                    ? AppConstants.cloudUpdatesHint.tr()
-                    : _updates!.isEmpty
-                    ? AppConstants.cloudUpToDate.tr()
-                    : AppConstants.cloudUpdatesFound.tr(
-                        namedArgs: {'count': '${_updates!.length}'},
-                      ),
-                style: const TextStyle(
-                  color: AppTheme.mutedText,
-                  fontSize: 12.5,
-                ),
-              ),
-              onTap: connected.isEmpty || _checkingUpdates
-                  ? null
-                  : _checkUpdates,
-            ),
-            for (final update in _updates ?? const <CloudUpdate>[]) ...[
-              const Divider(indent: 16),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 10, 8, 6),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      AppConstants.cloudUpdatedFile.tr(
-                        namedArgs: {'name': update.document.fileName},
-                      ),
-                      style: const TextStyle(color: AppTheme.text),
+        SettingsSection(
+          icon: Icons.download_outlined,
+          title: AppConstants.cloudImportTitle.tr(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SettingsGrid(
+                children: [
+                  SettingsGridAction(
+                    icon: Icons.bolt_outlined,
+                    title: AppConstants.cloudQuickImport.tr(),
+                    onTap: () => pickAndImportDocuments(
+                      context,
+                      widget.documentsService,
                     ),
-                    Text(
-                      update.provider.displayName,
-                      style: const TextStyle(
-                        color: AppTheme.mutedText,
-                        fontSize: 12,
-                      ),
-                    ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton(
-                          onPressed: () => _resolveUpdate(update, apply: false),
-                          child: Text(AppConstants.cloudKeepCurrent.tr()),
+                  ),
+                  SettingsGridAction(
+                    icon: Icons.sync_rounded,
+                    title: AppConstants.cloudCheckUpdates.tr(),
+                    value: updates == null
+                        ? null
+                        : updates.isEmpty
+                        ? AppConstants.cloudUpToDate.tr()
+                        : AppConstants.cloudUpdatesFound.tr(
+                            namedArgs: {'count': '${updates.length}'},
+                          ),
+                    loading: _checkingUpdates,
+                    onTap: connected.isEmpty || _checkingUpdates
+                        ? null
+                        : _checkUpdates,
+                  ),
+                ],
+              ),
+              for (final update in updates ?? const <CloudUpdate>[]) ...[
+                const SizedBox(height: 8),
+                SettingsCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        AppConstants.cloudUpdatedFile.tr(
+                          namedArgs: {'name': update.document.fileName},
                         ),
-                        TextButton(
-                          onPressed: () => _resolveUpdate(update, apply: true),
-                          child: Text(AppConstants.cloudUpdate.tr()),
+                        style: const TextStyle(color: AppTheme.text),
+                      ),
+                      Text(
+                        update.provider.displayName,
+                        style: const TextStyle(
+                          color: AppTheme.mutedText,
+                          fontSize: 12,
                         ),
-                      ],
-                    ),
-                  ],
+                      ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            onPressed: () =>
+                                _resolveUpdate(update, apply: false),
+                            child: Text(AppConstants.cloudKeepCurrent.tr()),
+                          ),
+                          TextButton(
+                            onPressed: () =>
+                                _resolveUpdate(update, apply: true),
+                            child: Text(AppConstants.cloudUpdate.tr()),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-              ),
+              ],
             ],
-          ],
+          ),
         ),
-        const SizedBox(height: 24),
-        _SectionTitle(AppConstants.backupTitle.tr()),
-        const SizedBox(height: 8),
-        _BackupCard(
+        const SizedBox(height: 12),
+        _BackupSection(
           providers: _cloud.providers,
           status: _status,
           busy: _backingUp,
-          onSelectDestination: _selectBackupDestination,
+          onChooseDestination: _chooseBackupDestination,
           onBackupNow: _backupNow,
-          onSaveToDevice: _saveToDevice,
           onRestore: _restore,
         ),
       ],
     );
+  }
+
+  /// An account: tap to connect it; once connected, tap for its options.
+  Widget _providerTile(CloudProvider provider) {
+    final status = _status[provider.id];
+    final isConnected = status?.connected == true;
+    return SettingsGridAction(
+      icon: cloudProviderIcon(provider.id),
+      iconColor: _providerColor(provider.id),
+      title: provider.displayName,
+      value: !provider.isConfigured
+          ? AppConstants.cloudNotConfiguredShort.tr()
+          : isConnected
+          ? (status?.account ?? AppConstants.cloudConnectedShort.tr())
+          : AppConstants.cloudConnect.tr(),
+      onTap: !provider.isConfigured
+          ? null
+          : isConnected
+          ? () => _showProviderOptions(provider)
+          : () => _connect(provider),
+    );
+  }
+
+  Future<void> _showProviderOptions(CloudProvider provider) async {
+    final action = await showOptionsSheet<String>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Text(
+                provider.displayName,
+                style: const TextStyle(
+                  color: AppTheme.text,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            if (provider.canBrowseFiles)
+              ListTile(
+                leading: const Icon(Icons.folder_open_outlined),
+                title: Text(AppConstants.cloudBrowse.tr()),
+                onTap: () => Navigator.of(context).pop('open'),
+              ),
+            ListTile(
+              leading: const Icon(
+                Icons.link_off_rounded,
+                color: AppTheme.destructive,
+              ),
+              title: Text(
+                AppConstants.cloudDisconnect.tr(),
+                style: const TextStyle(color: AppTheme.destructive),
+              ),
+              onTap: () => Navigator.of(context).pop('disconnect'),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (!mounted) return;
+    if (action == 'open') await openProvider(provider.id);
+    if (action == 'disconnect') await _disconnect(provider);
+  }
+
+  /// "Save to": this phone or one of the accounts (connected on the spot).
+  Future<void> _chooseBackupDestination() async {
+    final current = AppSettings.backupProvider.value;
+    final choice = await showOptionsSheet<({CloudProvider? provider})>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Text(
+                AppConstants.backupDestination.tr(),
+                style: const TextStyle(
+                  color: AppTheme.text,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            _DestinationTile(
+              leading: const CircleAvatar(
+                backgroundColor: AppTheme.surfaceStrong,
+                child: Icon(
+                  Icons.phone_android_outlined,
+                  color: AppTheme.text,
+                  size: 22,
+                ),
+              ),
+              title: AppConstants.backupThisDevice.tr(),
+              selected: _backupProvider == null,
+              onTap: () => Navigator.of(context).pop((provider: null)),
+            ),
+            for (final provider in _cloud.providers)
+              _DestinationTile(
+                leading: _ProviderAvatar(provider.id),
+                title: provider.displayName,
+                subtitle: !provider.isConfigured
+                    ? AppConstants.cloudNotConfiguredShort.tr()
+                    : _status[provider.id]?.connected == true
+                    ? (_status[provider.id]?.account ??
+                          AppConstants.cloudConnectedShort.tr())
+                    : AppConstants.cloudTapToConnect.tr(),
+                selected:
+                    current == provider.id.name &&
+                    _status[provider.id]?.connected == true,
+                onTap: provider.isConfigured
+                    ? () => Navigator.of(context).pop((provider: provider))
+                    : null,
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (choice == null || !mounted) return;
+    await _selectBackupDestination(choice.provider);
   }
 
   Future<void> _checkUpdates() async {
@@ -357,15 +466,6 @@ class CloudScreenState extends State<CloudScreen> {
     }
   }
 
-  Future<void> _saveToDevice() async {
-    setState(() => _backingUp = true);
-    try {
-      await saveBackupToDevice(context, widget.documentsService);
-    } finally {
-      if (mounted) setState(() => _backingUp = false);
-    }
-  }
-
   Future<void> _restore() async {
     // Every configured cloud is offered, not just connected ones: after a
     // reinstall nothing is connected yet, and that's exactly when a restore
@@ -410,57 +510,92 @@ class CloudScreenState extends State<CloudScreen> {
     }
     if (!mounted) return;
 
-    Future<BackupInfo?> Function()? restore;
-    if (source == 'device') {
-      restore = () => SecurityLockService.withoutAutoLock(
-        widget.documentsService.backup.pickAndRestoreFromDevice,
-      );
-    } else if (source is CloudProvider) {
-      final List<CloudItem> backups;
-      try {
-        backups = await source.listBackups();
-      } catch (_) {
-        if (mounted) showSnack(context, AppConstants.cloudRequestFailed.tr());
-        return;
+    final List<BackupSnapshot> snapshots;
+    try {
+      if (source is CloudProvider) {
+        snapshots = await widget.documentsService.backup.listCloudSnapshots(
+          source,
+        );
+      } else {
+        final folder = await SecurityLockService.withoutAutoLock(
+          () => widget.documentsService.backup.pickDeviceBackupFolder(
+            dialogTitle: AppConstants.backupPickRestoreFolder.tr(),
+          ),
+        );
+        if (folder == null) return;
+        snapshots = await widget.documentsService.backup.listDeviceSnapshots(
+          folder,
+        );
       }
-      if (!mounted) return;
-      if (backups.isEmpty) {
-        showSnack(context, AppConstants.backupNoneFound.tr());
-        return;
-      }
-      backups.sort(
-        (a, b) => (b.modifiedAt ?? DateTime(1970)).compareTo(
-          a.modifiedAt ?? DateTime(1970),
-        ),
-      );
-      final chosen = await showOptionsSheet<CloudItem>(
-        context: context,
-        builder: (context) => SafeArea(
+    } catch (_) {
+      if (mounted) showSnack(context, AppConstants.cloudRequestFailed.tr());
+      return;
+    }
+    if (!mounted) return;
+    if (snapshots.isEmpty) {
+      showSnack(context, AppConstants.backupNoneFound.tr());
+      return;
+    }
+    final chosen = await showOptionsSheet<BackupSnapshot>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * 0.7,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              for (final backup in backups)
-                ListTile(
-                  leading: const Icon(Icons.inventory_2_outlined),
-                  title: Text(backup.name),
-                  subtitle: backup.modifiedAt == null
-                      ? null
-                      : Text(
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                child: Text(
+                  AppConstants.backupHistoryTitle.tr(),
+                  style: const TextStyle(
+                    color: AppTheme.text,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Flexible(
+                child: ListView(
+                  shrinkWrap: true,
+                  children: [
+                    for (final snapshot in snapshots)
+                      ListTile(
+                        leading: Icon(
+                          snapshot.isLegacy
+                              ? Icons.folder_zip_outlined
+                              : Icons.history_rounded,
+                        ),
+                        title: Text(
                           DateFormat.yMMMd().add_Hm().format(
-                            backup.modifiedAt!.toLocal(),
+                            snapshot.createdAt,
                           ),
                         ),
-                  onTap: () => Navigator.of(context).pop(backup),
+                        subtitle: snapshot.isLatest || snapshot.isLegacy
+                            ? Text(
+                                snapshot.isLatest
+                                    ? AppConstants.backupLatest.tr()
+                                    : AppConstants.backupLegacy.tr(),
+                                style: const TextStyle(
+                                  color: AppTheme.mutedText,
+                                  fontSize: 12.5,
+                                ),
+                              )
+                            : null,
+                        onTap: () => Navigator.of(context).pop(snapshot),
+                      ),
+                  ],
                 ),
+              ),
             ],
           ),
         ),
-      );
-      if (chosen == null) return;
-      restore = () =>
-          widget.documentsService.backup.restoreFromCloud(source, chosen);
-    }
-    if (restore == null || !mounted) return;
+      ),
+    );
+    if (chosen == null || !mounted) return;
 
     final confirmed = await showConfirmDialog(
       context,
@@ -472,13 +607,22 @@ class CloudScreenState extends State<CloudScreen> {
 
     setState(() => _backingUp = true);
     try {
-      final info = await widget.documentsService.restoreBackup(restore());
+      final info = await widget.documentsService.restoreBackup(
+        widget.documentsService.backup.restoreSnapshot(chosen),
+      );
       if (info != null && mounted) {
         showSnack(
           context,
-          AppConstants.backupRestored.tr(
-            namedArgs: {'count': '${info.documentCount}'},
-          ),
+          info.missingCount > 0
+              ? AppConstants.backupRestoredMissing.tr(
+                  namedArgs: {
+                    'count': '${info.documentCount}',
+                    'missing': '${info.missingCount}',
+                  },
+                )
+              : AppConstants.backupRestored.tr(
+                  namedArgs: {'count': '${info.documentCount}'},
+                ),
         );
       }
     } on InvalidBackupException {
@@ -491,65 +635,7 @@ class CloudScreenState extends State<CloudScreen> {
   }
 }
 
-class _ProviderTile extends StatelessWidget {
-  const _ProviderTile({
-    required this.provider,
-    required this.status,
-    required this.onConnect,
-    required this.onOpen,
-    required this.onDisconnect,
-  });
-
-  final CloudProvider provider;
-  final _ProviderStatus? status;
-  final VoidCallback onConnect;
-  final VoidCallback onOpen;
-  final VoidCallback onDisconnect;
-
-  @override
-  Widget build(BuildContext context) {
-    final connected = status?.connected == true;
-    final subtitle = !provider.isConfigured
-        ? AppConstants.cloudNotConfiguredShort.tr()
-        : connected
-        ? (status?.account ?? AppConstants.cloudConnectedShort.tr())
-        : AppConstants.cloudNotConnected.tr();
-
-    return ListTile(
-      contentPadding: const EdgeInsets.fromLTRB(16, 4, 8, 4),
-      leading: _ProviderAvatar(provider.id),
-      title: Text(provider.displayName),
-      subtitle: Text(
-        subtitle,
-        style: const TextStyle(color: AppTheme.mutedText, fontSize: 12.5),
-      ),
-      onTap: connected ? onOpen : null,
-      trailing: connected
-          ? PopupMenuButton<String>(
-              onSelected: (value) =>
-                  value == 'open' ? onOpen() : onDisconnect(),
-              itemBuilder: (context) => [
-                PopupMenuItem(
-                  value: 'open',
-                  child: Text(AppConstants.cloudBrowse.tr()),
-                ),
-                PopupMenuItem(
-                  value: 'disconnect',
-                  child: Text(AppConstants.cloudDisconnect.tr()),
-                ),
-              ],
-            )
-          : OutlinedButton(
-              onPressed: provider.isConfigured ? onConnect : null,
-              style: OutlinedButton.styleFrom(minimumSize: const Size(0, 36)),
-              child: Text(AppConstants.cloudConnect.tr()),
-            ),
-    );
-  }
-}
-
 Color _providerColor(CloudProviderId id) => switch (id) {
-  CloudProviderId.oneDrive => const Color(0xFF4A90D9),
   CloudProviderId.googleDrive => const Color(0xFF5DB37E),
   CloudProviderId.dropbox => const Color(0xFF5B7FE0),
 };
@@ -567,23 +653,23 @@ class _ProviderAvatar extends StatelessWidget {
   }
 }
 
-class _BackupCard extends StatelessWidget {
-  const _BackupCard({
+/// Where backups go, the daily automatic backup, backing up now and
+/// restoring one from the history.
+class _BackupSection extends StatelessWidget {
+  const _BackupSection({
     required this.providers,
     required this.status,
     required this.busy,
-    required this.onSelectDestination,
+    required this.onChooseDestination,
     required this.onBackupNow,
-    required this.onSaveToDevice,
     required this.onRestore,
   });
 
   final List<CloudProvider> providers;
   final Map<CloudProviderId, _ProviderStatus> status;
   final bool busy;
-  final ValueChanged<CloudProvider?> onSelectDestination;
+  final VoidCallback onChooseDestination;
   final VoidCallback onBackupNow;
-  final VoidCallback onSaveToDevice;
   final VoidCallback onRestore;
 
   @override
@@ -593,8 +679,12 @@ class _BackupCard extends StatelessWidget {
         AppSettings.backupProvider,
         AppSettings.autoBackup,
         AppSettings.lastBackupAt,
+        PlanService.current,
       ]),
       builder: (context, _) {
+        final canAutoBackup = PlanService.current.value.has(
+          PlanFeature.autoBackup,
+        );
         // A saved destination whose account was disconnected falls back to
         // this phone.
         final selected = providers
@@ -605,61 +695,75 @@ class _BackupCard extends StatelessWidget {
             )
             .firstOrNull;
         final last = AppSettings.lastBackupAt.value;
-        return _Card(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
-              child: Text(
+        return SettingsSection(
+          icon: Icons.backup_outlined,
+          title: AppConstants.backupTitle.tr(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
                 AppConstants.backupHint.tr(),
                 style: const TextStyle(color: AppTheme.mutedText, fontSize: 13),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  AppConstants.backupDestination.tr(),
-                  style: const TextStyle(
-                    color: AppTheme.text,
-                    fontWeight: FontWeight.w600,
+              const SizedBox(height: 6),
+              Text(
+                '${AppConstants.backupLast.tr()}: '
+                '${last == null ? AppConstants.backupNever.tr() : DateFormat.yMMMd().add_Hm().format(last)}',
+                style: const TextStyle(color: AppTheme.text, fontSize: 13),
+              ),
+              const SizedBox(height: 10),
+              SettingsGrid(
+                children: [
+                  SettingsGridAction(
+                    icon: selected == null
+                        ? Icons.phone_android_outlined
+                        : cloudProviderIcon(selected.id),
+                    iconColor: selected == null
+                        ? null
+                        : _providerColor(selected.id),
+                    title: AppConstants.backupDestination.tr(),
+                    value:
+                        selected?.displayName ??
+                        AppConstants.backupThisDevice.tr(),
+                    onTap: busy ? null : onChooseDestination,
                   ),
-                ),
+                  SettingsGridToggle(
+                    icon: Icons.schedule_outlined,
+                    title: AppConstants.backupAuto.tr(),
+                    value:
+                        AppSettings.autoBackup.value &&
+                        selected != null &&
+                        canAutoBackup,
+                    onChanged: selected == null
+                        ? null
+                        : (enabled) {
+                            if (enabled && !canAutoBackup) {
+                              showPlansPrompt(
+                                context,
+                                title: AppConstants.backupAuto.tr(),
+                                message: AppConstants.plansAutoBackupLocked
+                                    .tr(),
+                              );
+                              return;
+                            }
+                            AppSettings.setAutoBackup(enabled);
+                          },
+                  ),
+                  SettingsGridAction(
+                    icon: Icons.backup_outlined,
+                    title: AppConstants.backupNow.tr(),
+                    loading: busy,
+                    onTap: busy ? null : onBackupNow,
+                  ),
+                  SettingsGridAction(
+                    icon: Icons.settings_backup_restore_rounded,
+                    title: AppConstants.backupRestore.tr(),
+                    onTap: busy ? null : onRestore,
+                  ),
+                ],
               ),
-            ),
-            _DestinationTile(
-              leading: const CircleAvatar(
-                backgroundColor: AppTheme.surfaceStrong,
-                child: Icon(
-                  Icons.phone_android_outlined,
-                  color: AppTheme.text,
-                  size: 22,
-                ),
-              ),
-              title: AppConstants.backupThisDevice.tr(),
-              selected: selected == null,
-              onTap: busy ? null : () => onSelectDestination(null),
-            ),
-            for (final provider in providers)
-              _DestinationTile(
-                leading: _ProviderAvatar(provider.id),
-                title: provider.displayName,
-                subtitle: !provider.isConfigured
-                    ? AppConstants.cloudNotConfiguredShort.tr()
-                    : status[provider.id]?.connected == true
-                    ? (status[provider.id]?.account ??
-                          AppConstants.cloudConnectedShort.tr())
-                    : AppConstants.cloudTapToConnect.tr(),
-                selected: selected?.id == provider.id,
-                onTap: busy || !provider.isConfigured
-                    ? null
-                    : () => onSelectDestination(provider),
-              ),
-            const Divider(indent: 16, endIndent: 16),
-            SwitchListTile(
-              secondary: const Icon(Icons.schedule_outlined),
-              title: Text(AppConstants.backupAuto.tr()),
-              subtitle: Text(
+              const SizedBox(height: 8),
+              Text(
                 selected == null
                     ? AppConstants.backupAutoNeedsCloud.tr()
                     : AppConstants.backupAutoHint.tr(),
@@ -668,71 +772,8 @@ class _BackupCard extends StatelessWidget {
                   fontSize: 12.5,
                 ),
               ),
-              value: AppSettings.autoBackup.value && selected != null,
-              onChanged: selected == null ? null : AppSettings.setAutoBackup,
-            ),
-            ListTile(
-              leading: const Icon(Icons.history_rounded),
-              title: Text(AppConstants.backupLast.tr()),
-              trailing: Text(
-                last == null
-                    ? AppConstants.backupNever.tr()
-                    : DateFormat.yMMMd().add_Hm().format(last),
-                style: const TextStyle(color: AppTheme.mutedText),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-              child: Column(
-                children: [
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      onPressed: busy ? null : onBackupNow,
-                      icon: busy
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.backup_outlined),
-                      label: Text(
-                        selected == null
-                            ? AppConstants.backupNow.tr()
-                            : AppConstants.backupNowTo.tr(
-                                namedArgs: {'provider': selected.displayName},
-                              ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      if (selected != null) ...[
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: busy ? null : onSaveToDevice,
-                            child: Text(
-                              AppConstants.backupSaveDevice.tr(),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                      ],
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: busy ? null : onRestore,
-                          child: Text(AppConstants.backupRestore.tr()),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
+            ],
+          ),
         );
       },
     );
@@ -772,40 +813,6 @@ class _DestinationTile extends StatelessWidget {
             ? Icons.radio_button_checked_rounded
             : Icons.radio_button_unchecked_rounded,
         color: selected ? AppTheme.accent : AppTheme.mutedText,
-      ),
-    );
-  }
-}
-
-class _Card extends StatelessWidget {
-  const _Card({required this.children});
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(AppTheme.radius),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(children: children),
-    );
-  }
-}
-
-class _SectionTitle extends StatelessWidget {
-  const _SectionTitle(this.text);
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: const TextStyle(
-        color: AppTheme.text,
-        fontSize: 16,
-        fontWeight: FontWeight.w600,
       ),
     );
   }

@@ -1,16 +1,16 @@
 import 'dart:convert';
-import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../../models/models.dart';
+import '../backup_storage.dart';
+import '../current_user.dart';
 
-enum CloudProviderId { oneDrive, googleDrive, dropbox }
+enum CloudProviderId { googleDrive, dropbox }
 
 extension CloudProviderIdSource on CloudProviderId {
   DocumentSource get documentSource => switch (this) {
-    CloudProviderId.oneDrive => DocumentSource.oneDrive,
     CloudProviderId.googleDrive => DocumentSource.googleDrive,
     CloudProviderId.dropbox => DocumentSource.dropbox,
   };
@@ -18,7 +18,6 @@ extension CloudProviderIdSource on CloudProviderId {
 
 CloudProviderId? cloudProviderIdForSource(DocumentSource source) {
   return switch (source) {
-    DocumentSource.oneDrive => CloudProviderId.oneDrive,
     DocumentSource.googleDrive => CloudProviderId.googleDrive,
     DocumentSource.dropbox => CloudProviderId.dropbox,
     _ => null,
@@ -82,8 +81,8 @@ class CloudRequestException implements Exception {
 
 /// Common interface for every cloud integration. Importing downloads a
 /// copy into AllDocs (it does not sync); [metadata] lets the app notice a
-/// newer remote version later; the backup methods write into an
-/// app-private folder of the account.
+/// newer remote version later; [backupStorage] is the folder of the account
+/// AllDocs backs up into (see BackupService).
 abstract class CloudProvider {
   CloudProviderId get id;
   String get displayName;
@@ -99,6 +98,10 @@ abstract class CloudProvider {
   Future<void> connect();
   Future<void> disconnect();
 
+  /// Whether the user's own files can be browsed and imported in the app.
+  /// When false the provider is only a backup destination.
+  bool get canBrowseFiles => true;
+
   /// Children of [folderId]; null means the account's root.
   Future<List<CloudItem>> listFolder(String? folderId);
   Future<List<CloudItem>> search(String query);
@@ -108,9 +111,12 @@ abstract class CloudProvider {
   /// (Google Docs files are exported, which changes their extension).
   Future<({String fileName, Uint8List bytes})> download(CloudItem item);
 
-  Future<CloudItem> uploadBackup(String fileName, File file);
-  Future<List<CloudItem>> listBackups();
-  Future<void> deleteBackup(CloudItem backup);
+  /// The account's "AllDocs Backups" folder tree.
+  BackupStorage backupStorage();
+
+  /// Single-zip backups made before backups became a folder tree. Only read
+  /// now, so they can still be restored.
+  Future<List<CloudItem>> listLegacyBackups();
 }
 
 /// Tokens live in the platform keystore (flutter_secure_storage), never in
@@ -121,10 +127,14 @@ class CloudTokenStore {
   final CloudProviderId provider;
   static const _storage = FlutterSecureStorage();
 
-  String get _key => 'cloud.${provider.name}';
+  // Per account (see CurrentUser): another account on this phone doesn't
+  // inherit these cloud connections.
+  String get _sharedKey => 'cloud.${provider.name}';
+  String get _key => CurrentUser.scoped(_sharedKey);
 
   Future<Map<String, dynamic>?> read() async {
     try {
+      await claimSharedSecureValue(_storage, _sharedKey, _key);
       final raw = await _storage.read(key: _key);
       if (raw == null) return null;
       return Map<String, dynamic>.from(jsonDecode(raw) as Map);
@@ -138,6 +148,22 @@ class CloudTokenStore {
   }
 
   Future<void> clear() => _storage.delete(key: _key);
+}
+
+/// Moves a value saved before connections were per account ([sharedKey]) to
+/// the first account that reads it ([accountKey]).
+Future<void> claimSharedSecureValue(
+  FlutterSecureStorage storage,
+  String sharedKey,
+  String accountKey,
+) async {
+  if (sharedKey == accountKey) return;
+  final shared = await storage.read(key: sharedKey);
+  if (shared == null) return;
+  if (await storage.read(key: accountKey) == null) {
+    await storage.write(key: accountKey, value: shared);
+  }
+  await storage.delete(key: sharedKey);
 }
 
 /// Dropbox (and some other APIs) want JSON in an HTTP header, which must be

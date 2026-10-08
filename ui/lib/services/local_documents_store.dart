@@ -16,11 +16,17 @@ import 'document_scanner_service.dart';
 import 'document_search.dart';
 import 'document_text_extractor.dart';
 import 'document_text_indexer.dart';
+import 'current_user.dart';
 import 'expiry_reminder_service.dart';
+import 'plan_service.dart';
 import 'secure_zip_extractor.dart';
 import 'storage_permission_service.dart';
 
 final _expiryReminderService = ExpiryReminderService();
+
+/// An album of the starter shelf (see LocalDocumentsStore.ensureStarterShelf).
+/// [since] is the version of the starter set that introduced it.
+typedef StarterAlbum = ({String name, String iconName, int since});
 
 /// What kind of files a picker call should offer.
 enum ImportPickKind { documents, images, zip }
@@ -45,6 +51,7 @@ class LocalDocumentsStore {
   static set debugDirectory(Directory? value) {
     _debugDirectory = value;
     _cachedState = null;
+    _userDirectory = null;
     _cachedDeviceFolders = null;
     _deviceFoldersCountedAt = null;
   }
@@ -65,6 +72,19 @@ class LocalDocumentsStore {
   // Caching the parsed state in memory turns every read after the first
   // into a plain map lookup; only genuine writes still touch disk.
   static Map<String, dynamic>? _cachedState;
+
+  // Each account has its own library (see [_appDirectory]); whatever was
+  // cached belongs to the account that was signed in when it was loaded.
+  static String? _cacheOwner;
+  static Directory? _userDirectory;
+
+  static void _dropCacheIfUserChanged() {
+    if (_cacheOwner == CurrentUser.key) return;
+    _cacheOwner = CurrentUser.key;
+    _cachedState = null;
+    _userDirectory = null;
+  }
+
   static const stateFileName = 'alldocs_state.json';
   static const documentsFolderName = 'documents';
   static const _stateVersion = 3;
@@ -129,7 +149,7 @@ class LocalDocumentsStore {
   /// can detect a .zip among the picked files and route it through the
   /// extract-preview-select flow (see [extractZipPreview]) instead of
   /// silently importing it whole. On Android the system picker also lists
-  /// cloud providers (Drive, OneDrive, Dropbox...), which is the "quick
+  /// cloud providers (Drive, Dropbox...), which is the "quick
   /// import" path from the cloud.
   Future<List<PlatformFile>> pickFilesForImport({
     ImportPickKind kind = ImportPickKind.documents,
@@ -454,8 +474,10 @@ class LocalDocumentsStore {
     const indexer = DocumentTextIndexer();
     if (!DocumentTextIndexer.ocrAvailable) return;
     _indexing = true;
+    final owner = CurrentUser.key;
     try {
       while (true) {
+        if (CurrentUser.key != owner) break;
         final state = await _readState();
         final pending = _documentsList(state).where((raw) {
           if (raw['text_indexed'] == true) return false;
@@ -493,6 +515,9 @@ class LocalDocumentsStore {
                 ?.toIso8601String();
           }
         }
+        // OCR takes a while; if the account changed meanwhile, this state
+        // belongs to the previous one.
+        if (CurrentUser.key != owner) break;
         await _writeState(state);
         final document = DocumentFile.fromJson(target);
         if (document.validityDate != null) {
@@ -652,44 +677,81 @@ class LocalDocumentsStore {
   // ---------------------------------------------------------------------
 
   /// Gives a new library a starting shelf with a few albums, so a new
-  /// account isn't an empty screen. Runs once per library (remembered in
-  /// the state, so deleting the shelf doesn't bring it back) and never
-  /// touches a library that already has shelves. Returns whether it added
-  /// anything.
+  /// account isn't an empty screen. Never touches a library that already
+  /// has shelves, and runs once per library (remembered in the state, so
+  /// deleting the shelf doesn't bring it back).
+  ///
+  /// Each album says in which [StarterAlbum.since] version of the starter
+  /// set it appeared: a library that got an older set gets just the albums
+  /// added since, in its starter shelf if it still has it — never ones the
+  /// user already had and deleted. Returns whether it added anything.
   Future<bool> ensureStarterShelf(
     String shelfName,
-    List<({String name, String iconName})> albums,
+    List<StarterAlbum> albums,
   ) async {
+    final latest = albums.fold<int>(1, (v, a) => a.since > v ? a.since : v);
     final state = await _readState();
-    if (state['starter_shelf_created'] == true) return false;
-    state['starter_shelf_created'] = true;
+    final had =
+        (state['starter_shelf_version'] as int?) ??
+        (state['starter_shelf_created'] == true ? 1 : 0);
+    if (had >= latest) return false;
+    state['starter_shelf_version'] = latest;
+    state.remove('starter_shelf_created');
+
     final shelves = _shelvesRaw(state);
-    if (shelves.isNotEmpty) {
-      await _writeState(state);
-      return false;
+    var added = false;
+    if (had == 0) {
+      if (shelves.isEmpty) {
+        final shelfId = _newId('shelf');
+        shelves.add(
+          DocumentShelf(
+            id: shelfId,
+            name: shelfName,
+            position: 0,
+            albums: [
+              for (final (index, album) in albums.indexed)
+                _starterAlbum(album, shelfId, index),
+            ],
+          ).toJson(),
+        );
+        added = true;
+      }
+    } else {
+      final key = normalizeForSearch(shelfName);
+      final shelf = _shelvesList(state)
+          .where((s) => normalizeForSearch(s['name']?.toString() ?? '') == key)
+          .firstOrNull;
+      if (shelf != null) {
+        final existing = {
+          for (final album in _albumsList(shelf))
+            normalizeForSearch(album['name']?.toString() ?? ''),
+        };
+        final raw = _albumsRaw(shelf);
+        for (final album in albums) {
+          if (album.since <= had) continue;
+          if (existing.contains(normalizeForSearch(album.name))) continue;
+          raw.add(
+            _starterAlbum(album, shelf['id'].toString(), raw.length).toJson(),
+          );
+          added = true;
+        }
+        _reindexAlbums(shelf);
+      }
     }
-    final shelfId = _newId('shelf');
-    shelves.add(
-      DocumentShelf(
-        id: shelfId,
-        name: shelfName,
-        position: 0,
-        albums: [
-          for (final (index, album) in albums.indexed)
-            DocumentAlbum(
-              id: '${_newId('album')}$index',
-              shelfId: shelfId,
-              name: album.name,
-              colorValue: _albumColorFor(index),
-              iconName: album.iconName,
-              position: index,
-              documentIds: const [],
-            ),
-        ],
-      ).toJson(),
-    );
     await _writeState(state);
-    return true;
+    return added;
+  }
+
+  DocumentAlbum _starterAlbum(StarterAlbum album, String shelfId, int index) {
+    return DocumentAlbum(
+      id: '${_newId('album')}$index',
+      shelfId: shelfId,
+      name: album.name,
+      colorValue: _albumColorFor(index),
+      iconName: album.iconName,
+      position: index,
+      documentIds: const [],
+    );
   }
 
   Future<void> createShelf(String name) async {
@@ -778,6 +840,19 @@ class LocalDocumentsStore {
     if (name != null && name.trim().isNotEmpty) album['name'] = name.trim();
     if (colorValue != null) album['color_value'] = colorValue;
     if (iconName != null) album['icon_name'] = iconName;
+    await _writeState(state);
+  }
+
+  /// Moves an album behind (or back out from) the hidden-albums PIN.
+  Future<void> setAlbumHidden(String albumId, bool hidden) async {
+    final state = await _readState();
+    final album = _findAlbum(state, albumId);
+    if (album == null) return;
+    if (hidden) {
+      album['hidden'] = true;
+    } else {
+      album.remove('hidden');
+    }
     await _writeState(state);
   }
 
@@ -990,6 +1065,57 @@ class LocalDocumentsStore {
     if (changed) await _writeState(state);
   }
 
+  // Tags ------------------------------------------------------------------
+  // Matched ignoring case and accents, like everywhere else tags are
+  // compared (so "Saúde" and "saude" are one tag).
+
+  /// Adds [tag] to each of [documentIds] (skipping ones that already have
+  /// it).
+  Future<void> addTagToDocuments(String tag, List<String> documentIds) async {
+    final name = tag.trim();
+    if (name.isEmpty) return;
+    final state = await _readState();
+    var changed = false;
+    for (final id in documentIds) {
+      changed |= _updateDocumentJson(state, id, (document) {
+        return document.copyWith(
+          tags: _normalizeTags([...document.tags, name]),
+        );
+      });
+    }
+    if (changed) await _writeState(state);
+  }
+
+  /// Renames [from] to [to] on every document, archived and trashed ones
+  /// included. A document that already has [to] just loses [from].
+  Future<void> renameTag(String from, String to) {
+    final name = to.trim();
+    if (name.isEmpty) return Future.value();
+    return _replaceTag(from, name);
+  }
+
+  /// Removes [tag] from every document; the documents themselves stay.
+  Future<void> deleteTag(String tag) => _replaceTag(tag, null);
+
+  Future<void> _replaceTag(String tag, String? replacement) async {
+    final key = normalizeForSearch(tag.trim());
+    final state = await _readState();
+    var changed = false;
+    for (final raw in _documentsList(state)) {
+      final document = DocumentFile.fromJson(raw);
+      if (!document.tags.any((t) => normalizeForSearch(t) == key)) continue;
+      changed |= _updateDocumentJson(state, document.id, (document) {
+        return document.copyWith(
+          tags: _normalizeTags([
+            for (final t in document.tags)
+              if (normalizeForSearch(t) != key) t else ?replacement,
+          ]),
+        );
+      });
+    }
+    if (changed) await _writeState(state);
+  }
+
   Future<void> setArchived(List<String> documentIds, bool archived) async {
     final state = await _readState();
     var changed = false;
@@ -1189,6 +1315,11 @@ class LocalDocumentsStore {
   }
 
   Future<void> _syncReminderBestEffort(DocumentFile document) async {
+    // With a cap on reminders, one document's reminder depends on all the
+    // others (only the soonest are scheduled), so everything is re-planned.
+    if (PlanService.current.value.maxActiveReminders != null) {
+      return syncAllReminders();
+    }
     try {
       await _expiryReminderService.syncReminder(document);
     } catch (_) {
@@ -1197,7 +1328,29 @@ class LocalDocumentsStore {
     }
   }
 
+  static Future<void> _reminderResync = Future.value();
+
+  /// Re-plans every expiry reminder against the plan's cap (all of them
+  /// without one). Runs one at a time, since imports trigger it in bursts.
+  Future<void> syncAllReminders() {
+    return _reminderResync = _reminderResync.then((_) async {
+      try {
+        final state = await _readState();
+        await _expiryReminderService.syncAll(
+          _documentsList(state).map(DocumentFile.fromJson),
+          limit: PlanService.current.value.maxActiveReminders,
+        );
+      } catch (_) {
+        // Best effort, like a single reminder.
+      }
+    });
+  }
+
   Future<void> _cancelReminderBestEffort(String documentId) async {
+    // A freed slot goes to the next document waiting for one.
+    if (PlanService.current.value.maxActiveReminders != null) {
+      unawaited(syncAllReminders());
+    }
     try {
       await _expiryReminderService.cancelReminder(documentId);
     } catch (_) {
@@ -1283,6 +1436,7 @@ class LocalDocumentsStore {
   // ---------------------------------------------------------------------
 
   Future<Map<String, dynamic>> _readState() async {
+    _dropCacheIfUserChanged();
     final cached = _cachedState;
     if (cached != null) return cached;
 
@@ -1317,7 +1471,10 @@ class LocalDocumentsStore {
 
   Future<void> _writeState(Map<String, dynamic> state) async {
     _cachedState = state;
-    final file = await _stateFile();
+    await _writeStateFile(await _stateFile(), state);
+  }
+
+  Future<void> _writeStateFile(File file, Map<String, dynamic> state) async {
     await file.parent.create(recursive: true);
     // Encoding also runs off the UI thread, and compact rather than
     // indented — nothing reads this file by hand, and both save real time
@@ -1344,7 +1501,51 @@ class LocalDocumentsStore {
     return documentsDir;
   }
 
+  /// The signed-in account's own library: `<root>/users/<account key>`, so
+  /// two people using AllDocs on the same phone never see each other's
+  /// documents. With nobody signed in (tests, the brief moment before the
+  /// session loads) it's the root itself.
   Future<Directory> _appDirectory() async {
+    _dropCacheIfUserChanged();
+    final key = CurrentUser.key;
+    final root = await _rootDirectory();
+    if (key == null) return root;
+    final cached = _userDirectory;
+    if (cached != null) return cached;
+    final userDirectory = Directory('${root.path}/users/$key');
+    await userDirectory.create(recursive: true);
+    await _claimSharedLibrary(root, userDirectory);
+    if (CurrentUser.key == key) _userDirectory = userDirectory;
+    return userDirectory;
+  }
+
+  /// Before libraries were per account, everything lived straight in the
+  /// root. The first account to sign in after the update takes that library
+  /// over (it's the one that was using it); later accounts start fresh.
+  Future<void> _claimSharedLibrary(Directory root, Directory userDir) async {
+    final userState = File('${userDir.path}/$stateFileName');
+    final sharedState = File('${root.path}/$stateFileName');
+    if (await userState.exists() || !await sharedState.exists()) return;
+    try {
+      final sharedDocuments = Directory('${root.path}/$documentsFolderName');
+      final userDocuments = Directory('${userDir.path}/$documentsFolderName');
+      if (await sharedDocuments.exists() && !await userDocuments.exists()) {
+        await sharedDocuments.rename(userDocuments.path);
+      }
+      await sharedState.rename(userState.path);
+      final state = await _readStateFile(userState);
+      if (state == null) return;
+      await userDocuments.create(recursive: true);
+      _relinkStoredFiles(state, userDocuments);
+      await _writeStateFile(userState, state);
+    } catch (_) {
+      // Left where it was; the account simply starts with an empty library.
+    }
+  }
+
+  /// Where libraries live: the test sandbox, the shared-storage folder
+  /// (Android, survives reinstalling) or the app's private folder.
+  Future<Directory> _rootDirectory() async {
     if (debugDirectory != null) return debugDirectory!;
     final persistent = _persistentDirectory;
     if (persistent != null) return persistent;
@@ -1409,7 +1610,7 @@ class LocalDocumentsStore {
       _relinkStoredFiles(state, libraryDocuments);
 
       _persistentDirectory = library;
-      await _writeState(state);
+      await _writeStateFile(File('${library.path}/$stateFileName'), state);
       if (await internalStateFile.exists()) await internalStateFile.delete();
       return library;
     } catch (_) {
@@ -1576,20 +1777,14 @@ class LocalDocumentsStore {
   Future<DocumentsSnapshot> _snapshotFromState(
     Map<String, dynamic> state,
   ) async {
-    final allDocuments =
+    final everyDocument =
         _documentsList(state)
             .map(DocumentFile.fromJson)
             .where((document) => document.id.isNotEmpty)
             .toList()
           ..sort(_newestFirst);
-    final documents = allDocuments.where((d) => d.isActive).toList();
-    final archivedDocuments = allDocuments
-        .where((d) => d.isArchived && !d.isDeleted)
-        .toList();
-    final trashDocuments = allDocuments.where((d) => d.isDeleted).toList()
-      ..sort((a, b) => b.deletedAt!.compareTo(a.deletedAt!));
 
-    final shelves =
+    final allShelves =
         _shelvesList(state)
             .map(DocumentShelf.fromJson)
             .where((shelf) => shelf.id.isNotEmpty)
@@ -1600,6 +1795,35 @@ class LocalDocumentsStore {
             })
             .toList()
           ..sort((a, b) => a.position.compareTo(b.position));
+
+    // Hidden albums and every document in one (even if it's also in a
+    // visible album) are left out of everything below — shelves, gallery,
+    // search, recents, suggestions — and only offered behind their PIN.
+    final hiddenAlbums = [
+      for (final shelf in allShelves)
+        for (final album in shelf.albums)
+          if (album.hidden) album,
+    ];
+    final hiddenAlbumIds = {for (final album in hiddenAlbums) album.id};
+    bool isHidden(DocumentFile document) =>
+        document.albumIds.any(hiddenAlbumIds.contains);
+    final allDocuments = everyDocument.where((d) => !isHidden(d)).toList();
+    final hiddenDocuments = everyDocument
+        .where((d) => isHidden(d) && !d.isDeleted)
+        .toList();
+    final documents = allDocuments.where((d) => d.isActive).toList();
+    final archivedDocuments = allDocuments
+        .where((d) => d.isArchived && !d.isDeleted)
+        .toList();
+    final trashDocuments = allDocuments.where((d) => d.isDeleted).toList()
+      ..sort((a, b) => b.deletedAt!.compareTo(a.deletedAt!));
+
+    final shelves = [
+      for (final shelf in allShelves)
+        shelf.copyWith(
+          albums: shelf.albums.where((album) => !album.hidden).toList(),
+        ),
+    ];
 
     // One pass to count documents per album, instead of the album loop
     // below re-scanning the full document list once per album — that was
@@ -1642,10 +1866,8 @@ class LocalDocumentsStore {
     final expiringDocuments =
         documents.where((document) => document.validityDate != null).toList()
           ..sort((a, b) => a.validityDate!.compareTo(b.validityDate!));
-    final usedBytes = allDocuments.fold<int>(
-      0,
-      (total, document) => total + document.sizeBytes,
-    );
+    // Hidden documents take space like any other.
+    final storageSummary = await _storageSummary(everyDocument);
     final tags =
         {for (final document in allDocuments) ...document.tags}.toList()..sort(
           (a, b) => normalizeForSearch(a).compareTo(normalizeForSearch(b)),
@@ -1687,6 +1909,8 @@ class LocalDocumentsStore {
       trashDocuments: trashDocuments,
       tags: tags,
       suggestions: suggestions,
+      hiddenAlbums: hiddenAlbums,
+      hiddenDocuments: hiddenDocuments,
       // Overwritten with the real signed-in user's name/email/plan by
       // DocumentsService.loadSnapshot() — these are just the fallback values
       // if that overlay is skipped (e.g. calling this store directly).
@@ -1697,12 +1921,54 @@ class LocalDocumentsStore {
         documentsCount: documents.length,
         categoriesCount: categories.length,
         favoritesCount: favoriteDocumentsAll.length,
-        storageSummary: StorageSummary(
-          usedGb: usedBytes / 1024 / 1024 / 1024,
-          totalGb: 10,
-        ),
+        storageSummary: storageSummary,
       ),
     );
+  }
+
+  /// Every document file the app holds, measured on disk rather than from
+  /// the size recorded at import (a replaced version, a re-scanned page or a
+  /// document from before sizes were recorded would otherwise be off).
+  /// Files missing from disk count as nothing.
+  Future<StorageSummary> _storageSummary(List<DocumentFile> documents) async {
+    final sizes = await Future.wait([
+      for (final document in documents) _fileSize(document.localPath),
+    ]);
+    var inAlbums = const StorageBucket();
+    var withoutAlbum = const StorageBucket();
+    var archivedOrDeleted = const StorageBucket();
+    var trashBytes = 0;
+    for (var i = 0; i < documents.length; i++) {
+      final document = documents[i];
+      final size = sizes[i];
+      if (size == null) continue;
+      if (!document.isActive) {
+        archivedOrDeleted = archivedOrDeleted.add(size);
+        if (document.isDeleted) trashBytes += size;
+      } else if (document.albumIds.isNotEmpty) {
+        inAlbums = inAlbums.add(size);
+      } else {
+        withoutAlbum = withoutAlbum.add(size);
+      }
+    }
+    return StorageSummary(
+      // The plan's limit is applied by DocumentsService.
+      limitBytes: PlanCatalog.builtIn.byId(AppPlan.free).storageBytes,
+      inAlbums: inAlbums,
+      withoutAlbum: withoutAlbum,
+      archivedOrDeleted: archivedOrDeleted,
+      trashBytes: trashBytes,
+    );
+  }
+
+  Future<int?> _fileSize(String? path) async {
+    if (path == null || path.isEmpty) return null;
+    try {
+      final stat = await File(path).stat();
+      return stat.type == FileSystemEntityType.notFound ? null : stat.size;
+    } catch (_) {
+      return null;
+    }
   }
 
   Map<String, dynamic> _initialState() {

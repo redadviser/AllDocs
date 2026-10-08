@@ -11,6 +11,7 @@ import 'bookshelf.dart';
 import 'document_details_sheet.dart';
 import 'document_file_icon.dart';
 import 'document_preview_card.dart';
+import 'pdf_tools_flow.dart';
 import 'sheet_quick_action.dart';
 
 void showSnack(BuildContext context, String message) {
@@ -205,6 +206,28 @@ Future<void> showDocumentActions(
                   ]),
                 ),
               ),
+              if (isPdfDocument(document) ||
+                  document.type == DocumentType.image)
+                _Action(
+                  icon: Icons.branding_watermark_outlined,
+                  label: AppConstants.pdfWatermarkAction.tr(),
+                  onTap: () => run(
+                    () => shareWatermarkedCopy(
+                      context,
+                      documentsService,
+                      document,
+                    ),
+                  ),
+                ),
+              if (isPdfDocument(document))
+                _Action(
+                  icon: Icons.picture_as_pdf_outlined,
+                  label: AppConstants.pdfTools.tr(),
+                  onTap: () => run(
+                    () =>
+                        showPdfToolsSheet(context, documentsService, document),
+                  ),
+                ),
               if (albumContextId != null)
                 _Action(
                   icon: Icons.folder_off_outlined,
@@ -369,61 +392,28 @@ Future<void> showAlbumMembershipSheet(
                       shrinkWrap: true,
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       children: [
-                        for (final shelf in snapshot.shelves)
-                          if (shelf.albums.isNotEmpty) ...[
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
-                              child: Text(
-                                shelf.name.toUpperCase(),
-                                style: const TextStyle(
-                                  color: AppTheme.mutedText,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 12.5,
-                                  letterSpacing: 1.05,
-                                ),
-                              ),
-                            ),
-                            BookshelfLane(
-                              child: ListView(
-                                scrollDirection: Axis.horizontal,
-                                padding: const EdgeInsets.fromLTRB(8, 14, 8, 0),
-                                children: [
-                                  for (final album in shelf.albums)
-                                    GestureDetector(
-                                      behavior: HitTestBehavior.opaque,
-                                      onTap: () async {
-                                        if (!inAlbum(album.id)) {
-                                          await documentsService
-                                              .addDocumentsToAlbum(
-                                                ids.toList(),
-                                                album.id,
-                                              );
-                                        } else {
-                                          for (final id in ids) {
-                                            await documentsService
-                                                .removeDocumentFromAlbum(
-                                                  id,
-                                                  album.id,
-                                                );
-                                          }
-                                        }
-                                        await refresh();
-                                      },
-                                      child: Tooltip(
-                                        message: album.name,
-                                        child: AlbumSpine(
-                                          album: album,
-                                          count: snapshot
-                                              .documentsForAlbum(album.id)
-                                              .length,
-                                          selected: inAlbum(album.id),
-                                        ),
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ),
-                          ],
+                        AlbumShelfPicker(
+                          shelves: snapshot.shelves,
+                          isSelected: inAlbum,
+                          countFor: (albumId) =>
+                              snapshot.documentsForAlbum(albumId).length,
+                          onToggle: (album) async {
+                            if (!inAlbum(album.id)) {
+                              await documentsService.addDocumentsToAlbum(
+                                ids.toList(),
+                                album.id,
+                              );
+                            } else {
+                              for (final id in ids) {
+                                await documentsService.removeDocumentFromAlbum(
+                                  id,
+                                  album.id,
+                                );
+                              }
+                            }
+                            await refresh();
+                          },
+                        ),
                         Padding(
                           padding: const EdgeInsets.fromLTRB(4, 14, 4, 0),
                           child: _SelectedAlbums(

@@ -8,13 +8,15 @@ import 'package:pdfx/pdfx.dart';
 import '../../common/app_constants.dart';
 import '../../common/document_actions.dart';
 import '../../common/document_file_icon.dart';
+import '../../common/office_document_view.dart';
 import '../../models/models.dart';
 import '../../services/services.dart';
 import '../../theme/app_theme.dart';
 
 /// Opens [document] full screen inside AllDocs. PDFs and images are shown
-/// natively (pinch to zoom); Office/text files show their text, with a
-/// button to open them in another app.
+/// natively (pinch to zoom); Word/PowerPoint/Excel with their real layout
+/// (OfficeDocumentView); anything else — or a file those can't lay out —
+/// shows its text, with a button to open it in another app.
 Future<void> openDocumentViewer(
   BuildContext context,
   DocumentsService documentsService,
@@ -50,6 +52,7 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
   PdfControllerPinch? _pdfController;
   bool _chromeVisible = true;
   bool _pdfFailed = false;
+  bool _officeFailed = false;
   int _page = 1;
   int _pages = 0;
 
@@ -222,10 +225,23 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
       );
     }
 
+    final officeKind = officeKindFor(_document.fileName);
+    if (officeKind != null && !_officeFailed) {
+      return OfficeDocumentView(
+        path: path,
+        kind: officeKind,
+        topInset: MediaQuery.of(context).padding.top + kToolbarHeight + 8,
+        onFailed: () {
+          if (mounted) setState(() => _officeFailed = true);
+        },
+      );
+    }
+
     return _textFallback();
   }
 
-  /// Word/Excel/PowerPoint/text: the extracted text on a paper-like page,
+  /// Old Office formats, text files, or a document the in-app viewer
+  /// couldn't lay out: the extracted text on a paper-like page,
   /// plus "open in another app" for the real layout.
   Widget _textFallback() {
     final text = _document.ocrText?.trim();

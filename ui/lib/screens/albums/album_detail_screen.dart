@@ -5,6 +5,7 @@ import '../../common/add_document_sheet.dart';
 import '../../common/album_dialog.dart';
 import '../../common/app_constants.dart';
 import '../../common/app_sheet.dart';
+import '../../common/device_scan_sheet.dart';
 import '../../common/document_actions.dart';
 import '../../common/document_preview_card.dart';
 import '../../common/snapshot_builder.dart';
@@ -12,6 +13,7 @@ import '../../models/models.dart';
 import '../../services/services.dart';
 import '../../theme/app_theme.dart';
 import '../viewer/document_viewer_screen.dart';
+import 'hidden_albums_screen.dart';
 
 /// One album (by [albumId]) or a computed collection (by [select], e.g.
 /// favorites).
@@ -101,12 +103,22 @@ class AlbumDetailScreen extends StatelessWidget {
                           PopupMenuButton<String>(
                             onSelected: (value) {
                               if (value == 'edit') _edit(context, album);
+                              if (value == 'hide') _setHidden(context, album);
                               if (value == 'delete') _delete(context, album);
                             },
                             itemBuilder: (context) => [
                               PopupMenuItem(
                                 value: 'edit',
                                 child: Text(AppConstants.albumsEditAlbum.tr()),
+                              ),
+                              PopupMenuItem(
+                                value: 'hide',
+                                child: Text(
+                                  (album.hidden
+                                          ? AppConstants.hiddenUnhide
+                                          : AppConstants.hiddenHide)
+                                      .tr(),
+                                ),
                               ),
                               PopupMenuItem(
                                 value: 'delete',
@@ -233,37 +245,28 @@ class AlbumDetailScreen extends StatelessWidget {
     DocumentsSnapshot snapshot,
     DocumentAlbum album,
   ) async {
-    final choice = await showOptionsSheet<String>(
-      context: context,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.collections_outlined),
-              title: Text(AppConstants.albumsFromGallery.tr()),
-              onTap: () => Navigator.of(context).pop('gallery'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.add_rounded),
-              title: Text(AppConstants.albumsImportNew.tr()),
-              onTap: () => Navigator.of(context).pop('import'),
-            ),
-          ],
+    // Straight to the gallery: someone who starts on the shelf may not know
+    // what the gallery is yet. When it's empty, the picker offers to find
+    // documents on the phone and put them right into this album.
+    // The gallery is what isn't in any album yet; documents already
+    // organized elsewhere are moved from their own album, not from here.
+    final candidates = snapshot.unorganizedDocuments;
+    final picked = await showPickDocumentsSheet(
+      context,
+      candidates,
+      title: AppConstants.navGallery.tr(),
+      emptyTitle: AppConstants.albumsGalleryEmptyTitle.tr(),
+      emptyMessage: AppConstants.albumsGalleryEmptyMessage.tr(),
+      onSearchDevice: () => scanDeviceAndShow(
+        context,
+        documentsService,
+        () => documentsService.scanAllDeviceDocuments(
+          title: AppConstants.archiveAllDeviceDocuments.tr(),
         ),
+        albumId: album.id,
       ),
-    );
-    if (!context.mounted || choice == null) return;
-    if (choice == 'import') {
-      await showAddDocumentSheet(context, documentsService, albumId: album.id);
-      return;
-    }
-    final candidates = snapshot.documents
-        .where((document) => !document.albumIds.contains(album.id))
-        .toList();
-    final picked = await showAppSheet<List<String>>(
-      context: context,
-      builder: (context) => _PickDocumentsSheet(documents: candidates),
+      onOtherWays: () =>
+          showAddDocumentSheet(context, documentsService, albumId: album.id),
     );
     if (picked == null || picked.isEmpty) return;
     await documentsService.addDocumentsToAlbum(picked, album.id);
@@ -280,6 +283,18 @@ class AlbumDetailScreen extends StatelessWidget {
     );
   }
 
+  /// Hides the album (or shows it again). Either way it leaves the list
+  /// this screen was opened from, so the screen closes.
+  Future<void> _setHidden(BuildContext context, DocumentAlbum album) async {
+    final changed = await setAlbumHiddenFlow(
+      context,
+      documentsService,
+      album,
+      hidden: !album.hidden,
+    );
+    if (changed && context.mounted) Navigator.of(context).maybePop();
+  }
+
   Future<void> _delete(BuildContext context, DocumentAlbum album) async {
     final confirmed = await showConfirmDialog(
       context,
@@ -293,10 +308,48 @@ class AlbumDetailScreen extends StatelessWidget {
   }
 }
 
+/// Lets the user tick documents out of [documents] (searchable grid);
+/// returns the picked ids, or null if dismissed. With [onSearchDevice] /
+/// [onOtherWays] it also offers bringing new documents in (the sheet closes
+/// and the callback runs) — prominently when there's nothing to pick.
+Future<List<String>?> showPickDocumentsSheet(
+  BuildContext context,
+  List<DocumentFile> documents, {
+  String? title,
+  String? emptyTitle,
+  String? emptyMessage,
+  VoidCallback? onSearchDevice,
+  VoidCallback? onOtherWays,
+}) {
+  return showAppSheet<List<String>>(
+    context: context,
+    builder: (context) => _PickDocumentsSheet(
+      documents: documents,
+      title: title,
+      emptyTitle: emptyTitle,
+      emptyMessage: emptyMessage,
+      onSearchDevice: onSearchDevice,
+      onOtherWays: onOtherWays,
+    ),
+  );
+}
+
 class _PickDocumentsSheet extends StatefulWidget {
-  const _PickDocumentsSheet({required this.documents});
+  const _PickDocumentsSheet({
+    required this.documents,
+    this.title,
+    this.emptyTitle,
+    this.emptyMessage,
+    this.onSearchDevice,
+    this.onOtherWays,
+  });
 
   final List<DocumentFile> documents;
+  final String? title;
+  final String? emptyTitle;
+  final String? emptyMessage;
+  final VoidCallback? onSearchDevice;
+  final VoidCallback? onOtherWays;
 
   @override
   State<_PickDocumentsSheet> createState() => _PickDocumentsSheetState();
@@ -306,8 +359,15 @@ class _PickDocumentsSheetState extends State<_PickDocumentsSheet> {
   final Set<String> _selected = {};
   String _query = '';
 
+  /// Closes the picker, then runs [action] (which opens its own flow).
+  void _leaveFor(VoidCallback action) {
+    Navigator.of(context).pop();
+    action();
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (widget.documents.isEmpty) return _buildEmpty();
     final visible = searchDocuments(
       widget.documents,
       DocumentSearchFilter(query: _query),
@@ -316,6 +376,30 @@ class _PickDocumentsSheetState extends State<_PickDocumentsSheet> {
       height: MediaQuery.of(context).size.height * 0.85,
       child: Column(
         children: [
+          if (widget.title != null || widget.onSearchDevice != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 8, 6),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      widget.title ?? '',
+                      style: const TextStyle(
+                        color: AppTheme.text,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  if (widget.onSearchDevice != null)
+                    TextButton.icon(
+                      onPressed: () => _leaveFor(widget.onSearchDevice!),
+                      icon: const Icon(Icons.manage_search_rounded, size: 18),
+                      label: Text(AppConstants.albumsSearchDevice.tr()),
+                    ),
+                ],
+              ),
+            ),
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
             child: TextField(
@@ -366,6 +450,69 @@ class _PickDocumentsSheetState extends State<_PickDocumentsSheet> {
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmpty() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(28, 8, 28, 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              color: AppTheme.accent.withValues(alpha: 0.14),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.collections_outlined,
+              color: AppTheme.accent,
+              size: 30,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            widget.emptyTitle ?? AppConstants.albumsNothingToPick.tr(),
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: AppTheme.text,
+              fontSize: 17,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          if (widget.emptyMessage != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              widget.emptyMessage!,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: AppTheme.mutedText, height: 1.4),
+            ),
+          ],
+          if (widget.onSearchDevice != null) ...[
+            const SizedBox(height: 22),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: () => _leaveFor(widget.onSearchDevice!),
+                icon: const Icon(Icons.manage_search_rounded),
+                label: Text(AppConstants.albumsSearchDevice.tr()),
+              ),
+            ),
+          ],
+          if (widget.onOtherWays != null) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () => _leaveFor(widget.onOtherWays!),
+                child: Text(AppConstants.albumsOtherWays.tr()),
+              ),
+            ),
+          ],
         ],
       ),
     );

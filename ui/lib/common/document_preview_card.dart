@@ -8,6 +8,8 @@ import '../services/thumbnail_cache.dart';
 import '../theme/app_theme.dart';
 import 'app_constants.dart';
 import 'document_file_icon.dart';
+import 'office_document_view.dart';
+import 'office_thumbnail_host.dart';
 
 /// Gallery card: a real preview of the document (first PDF page, the image
 /// itself, or the start of its text) with the name and date underneath.
@@ -197,7 +199,54 @@ class DocumentThumbnail extends StatelessWidget {
     if (document.type == DocumentType.pdf) {
       return _PdfThumbnail(path: path, fallback: fallback);
     }
+    final officeKind = officeKindFor(document.fileName);
+    if (officeKind != null) {
+      return _OfficeThumbnail(path: path, kind: officeKind, fallback: fallback);
+    }
     return fallback;
+  }
+}
+
+/// First page / slide / sheet of a Word, PowerPoint or Excel file, drawn
+/// like the in-app viewer shows it (see OfficeThumbnailHost); the text page
+/// until it's ready, or if it can't be drawn.
+class _OfficeThumbnail extends StatelessWidget {
+  const _OfficeThumbnail({
+    required this.path,
+    required this.kind,
+    required this.fallback,
+  });
+
+  final String path;
+  final OfficeKind kind;
+  final Widget fallback;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<File?>(
+      future: ThumbnailCache.instance.officeThumbnail(
+        path,
+        () => OfficeThumbnailHost.render(path, kind),
+      ),
+      builder: (context, snapshot) {
+        final file = snapshot.data;
+        if (file == null) return fallback;
+        // Slides are landscape: shown whole on a neutral card instead of
+        // cropped to the card's portrait shape.
+        final slide = kind == OfficeKind.pptx;
+        return ColoredBox(
+          color: slide ? const Color(0xFFE9ECF0) : Colors.white,
+          child: Image.file(
+            file,
+            fit: slide ? BoxFit.contain : BoxFit.cover,
+            alignment: slide ? Alignment.center : Alignment.topCenter,
+            cacheWidth: 360,
+            gaplessPlayback: true,
+            errorBuilder: (context, error, stackTrace) => fallback,
+          ),
+        );
+      },
+    );
   }
 }
 

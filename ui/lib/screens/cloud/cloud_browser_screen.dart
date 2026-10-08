@@ -8,6 +8,7 @@ import '../../common/app_constants.dart';
 import '../../common/document_actions.dart';
 import '../../common/document_file_icon.dart';
 import '../../common/document_import_flow.dart';
+import '../../common/plan_prompts.dart';
 import '../../common/zip_preview_sheet.dart';
 import '../../models/models.dart';
 import '../../services/services.dart';
@@ -337,6 +338,10 @@ class _CloudBrowserScreenState extends State<CloudBrowserScreen> {
     Navigator.of(context, rootNavigator: true).pop();
     progress.dispose();
     setState(_selected.clear);
+    if (failure is StorageFullException) {
+      await showStorageFullDialog(context, failure);
+      return;
+    }
     if (failure != null) {
       showSnack(context, AppConstants.cloudRequestFailed.tr());
       return;

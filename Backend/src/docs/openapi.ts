@@ -29,8 +29,8 @@ export const openApiSpec = {
     title: 'AllDocs API',
     version: '0.1.0',
     description: [
-      'Backend of the AllDocs app: accounts, sessions/devices and app',
-      'configuration. Documents themselves stay on the phone.',
+      'Backend of the AllDocs app: accounts, sessions/devices, subscription',
+      'plans and app configuration. Documents themselves stay on the phone.',
       '',
       'Authentication is a `session_token` cookie. In this page, calling a',
       'login endpoint with **Try it out** sets the cookie in the browser, so',
@@ -42,7 +42,7 @@ export const openApiSpec = {
       '  (Google Sign-In SDK) and posts it to `POST /api/auth/google/signin`,',
       '  which verifies it and opens the session. There is no redirect',
       '  callback URL on the backend.',
-      '- *Google Drive, OneDrive, Dropbox*: authorized on the phone (PKCE);',
+      '- *Google Drive, Dropbox*: authorized on the phone (PKCE);',
       '  the OAuth redirect is the app\'s own scheme',
       '  `com.alldocs.app:/oauth2redirect`, and the tokens stay in the',
       '  phone\'s keystore. The backend only hands out the public client ids',
@@ -53,6 +53,7 @@ export const openApiSpec = {
   tags: [
     { name: 'Auth', description: 'AllDocs accounts and sessions' },
     { name: 'Devices', description: 'Signed-in devices (sessions) of the current user' },
+    { name: 'Plans', description: 'Subscription plans (Pocket, Folio, Vault), bought through Adapty' },
     { name: 'Config', description: 'Public app configuration' },
     { name: 'Health' },
   ],
@@ -91,6 +92,43 @@ export const openApiSpec = {
           createdAt: { type: 'string', format: 'date-time' },
         },
       },
+      Plan: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', enum: ['free', 'premium', 'pro'] },
+          name: { type: 'string', example: 'Folio' },
+          priceMonthlyCents: { type: 'integer', example: 199 },
+          priceYearlyCents: { type: 'integer', example: 1599 },
+          currency: { type: 'string', example: 'EUR' },
+          storageBytes: { type: 'integer', description: 'How much the library may hold on the phone', example: 5368709120 },
+          maxActiveReminders: { type: 'integer', nullable: true, description: 'null = unlimited', example: null },
+          maxDevices: { type: 'integer', example: 2 },
+          features: {
+            type: 'array',
+            items: {
+              type: 'string',
+              enum: [
+                'autoBackup', 'unlimitedReminders', 'watermark', 'pdfTools', 'hiddenAlbums',
+                'deviceSync', 'secureSharing', 'documentRequests', 'aiAssistant', 'prioritySupport',
+              ],
+            },
+          },
+        },
+      },
+      PlansOverview: {
+        type: 'object',
+        properties: {
+          currentPlanId: { type: 'string', enum: ['free', 'premium', 'pro'] },
+          billingPeriod: { type: 'string', enum: ['monthly', 'yearly'], nullable: true },
+          expiresAt: { type: 'string', format: 'date-time', nullable: true, description: 'End of the paid period, when known' },
+          plans: { type: 'array', items: { $ref: '#/components/schemas/Plan' } },
+          comingSoon: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Features listed by plans that the app does not have yet',
+          },
+        },
+      },
       CloudConfig: {
         type: 'object',
         properties: {
@@ -100,10 +138,6 @@ export const openApiSpec = {
               webClientId: { type: 'string', nullable: true },
               iosClientId: { type: 'string', nullable: true },
             },
-          },
-          oneDrive: {
-            type: 'object',
-            properties: { clientId: { type: 'string', nullable: true } },
           },
           dropbox: {
             type: 'object',
@@ -383,10 +417,59 @@ export const openApiSpec = {
         },
       },
     },
+    '/api/plans': {
+      get: {
+        tags: ['Plans'],
+        summary: "The plans and the current account's plan",
+        security: [{ sessionCookie: [] }],
+        responses: {
+          200: { description: 'Plans', content: { 'application/json': { schema: { $ref: '#/components/schemas/PlansOverview' } } } },
+          401: { description: 'Not authenticated', content: { 'application/json': { schema: error } } },
+        },
+      },
+    },
+    '/api/plans/sync': {
+      post: {
+        tags: ['Plans'],
+        summary: 'Update the plan from Adapty',
+        description: [
+          'Asks Adapty (server-side API, `ADAPTY_SECRET_API_KEY`) for the',
+          "account's active access levels and stores the highest one as the",
+          'plan. The app calls it after a purchase or a restore; the phone never',
+          'sets its own plan.',
+        ].join('\n'),
+        security: [{ sessionCookie: [] }],
+        responses: {
+          200: { description: 'Plan updated', content: { 'application/json': { schema: { $ref: '#/components/schemas/PlansOverview' } } } },
+          401: { description: 'Not authenticated', content: { 'application/json': { schema: error } } },
+          502: { description: 'Adapty could not be reached', content: { 'application/json': { schema: error } } },
+          503: { description: 'Adapty is not configured on this server', content: { 'application/json': { schema: error } } },
+        },
+      },
+    },
+    '/api/adapty/webhook': {
+      post: {
+        tags: ['Plans'],
+        summary: 'Adapty webhook',
+        description: [
+          'Configured in the Adapty dashboard with an `Authorization` header',
+          'equal to `ADAPTY_WEBHOOK_AUTH`. Every event is stored in',
+          '`subscription_events`; events of a known AllDocs user',
+          '(`customer_user_id` = user id) update its plan. An empty body is',
+          'answered with 200 (Adapty\'s URL check).',
+        ].join('\n'),
+        requestBody: { content: { 'application/json': { schema: { type: 'object' } } } },
+        responses: {
+          200: { description: 'Received', content: { 'application/json': { schema: { type: 'object' } } } },
+          401: { description: 'Wrong or missing Authorization header', content: { 'application/json': { schema: error } } },
+          500: { description: 'Processing failed (Adapty retries)', content: { 'application/json': { schema: error } } },
+        },
+      },
+    },
     '/api/config/cloud': {
       get: {
         tags: ['Config'],
-        summary: 'OAuth client ids for Google, OneDrive and Dropbox',
+        summary: 'OAuth client ids for Google and Dropbox',
         description: [
           'Public (needed before sign-in). Values come from the server .env;',
           '`null` means that provider is not configured and the app shows it',

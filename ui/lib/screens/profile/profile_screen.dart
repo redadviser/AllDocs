@@ -9,13 +9,18 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../common/app_constants.dart';
 import '../../common/app_sheet.dart';
 import '../../common/backup_flow.dart';
-import '../../common/glass_panel.dart';
+import '../../common/language_picker.dart';
+import '../../common/settings_grid.dart';
+import '../../common/zip_preview_sheet.dart' show formatBytes;
+import 'plans_screen.dart';
 import '../../common/snapshot_builder.dart';
 import '../../common/user_initials.dart';
 import '../../models/models.dart';
 import '../../services/services.dart';
 import '../../theme/app_theme.dart';
 import '../auth/auth_gate.dart';
+import '../albums/hidden_albums_screen.dart';
+import '../auth/security_gate.dart';
 import '../cloud/cloud_screen.dart';
 import '../security/devices_screen.dart';
 import '../support/faq_screen.dart';
@@ -77,11 +82,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   children: [
                     _ProfileOverviewPage(
                       profile: profile,
+                      snapshot: snapshot,
                       documentsService: widget.documentsService,
                     ),
                     _ProfileSettingsPage(
                       profile: profile,
-                      snapshot: snapshot,
                       documentsService: widget.documentsService,
                     ),
                   ],
@@ -108,10 +113,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
 class _ProfileOverviewPage extends StatelessWidget {
   const _ProfileOverviewPage({
     required this.profile,
+    required this.snapshot,
     required this.documentsService,
   });
 
   final UserProfile profile;
+  final DocumentsSnapshot snapshot;
   final DocumentsService documentsService;
 
   @override
@@ -124,42 +131,130 @@ class _ProfileOverviewPage extends StatelessWidget {
           profile: profile,
           onEditPhoto: () => _pickAndSaveAvatar(documentsService),
         ),
-        const SizedBox(height: 14),
-        _BackupPanel(documentsService: documentsService),
-        const SizedBox(height: 14),
-        _StoragePanel(summary: profile.storageSummary),
-        const SizedBox(height: 14),
-        _ProfileWideAction(
-          icon: Icons.cloud_outlined,
-          iconColor: AppTheme.accent,
-          title: AppConstants.connectionsTitle.tr(),
-          subtitle: AppConstants.connectionsSubtitle.tr(),
-          onTap: () => openConnectionsPage(context, documentsService),
+        const SizedBox(height: 12),
+        _StatsGrid(profile: profile, tagsCount: snapshot.tags.length),
+        const SizedBox(height: 12),
+        _BackupSection(documentsService: documentsService),
+        const SizedBox(height: 12),
+        _StorageSection(summary: profile.storageSummary),
+        const SizedBox(height: 24),
+      ],
+    );
+  }
+}
+
+class _ProfileSettingsPage extends StatelessWidget {
+  const _ProfileSettingsPage({
+    required this.profile,
+    required this.documentsService,
+  });
+
+  final UserProfile profile;
+  final DocumentsService documentsService;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      key: const PageStorageKey('profile_settings'),
+      physics: const BouncingScrollPhysics(),
+      children: [
+        _ProfileHeader(
+          profile: profile,
+          onEditPhoto: () => _pickAndSaveAvatar(documentsService),
         ),
-        const SizedBox(height: 14),
-        _StatsPanel(profile: profile),
-        const SizedBox(height: 14),
-        GlassPanel(
-          child: _SettingsTile(
-            icon: Icons.language_rounded,
-            title: AppConstants.profileLanguage.tr(),
-            value: _languageName(context),
-            onTap: () => _showLanguageSheet(context),
+        const SizedBox(height: 12),
+        const _CustomizationPanel(),
+        const SizedBox(height: 12),
+        _SecuritySection(profile: profile, documentsService: documentsService),
+        const SizedBox(height: 12),
+        const _LanguageSection(),
+        const SizedBox(height: 12),
+        const _HelpSection(),
+        const SizedBox(height: 12),
+        _AccountSection(documentsService: documentsService),
+      ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Profile page
+// ---------------------------------------------------------------------------
+
+class _StatsGrid extends StatelessWidget {
+  const _StatsGrid({required this.profile, required this.tagsCount});
+
+  final UserProfile profile;
+  final int tagsCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final stats = [
+      (
+        icon: Icons.description_outlined,
+        value: _formatNumber(profile.documentsCount),
+        label: AppConstants.profileDocuments.tr(),
+      ),
+      (
+        icon: Icons.collections_bookmark_outlined,
+        value: _formatNumber(profile.categoriesCount),
+        label: AppConstants.profileAlbums.tr(),
+      ),
+      (
+        icon: Icons.sell_outlined,
+        value: _formatNumber(tagsCount),
+        label: AppConstants.profileTags.tr(),
+      ),
+      (
+        icon: Icons.star_outline_rounded,
+        value: _formatNumber(profile.favoritesCount),
+        label: AppConstants.profileFavorites.tr(),
+      ),
+    ];
+    return SettingsGrid(
+      spacing: 10,
+      wideColumns: 4,
+      children: [
+        for (final stat in stats)
+          SettingsCard(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Column(
+              children: [
+                Icon(stat.icon, size: 24, color: AppTheme.mutedText),
+                const SizedBox(height: 8),
+                Text(
+                  stat.value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppTheme.text,
+                    fontSize: 30,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  stat.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppTheme.mutedText,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-        const SizedBox(height: 14),
-        const _SupportPanel(),
-        const SizedBox(height: 14),
-        const _LogoutButton(),
       ],
     );
   }
 }
 
 /// Backup at one tap: shows when/where the last one went; "Back up now"
-/// asks where to (phone or any cloud) and does it.
-class _BackupPanel extends StatelessWidget {
-  const _BackupPanel({required this.documentsService});
+/// asks where to (phone or any cloud) and does it; "Options" opens the
+/// connections page (destination, daily backup, restore).
+class _BackupSection extends StatelessWidget {
+  const _BackupSection({required this.documentsService});
 
   final DocumentsService documentsService;
 
@@ -177,73 +272,35 @@ class _BackupPanel extends StatelessWidget {
             ? AppConstants.backupThisDevice.tr()
             : documentsService.cloud.providerNamed(providerId)?.displayName ??
                   AppConstants.backupThisDevice.tr();
-        return GlassPanel(
+        return SettingsSection(
+          icon: Icons.backup_outlined,
+          title: AppConstants.backupTitle.tr(),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
-                children: [
-                  Container(
-                    width: 46,
-                    height: 46,
-                    decoration: BoxDecoration(
-                      color: AppTheme.accent.withValues(alpha: 0.18),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Icon(
-                      Icons.backup_outlined,
-                      color: AppTheme.accent,
-                      size: 26,
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          AppConstants.backupTitle.tr(),
-                          style: const TextStyle(
-                            color: AppTheme.text,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          last == null
-                              ? AppConstants.backupStatusNever.tr()
-                              : AppConstants.backupStatus.tr(
-                                  namedArgs: {
-                                    'date': DateFormat.yMMMd().add_Hm().format(
-                                      last,
-                                    ),
-                                    'destination': destination,
-                                  },
-                                ),
-                          style: const TextStyle(color: AppTheme.mutedText),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+              Text(
+                last == null
+                    ? AppConstants.backupStatusNever.tr()
+                    : AppConstants.backupStatus.tr(
+                        namedArgs: {
+                          'date': DateFormat.yMMMd().add_Hm().format(last),
+                          'destination': destination,
+                        },
+                      ),
+                style: const TextStyle(color: AppTheme.mutedText),
               ),
-              const SizedBox(height: 14),
-              Row(
+              const SizedBox(height: 10),
+              SettingsGrid(
                 children: [
-                  Expanded(
-                    child: FilledButton.icon(
-                      onPressed: () =>
-                          showBackupSheet(context, documentsService),
-                      icon: const Icon(Icons.backup_outlined),
-                      label: Text(AppConstants.backupNow.tr()),
-                    ),
+                  SettingsGridAction(
+                    icon: Icons.backup_outlined,
+                    title: AppConstants.backupNow.tr(),
+                    onTap: () => showBackupSheet(context, documentsService),
                   ),
-                  const SizedBox(width: 10),
-                  OutlinedButton(
-                    onPressed: () =>
-                        openConnectionsPage(context, documentsService),
-                    child: Text(AppConstants.backupOptions.tr()),
+                  SettingsGridAction(
+                    icon: Icons.cloud_outlined,
+                    title: AppConstants.connectionsTitle.tr(),
+                    onTap: () => openConnectionsPage(context, documentsService),
                   ),
                 ],
               ),
@@ -255,39 +312,539 @@ class _BackupPanel extends StatelessWidget {
   }
 }
 
+/// Everything the app stores: the gallery (in albums or not), the archive
+/// and the recycle bin, against the library's limit.
+class _StorageSection extends StatelessWidget {
+  const _StorageSection({required this.summary});
+
+  final StorageSummary summary;
+
+  @override
+  Widget build(BuildContext context) {
+    String count(int value) => AppConstants.profileStorageCount.tr(
+      namedArgs: {'count': _formatNumber(value)},
+    );
+
+    return SettingsSection(
+      icon: Icons.inventory_2_outlined,
+      title: AppConstants.profileStorage.tr(),
+      child: SettingsGrid(
+        spacing: 10,
+        square: true,
+        children: [
+          _StorageUsageTile(summary: summary),
+          _StorageInfoTile(
+            icon: Icons.collections_bookmark_outlined,
+            title: AppConstants.profileStorageInAlbums.tr(),
+            value: formatBytes(summary.inAlbums.bytes),
+            subtitle: count(summary.inAlbums.count),
+          ),
+          _StorageInfoTile(
+            icon: Icons.photo_library_outlined,
+            title: AppConstants.profileStorageWithoutAlbum.tr(),
+            value: formatBytes(summary.withoutAlbum.bytes),
+            subtitle: count(summary.withoutAlbum.count),
+          ),
+          _StorageInfoTile(
+            icon: Icons.inventory_outlined,
+            title: AppConstants.profileStorageArchiveTrash.tr(),
+            value: formatBytes(summary.archivedOrDeleted.bytes),
+            subtitle: count(summary.archivedOrDeleted.count),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StorageUsageTile extends StatelessWidget {
+  const _StorageUsageTile({required this.summary});
+
+  final StorageSummary summary;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = summary.usedRatio > 0.85
+        ? AppTheme.destructive
+        : AppTheme.accent;
+    return SettingsCard(
+      padding: const EdgeInsets.all(10),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final shortest = constraints.biggest.shortestSide;
+          final compact = shortest < 160;
+          final circle = (shortest * (compact ? 0.42 : 0.5)).clamp(56.0, 90.0);
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(
+                    Icons.folder_copy_outlined,
+                    size: 16,
+                    color: AppTheme.mutedText,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      AppConstants.profileStorageInApp.tr(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: AppTheme.text,
+                        fontSize: compact ? 13 : 14,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: compact ? 6 : 10),
+              Expanded(
+                child: Center(
+                  child: SizedBox.square(
+                    dimension: circle,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        CircularProgressIndicator(
+                          // A sliver even when nearly empty, so it reads as
+                          // a gauge rather than an empty ring.
+                          value: summary.usedBytes == 0
+                              ? 0
+                              : summary.usedRatio.clamp(0.01, 1.0),
+                          strokeWidth: compact ? 8 : 10,
+                          backgroundColor: AppTheme.surfaceSoft,
+                          valueColor: AlwaysStoppedAnimation(color),
+                        ),
+                        Center(
+                          child: Text(
+                            '${summary.usedPercent}%',
+                            style: TextStyle(
+                              color: AppTheme.text,
+                              fontSize: compact ? 15 : 19,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(height: compact ? 6 : 8),
+              Text(
+                '${formatBytes(summary.usedBytes)} / '
+                '${formatBytes(summary.limitBytes)}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: AppTheme.mutedText,
+                  fontSize: compact ? 11 : 12,
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _StorageInfoTile extends StatelessWidget {
+  const _StorageInfoTile({
+    required this.icon,
+    required this.title,
+    required this.value,
+    required this.subtitle,
+  });
+
+  final IconData icon;
+  final String title;
+  final String value;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return SettingsCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 17, color: AppTheme.mutedText),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: AppTheme.text, fontSize: 14),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: AlignmentDirectional.centerStart,
+              child: Text(
+                value,
+                maxLines: 1,
+                style: const TextStyle(
+                  color: AppTheme.text,
+                  fontSize: 24,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            subtitle,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: AppTheme.mutedText, fontSize: 12),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Settings page
+// ---------------------------------------------------------------------------
+
+/// App lock (biometrics, when it locks), hidden previews and the account's
+/// sessions/devices.
+class _SecuritySection extends StatefulWidget {
+  const _SecuritySection({
+    required this.profile,
+    required this.documentsService,
+  });
+
+  final DocumentsService documentsService;
+
+  /// Whose PIN it is (shown on the change-PIN screen).
+  final UserProfile profile;
+
+  @override
+  State<_SecuritySection> createState() => _SecuritySectionState();
+}
+
+class _SecuritySectionState extends State<_SecuritySection> {
+  final SecurityLockService _securityLockService = SecurityLockService();
+  bool _loading = true;
+  bool _biometricEnabled = false;
+  bool _canUseBiometrics = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final enabled = await _securityLockService.isBiometricEnabled();
+    final canUseBiometrics = await _securityLockService.canUseBiometrics();
+    if (!mounted) return;
+    setState(() {
+      _biometricEnabled = enabled && canUseBiometrics;
+      _canUseBiometrics = canUseBiometrics;
+      _loading = false;
+    });
+  }
+
+  Future<void> _setBiometricEnabled(bool enabled) async {
+    if (enabled && !_canUseBiometrics) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppConstants.securityBiometricUnavailable.tr())),
+      );
+      return;
+    }
+    await _securityLockService.setBiometricEnabled(enabled);
+    if (!mounted) return;
+    setState(() => _biometricEnabled = enabled);
+  }
+
+  Future<void> _changePin() async {
+    final changed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => PinChangeScreen(
+          userName: widget.profile.name,
+          avatarUrl: widget.profile.avatarUrl,
+        ),
+      ),
+    );
+    if (changed != true || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(AppConstants.securityPinChanged.tr())),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SettingsSection(
+      icon: Icons.shield_outlined,
+      title: AppConstants.profileSecurity.tr(),
+      child: AnimatedBuilder(
+        animation: Listenable.merge([
+          AppSettings.autoLockMinutes,
+          AppSettings.hidePreviews,
+        ]),
+        builder: (context, _) => SettingsGrid(
+          children: [
+            SettingsGridAction(
+              icon: Icons.pin_outlined,
+              title: AppConstants.securityChangePin.tr(),
+              onTap: _changePin,
+            ),
+            SettingsGridToggle(
+              icon: Icons.fingerprint_rounded,
+              title: AppConstants.profileBiometricLock.tr(),
+              value: _biometricEnabled,
+              onChanged: _loading ? null : _setBiometricEnabled,
+            ),
+            SettingsGridAction(
+              icon: Icons.timer_outlined,
+              title: AppConstants.settingsAutoLock.tr(),
+              value: autoLockLabel(AppSettings.autoLockMinutes.value),
+              onTap: () => _showAutoLockSheet(context),
+            ),
+            SettingsGridToggle(
+              icon: Icons.visibility_off_outlined,
+              title: AppConstants.settingsHidePreviews.tr(),
+              value: AppSettings.hidePreviews.value,
+              onChanged: AppSettings.setHidePreviews,
+            ),
+            SettingsGridAction(
+              icon: Icons.visibility_off_outlined,
+              title: AppConstants.hiddenTitle.tr(),
+              onTap: () => openHiddenAlbums(context, widget.documentsService),
+            ),
+            SettingsGridAction(
+              icon: Icons.devices_outlined,
+              title: AppConstants.profileDevices.tr(),
+              onTap: () => Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const DevicesScreen())),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LanguageSection extends StatelessWidget {
+  const _LanguageSection();
+
+  static const _flags = {
+    'pt': '🇵🇹',
+    'en': '🇬🇧',
+    'es': '🇪🇸',
+    'fr': '🇫🇷',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final options = [
+      (locale: const Locale('pt'), label: AppConstants.profilePortuguese.tr()),
+      (locale: const Locale('en'), label: AppConstants.profileEnglish.tr()),
+      (locale: const Locale('es'), label: AppConstants.profileSpanish.tr()),
+      (locale: const Locale('fr'), label: AppConstants.profileFrench.tr()),
+    ];
+    return SettingsSection(
+      icon: Icons.language_outlined,
+      title: AppConstants.profileLanguage.tr(),
+      child: SettingsGrid(
+        wideColumns: 4,
+        children: [
+          for (final option in options)
+            _LanguageOption(
+              flag: _flags[option.locale.languageCode]!,
+              label: option.label,
+              selected:
+                  context.locale.languageCode == option.locale.languageCode,
+              onTap: () => changeAppLanguage(context, option.locale),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LanguageOption extends StatelessWidget {
+  const _LanguageOption({
+    required this.flag,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String flag;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected
+          ? AppTheme.accent.withValues(alpha: 0.16)
+          : AppTheme.surfaceStrong.withValues(alpha: 0.72),
+      borderRadius: BorderRadius.circular(999),
+      child: InkWell(
+        onTap: selected ? null : onTap,
+        borderRadius: BorderRadius.circular(999),
+        child: Container(
+          height: 44,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: selected ? AppTheme.accent : AppTheme.border,
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(flag, style: const TextStyle(fontSize: 18)),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: selected ? AppTheme.accent : AppTheme.text,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              if (selected) ...[
+                const SizedBox(width: 6),
+                Icon(Icons.check_rounded, size: 16, color: AppTheme.accent),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Taking the documents out of the app, and signing out.
+class _AccountSection extends StatelessWidget {
+  const _AccountSection({required this.documentsService});
+
+  final DocumentsService documentsService;
+
+  @override
+  Widget build(BuildContext context) {
+    return SettingsSection(
+      icon: Icons.manage_accounts_outlined,
+      title: AppConstants.profileAccountTitle.tr(),
+      child: SettingsGrid(
+        children: [
+          SettingsGridAction(
+            icon: Icons.ios_share_rounded,
+            title: AppConstants.profileExportDocuments.tr(),
+            onTap: () => _exportDocuments(context),
+          ),
+          SettingsGridAction(
+            icon: Icons.logout_rounded,
+            title: AppConstants.profileLogout.tr(),
+            destructive: true,
+            onTap: () => _confirmAndLogout(context),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _exportDocuments(BuildContext context) async {
+    final result = await documentsService.exportDocuments(
+      dialogTitle: AppConstants.profileExportPickerTitle.tr(),
+    );
+    if (!context.mounted) return;
+
+    final message = result.count == 0 || result.path == null
+        ? AppConstants.profileExportEmpty.tr()
+        : AppConstants.profileExportDone.tr(
+            namedArgs: {'count': '${result.count}', 'path': result.path!},
+          );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _confirmAndLogout(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        title: Text(AppConstants.profileLogoutConfirmTitle.tr()),
+        content: Text(AppConstants.profileLogoutConfirmMessage.tr()),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(AppConstants.commonCancel.tr()),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            style: TextButton.styleFrom(foregroundColor: AppTheme.destructive),
+            child: Text(AppConstants.profileLogout.tr()),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    await AuthService.logout();
+    if (!context.mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const AuthGate()),
+      (route) => false,
+    );
+  }
+}
+
 const _supportEmail = 'webmaster@eupasoft.com';
 const _privacyPolicyUrl = 'https://redadviser.com/?page_id=316';
 const _androidPackageName = 'com.alldocs.app';
 
-class _SupportPanel extends StatelessWidget {
-  const _SupportPanel();
+class _HelpSection extends StatelessWidget {
+  const _HelpSection();
 
   @override
   Widget build(BuildContext context) {
-    return GlassPanel(
-      child: Column(
+    return SettingsSection(
+      icon: Icons.help_outline_rounded,
+      title: AppConstants.profileHelpTitle.tr(),
+      child: SettingsGrid(
         children: [
-          _SettingsTile(
-            icon: Icons.help_outline_rounded,
+          SettingsGridAction(
+            icon: Icons.quiz_outlined,
             title: AppConstants.profileFaq.tr(),
             onTap: () => Navigator.of(
               context,
             ).push(MaterialPageRoute(builder: (_) => const FaqScreen())),
           ),
-          const Divider(height: 1),
-          _SettingsTile(
-            icon: Icons.mail_outline_rounded,
+          SettingsGridAction(
+            icon: Icons.support_agent_outlined,
             title: AppConstants.profileContactSupport.tr(),
             onTap: () => _contactSupport(context),
           ),
-          const Divider(height: 1),
-          _SettingsTile(
-            icon: Icons.star_outline_rounded,
+          SettingsGridAction(
+            icon: Icons.star_rate_outlined,
             title: AppConstants.profileRateApp.tr(),
             onTap: () => _rateApp(context),
           ),
-          const Divider(height: 1),
-          _SettingsTile(
+          SettingsGridAction(
             icon: Icons.privacy_tip_outlined,
             title: AppConstants.profilePrivacyPolicy.tr(),
             onTap: () => _launch(context, Uri.parse(_privacyPolicyUrl)),
@@ -340,102 +897,6 @@ class _SupportPanel extends StatelessWidget {
         SnackBar(content: Text(AppConstants.profileLinkOpenError.tr())),
       );
     }
-  }
-}
-
-class _ProfileSettingsPage extends StatelessWidget {
-  const _ProfileSettingsPage({
-    required this.profile,
-    required this.snapshot,
-    required this.documentsService,
-  });
-
-  final UserProfile profile;
-  final DocumentsSnapshot snapshot;
-  final DocumentsService documentsService;
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView(
-      key: const PageStorageKey('profile_settings'),
-      physics: const BouncingScrollPhysics(),
-      children: [
-        _ProfileHeader(
-          profile: profile,
-          onEditPhoto: () => _pickAndSaveAvatar(documentsService),
-        ),
-        const SizedBox(height: 14),
-        const _CustomizationPanel(),
-        const SizedBox(height: 14),
-        _SettingsPanel(snapshot: snapshot, documentsService: documentsService),
-        const SizedBox(height: 14),
-        _ProfileWideAction(
-          icon: Icons.shield_rounded,
-          iconColor: const Color(0xFF37C66A),
-          title: AppConstants.profileSecurity.tr(),
-          subtitle: AppConstants.profileSecuritySubtitle.tr(),
-          onTap: () => Navigator.of(
-            context,
-          ).push(MaterialPageRoute(builder: (_) => const DevicesScreen())),
-        ),
-        const SizedBox(height: 14),
-        _PremiumPanel(profile: profile),
-      ],
-    );
-  }
-}
-
-class _LogoutButton extends StatelessWidget {
-  const _LogoutButton();
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      child: OutlinedButton.icon(
-        onPressed: () => _confirmAndLogout(context),
-        style: OutlinedButton.styleFrom(
-          foregroundColor: AppTheme.destructive,
-          side: const BorderSide(color: AppTheme.destructive),
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-        ),
-        icon: const Icon(Icons.logout_rounded),
-        label: Text(AppConstants.profileLogout.tr()),
-      ),
-    );
-  }
-
-  Future<void> _confirmAndLogout(BuildContext context) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: AppTheme.surface,
-        title: Text(AppConstants.profileLogoutConfirmTitle.tr()),
-        content: Text(AppConstants.profileLogoutConfirmMessage.tr()),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: Text(AppConstants.commonCancel.tr()),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            style: TextButton.styleFrom(foregroundColor: AppTheme.destructive),
-            child: Text(AppConstants.profileLogout.tr()),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !context.mounted) return;
-
-    await AuthService.logout();
-    if (!context.mounted) return;
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const AuthGate()),
-      (route) => false,
-    );
   }
 }
 
@@ -529,8 +990,8 @@ class _ProfileHeader extends StatelessWidget {
     final isNetworkAvatar = avatarUrl != null && avatarUrl.startsWith('http');
     final isLocalAvatar = avatarUrl != null && !isNetworkAvatar;
 
-    return GlassPanel(
-      padding: const EdgeInsets.all(22),
+    return SettingsCard(
+      padding: const EdgeInsets.all(16),
       child: Row(
         children: [
           Stack(
@@ -577,9 +1038,9 @@ class _ProfileHeader extends StatelessWidget {
                       color: AppTheme.accent,
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.photo_camera_rounded,
-                      color: Colors.white,
+                      color: AppTheme.onAccent,
                       size: 20,
                     ),
                   ),
@@ -613,212 +1074,59 @@ class _ProfileHeader extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppTheme.accent.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(99),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.workspace_premium_rounded,
-                        color: AppTheme.primarySoft,
-                        size: 18,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        profile.planName,
-                        style: const TextStyle(
-                          color: AppTheme.text,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                // The plan, as a button: the way into the plans page.
+                _PlanButton(summary: profile.storageSummary),
               ],
             ),
           ),
-          const Icon(Icons.chevron_right_rounded, size: 34),
         ],
       ),
     );
   }
 }
 
-class _StoragePanel extends StatelessWidget {
-  const _StoragePanel({required this.summary});
+class _PlanButton extends StatelessWidget {
+  const _PlanButton({required this.summary});
 
   final StorageSummary summary;
 
   @override
   Widget build(BuildContext context) {
-    return GlassPanel(
-      child: Row(
-        children: [
-          Container(
-            width: 58,
-            height: 58,
-            decoration: BoxDecoration(
-              color: AppTheme.accent.withValues(alpha: 0.14),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppTheme.border),
-            ),
-            child: const Icon(Icons.inventory_2_outlined, size: 32),
-          ),
-          const SizedBox(width: 18),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    return ValueListenableBuilder<AppPlan>(
+      valueListenable: PlanService.current,
+      builder: (context, plan, _) => Material(
+        color: AppTheme.accent.withValues(alpha: 0.18),
+        shape: const StadiumBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => openPlansScreen(context, summary: summary),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(10, 6, 6, 6),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        AppConstants.profileStorage.tr(),
-                        style: const TextStyle(
-                          color: AppTheme.text,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                PlanMedal(plan: plan, size: 18),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    '${plan.name} · ${AppConstants.plansSeePlans.tr()}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppTheme.text,
+                      fontWeight: FontWeight.w700,
                     ),
-                    Text(
-                      AppConstants.profileStorageUsedOf.tr(
-                        namedArgs: {
-                          'used': summary.usedGb.toStringAsFixed(1),
-                          'total': summary.totalGb.toStringAsFixed(0),
-                        },
-                      ),
-                      style: const TextStyle(color: AppTheme.mutedText),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  AppConstants.profileStoragePercent.tr(
-                    namedArgs: {'percent': '${summary.usedPercent}'},
-                  ),
-                  style: const TextStyle(
-                    color: AppTheme.primarySoft,
-                    fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(height: 12),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(99),
-                  child: LinearProgressIndicator(
-                    value: summary.usedRatio,
-                    minHeight: 9,
-                    backgroundColor: AppTheme.surfaceSoft,
-                    color: AppTheme.accent,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    _StorageLegend(
-                      color: AppTheme.accent,
-                      label: AppConstants.profileStorageUsed.tr(
-                        namedArgs: {'used': summary.usedGb.toStringAsFixed(1)},
-                      ),
-                    ),
-                    const SizedBox(width: 18),
-                    _StorageLegend(
-                      color: AppTheme.surfaceSoft,
-                      label: AppConstants.profileStorageAvailable.tr(
-                        namedArgs: {
-                          'available': summary.availableGb.toStringAsFixed(1),
-                        },
-                      ),
-                    ),
-                  ],
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  size: 20,
+                  color: AppTheme.mutedText,
                 ),
               ],
             ),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StorageLegend extends StatelessWidget {
-  const _StorageLegend({required this.color, required this.label});
-
-  final Color color;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Flexible(
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 12,
-            height: 12,
-            decoration: BoxDecoration(
-              color: color,
-              borderRadius: BorderRadius.circular(4),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Flexible(
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: AppTheme.mutedText),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StatsPanel extends StatelessWidget {
-  const _StatsPanel({required this.profile});
-
-  final UserProfile profile;
-
-  @override
-  Widget build(BuildContext context) {
-    return GlassPanel(
-      child: Row(
-        children: [
-          Expanded(
-            child: _StatCard(
-              icon: Icons.folder_rounded,
-              value: _formatNumber(profile.documentsCount),
-              label: AppConstants.profileDocuments.tr(),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _StatCard(
-              icon: Icons.collections_bookmark,
-              iconColor: AppTheme.premium,
-              value: '${profile.categoriesCount}',
-              label: AppConstants.profileAlbums.tr(),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _StatCard(
-              icon: Icons.star_rounded,
-              iconColor: AppTheme.warning,
-              value: '${profile.favoritesCount}',
-              label: AppConstants.profileFavorites.tr(),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -845,15 +1153,12 @@ class _CustomizationPanel extends StatelessWidget {
         AppTheme.highContrastMode,
       ]),
       builder: (context, child) {
-        return GlassPanel(
+        return SettingsSection(
+          icon: Icons.tune_rounded,
+          title: AppConstants.profileCustomization.tr(),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SectionTitle(
-                icon: Icons.tune_rounded,
-                title: AppConstants.profileCustomization.tr(),
-              ),
-              const SizedBox(height: 16),
               Text(
                 AppConstants.profilePrimaryColor.tr(),
                 style: const TextStyle(
@@ -979,124 +1284,6 @@ class _ColorSwatch extends StatelessWidget {
   }
 }
 
-class _StatCard extends StatelessWidget {
-  const _StatCard({
-    required this.icon,
-    required this.value,
-    required this.label,
-    this.iconColor,
-  });
-
-  final IconData icon;
-  final String value;
-  final String label;
-  final Color? iconColor;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppTheme.surfaceStrong.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.border.withValues(alpha: 0.65)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: iconColor ?? AppTheme.accent, size: 24),
-          const SizedBox(height: 12),
-          Text(
-            value,
-            style: const TextStyle(
-              color: AppTheme.text,
-              fontSize: 22,
-              height: 1.05,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: AppTheme.mutedText, fontSize: 11),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SettingsPanel extends StatelessWidget {
-  const _SettingsPanel({
-    required this.snapshot,
-    required this.documentsService,
-  });
-
-  final DocumentsSnapshot snapshot;
-  final DocumentsService documentsService;
-
-  @override
-  Widget build(BuildContext context) {
-    return GlassPanel(
-      child: Column(
-        children: [
-          const _BiometricSettingsTile(),
-          const Divider(height: 1),
-          ValueListenableBuilder<int>(
-            valueListenable: AppSettings.autoLockMinutes,
-            builder: (context, minutes, _) => _SettingsTile(
-              icon: Icons.timer_outlined,
-              title: AppConstants.settingsAutoLock.tr(),
-              value: autoLockLabel(minutes),
-              onTap: () => _showAutoLockSheet(context),
-            ),
-          ),
-          const Divider(height: 1),
-          ValueListenableBuilder<bool>(
-            valueListenable: AppSettings.hidePreviews,
-            builder: (context, enabled, _) => _SettingsTile(
-              icon: Icons.visibility_off_outlined,
-              title: AppConstants.settingsHidePreviews.tr(),
-              trailingSwitch: true,
-              switchValue: enabled,
-              onSwitchChanged: AppSettings.setHidePreviews,
-            ),
-          ),
-          const Divider(height: 1),
-          _SettingsTile(
-            icon: Icons.collections_bookmark_rounded,
-            title: AppConstants.profileAlbums.tr(),
-            onTap: () => _showAlbumsSheet(context, snapshot),
-          ),
-          const Divider(height: 1),
-          _SettingsTile(
-            icon: Icons.ios_share_rounded,
-            title: AppConstants.profileExportDocuments.tr(),
-            onTap: () => _exportDocuments(context),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _exportDocuments(BuildContext context) async {
-    final result = await documentsService.exportDocuments(
-      dialogTitle: AppConstants.profileExportPickerTitle.tr(),
-    );
-    if (!context.mounted) return;
-
-    final message = result.count == 0 || result.path == null
-        ? AppConstants.profileExportEmpty.tr()
-        : AppConstants.profileExportDone.tr(
-            namedArgs: {'count': '${result.count}', 'path': result.path!},
-          );
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
-  }
-}
-
 String autoLockLabel(int minutes) {
   if (minutes < 0) return AppConstants.settingsAutoLockNever.tr();
   if (minutes == 0) return AppConstants.settingsAutoLockImmediately.tr();
@@ -1147,418 +1334,6 @@ void _showAutoLockSheet(BuildContext context) {
       ),
     ),
   );
-}
-
-class _BiometricSettingsTile extends StatefulWidget {
-  const _BiometricSettingsTile();
-
-  @override
-  State<_BiometricSettingsTile> createState() => _BiometricSettingsTileState();
-}
-
-class _BiometricSettingsTileState extends State<_BiometricSettingsTile> {
-  final SecurityLockService _securityLockService = SecurityLockService();
-  bool _loading = true;
-  bool _enabled = false;
-  bool _canUseBiometrics = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return _SettingsTile(
-      icon: Icons.lock_outline_rounded,
-      title: AppConstants.profileBiometricLock.tr(),
-      trailingSwitch: true,
-      switchValue: _enabled,
-      onSwitchChanged: _loading ? null : _setEnabled,
-    );
-  }
-
-  Future<void> _load() async {
-    final enabled = await _securityLockService.isBiometricEnabled();
-    final canUseBiometrics = await _securityLockService.canUseBiometrics();
-    if (!mounted) return;
-    setState(() {
-      _enabled = enabled && canUseBiometrics;
-      _canUseBiometrics = canUseBiometrics;
-      _loading = false;
-    });
-  }
-
-  Future<void> _setEnabled(bool enabled) async {
-    if (enabled && !_canUseBiometrics) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppConstants.securityBiometricUnavailable.tr())),
-      );
-      return;
-    }
-
-    await _securityLockService.setBiometricEnabled(enabled);
-    if (!mounted) return;
-    setState(() => _enabled = enabled);
-  }
-}
-
-void _showAlbumsSheet(BuildContext context, DocumentsSnapshot snapshot) {
-  final albums = [
-    for (final shelf in snapshot.shelves)
-      for (final album in shelf.albums) (shelf: shelf, album: album),
-  ];
-
-  showOptionsSheet<void>(
-    context: context,
-    backgroundColor: AppTheme.surface,
-    builder: (context) {
-      return SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(18, 4, 18, 18),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      AppConstants.profileAlbums.tr(),
-                      style: const TextStyle(
-                        color: AppTheme.text,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: AppConstants.commonClose.tr(),
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close_rounded),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              if (albums.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 18),
-                  child: Text(
-                    AppConstants.docshelfCreateFirstShelfMessage.tr(),
-                    style: const TextStyle(color: AppTheme.mutedText),
-                  ),
-                )
-              else
-                for (final (index, item) in albums.indexed) ...[
-                  if (index > 0) const Divider(height: 1),
-                  ListTile(
-                    leading: Icon(
-                      Icons.folder_rounded,
-                      color: Color(item.album.colorValue),
-                    ),
-                    title: Text(item.album.name),
-                    subtitle: Text(item.shelf.name),
-                    trailing: Text(
-                      AppConstants.docshelfDocumentCount.tr(
-                        namedArgs: {
-                          'count':
-                              '${snapshot.documentsForAlbum(item.album.id).length}',
-                        },
-                      ),
-                    ),
-                  ),
-                ],
-            ],
-          ),
-        ),
-      );
-    },
-  );
-}
-
-class _SettingsTile extends StatelessWidget {
-  const _SettingsTile({
-    required this.icon,
-    required this.title,
-    this.value,
-    this.trailingSwitch = false,
-    this.switchValue = false,
-    this.onSwitchChanged,
-    this.onTap,
-  });
-
-  final IconData icon;
-  final String title;
-  final String? value;
-  final bool trailingSwitch;
-  final bool switchValue;
-  final ValueChanged<bool>? onSwitchChanged;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(14),
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        child: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: AppTheme.accent.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(icon, color: AppTheme.primarySoft, size: 24),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Text(
-                title,
-                style: const TextStyle(
-                  color: AppTheme.text,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-            if (value != null)
-              Text(
-                value!,
-                style: const TextStyle(
-                  color: AppTheme.primarySoft,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            if (trailingSwitch)
-              Switch(value: switchValue, onChanged: onSwitchChanged),
-            if (!trailingSwitch && onTap != null) ...[
-              const SizedBox(width: 4),
-              const Icon(Icons.chevron_right_rounded, size: 28),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-String _languageName(BuildContext context) {
-  return switch (context.locale.languageCode) {
-    'en' => AppConstants.profileEnglish.tr(),
-    'es' => AppConstants.profileSpanish.tr(),
-    'fr' => AppConstants.profileFrench.tr(),
-    _ => AppConstants.profilePortuguese.tr(),
-  };
-}
-
-/// Most text uses `.tr()` without a context, so nothing depends on the
-/// locale and a language change only showed up as screens happened to
-/// rebuild (e.g. switching tabs). Marking every element dirty repaints the
-/// whole app in the new language at once while keeping all state (open
-/// tab, routes, unlocked session).
-Future<void> _rebuildWholeApp() async {
-  // The new translations are applied when MaterialApp's Localizations
-  // updates, which happens on the next frame.
-  await WidgetsBinding.instance.endOfFrame;
-  void markDirty(Element element) {
-    element.markNeedsBuild();
-    element.visitChildren(markDirty);
-  }
-
-  WidgetsBinding.instance.rootElement?.visitChildren(markDirty);
-}
-
-void _showLanguageSheet(BuildContext context) {
-  final options = [
-    (locale: const Locale('pt'), label: AppConstants.profilePortuguese.tr()),
-    (locale: const Locale('en'), label: AppConstants.profileEnglish.tr()),
-    (locale: const Locale('es'), label: AppConstants.profileSpanish.tr()),
-    (locale: const Locale('fr'), label: AppConstants.profileFrench.tr()),
-  ];
-
-  showOptionsSheet<void>(
-    context: context,
-    backgroundColor: AppTheme.surface,
-    builder: (sheetContext) {
-      return SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(18, 4, 18, 18),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                AppConstants.profileLanguage.tr(),
-                style: const TextStyle(
-                  color: AppTheme.text,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 8),
-              for (final option in options)
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(option.label),
-                  trailing:
-                      context.locale.languageCode == option.locale.languageCode
-                      ? Icon(Icons.check_circle_rounded, color: AppTheme.accent)
-                      : null,
-                  onTap: () async {
-                    await context.setLocale(option.locale);
-                    if (sheetContext.mounted) Navigator.of(sheetContext).pop();
-                    await _rebuildWholeApp();
-                  },
-                ),
-            ],
-          ),
-        ),
-      );
-    },
-  );
-}
-
-class _ProfileWideAction extends StatelessWidget {
-  const _ProfileWideAction({
-    required this.icon,
-    required this.iconColor,
-    required this.title,
-    required this.subtitle,
-    this.onTap,
-  });
-
-  final IconData icon;
-  final Color iconColor;
-  final String title;
-  final String subtitle;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(18),
-      onTap: onTap,
-      child: GlassPanel(
-        child: Row(
-          children: [
-            Container(
-              width: 46,
-              height: 46,
-              decoration: BoxDecoration(
-                color: iconColor.withValues(alpha: 0.18),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(icon, color: iconColor, size: 28),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      color: AppTheme.text,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(color: AppTheme.mutedText),
-                  ),
-                ],
-              ),
-            ),
-            if (onTap != null)
-              const Icon(
-                Icons.chevron_right_rounded,
-                color: AppTheme.mutedText,
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _PremiumPanel extends StatelessWidget {
-  const _PremiumPanel({required this.profile});
-
-  final UserProfile profile;
-
-  bool get _isFree => profile.planName.toLowerCase() == 'free';
-
-  @override
-  Widget build(BuildContext context) {
-    return GlassPanel(
-      child: Row(
-        children: [
-          Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFFB66CFF), Color(0xFF6637D8)],
-              ),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: const Icon(
-              Icons.workspace_premium_rounded,
-              color: Colors.white,
-              size: 28,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  AppConstants.profilePlanTitle.tr(
-                    namedArgs: {'plan': profile.planName},
-                  ),
-                  style: const TextStyle(
-                    color: AppTheme.text,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  _isFree
-                      ? AppConstants.profilePlanFreeSubtitle.tr()
-                      : AppConstants.profilePlanActiveSubtitle.tr(),
-                  style: const TextStyle(color: AppTheme.mutedText),
-                ),
-              ],
-            ),
-          ),
-          OutlinedButton(
-            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(AppConstants.profileBackendFeature.tr())),
-            ),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: const Color(0xFFB993FF),
-              side: const BorderSide(color: AppTheme.premium),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(99),
-              ),
-            ),
-            child: Text(AppConstants.profileManagePlan.tr()),
-          ),
-          const SizedBox(width: 4),
-          const Icon(Icons.chevron_right_rounded, size: 30),
-        ],
-      ),
-    );
-  }
 }
 
 String _formatNumber(int value) {

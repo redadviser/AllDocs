@@ -22,6 +22,8 @@ class DocumentsSnapshot {
     this.trashDocuments = const [],
     this.tags = const [],
     this.suggestions = const [],
+    this.hiddenAlbums = const [],
+    this.hiddenDocuments = const [],
   });
 
   final List<DocumentShelf> shelves;
@@ -51,6 +53,11 @@ class DocumentsSnapshot {
   /// start one), e.g. "looks like an invoice → Invoices".
   final List<AlbumSuggestion> suggestions;
 
+  /// Albums behind the hidden-albums PIN, and the documents in them (which
+  /// appear nowhere else).
+  final List<DocumentAlbum> hiddenAlbums;
+  final List<DocumentFile> hiddenDocuments;
+
   /// How long a newly added document stays in the gallery's "Recent" row.
   static const recentWindow = Duration(hours: 1);
 
@@ -74,11 +81,15 @@ class DocumentsSnapshot {
         if (album.id == albumId) return album;
       }
     }
+    for (final album in hiddenAlbums) {
+      if (album.id == albumId) return album;
+    }
     return null;
   }
 
   List<DocumentFile> documentsForAlbum(String albumId) {
-    return documents
+    final hidden = hiddenAlbums.any((album) => album.id == albumId);
+    return (hidden ? hiddenDocuments : documents)
         .where((document) => document.albumIds.contains(albumId))
         .toList();
   }
@@ -98,6 +109,8 @@ class DocumentsSnapshot {
     List<DocumentFile>? trashDocuments,
     List<String>? tags,
     List<AlbumSuggestion>? suggestions,
+    List<DocumentAlbum>? hiddenAlbums,
+    List<DocumentFile>? hiddenDocuments,
   }) {
     return DocumentsSnapshot(
       shelves: shelves ?? this.shelves,
@@ -114,6 +127,8 @@ class DocumentsSnapshot {
       trashDocuments: trashDocuments ?? this.trashDocuments,
       tags: tags ?? this.tags,
       suggestions: suggestions ?? this.suggestions,
+      hiddenAlbums: hiddenAlbums ?? this.hiddenAlbums,
+      hiddenDocuments: hiddenDocuments ?? this.hiddenDocuments,
     );
   }
 }

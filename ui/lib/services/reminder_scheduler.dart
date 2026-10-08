@@ -36,6 +36,23 @@ class ReminderScheduler {
       scheduledFor: scheduledFor,
     );
   }
+
+  /// The documents whose reminder should be scheduled: active ones with a
+  /// reminder still ahead, soonest first — only the first [limit] when the
+  /// plan caps them (the next one takes a freed slot on a later sync).
+  List<DocumentFile> pick(
+    Iterable<DocumentFile> documents, {
+    int? limit,
+    DateTime? now,
+  }) {
+    final reference = now ?? DateTime.now();
+    final due = [
+      for (final document in documents)
+        if (document.isActive && planFor(document, now: reference) != null)
+          document,
+    ]..sort((a, b) => a.validityDate!.compareTo(b.validityDate!));
+    return limit == null || due.length <= limit ? due : due.sublist(0, limit);
+  }
 }
 
 /// Deterministic per-document notification id, so re-scanning/re-scheduling

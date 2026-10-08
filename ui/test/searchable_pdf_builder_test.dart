@@ -39,7 +39,13 @@ void main() {
           imagePath: imageFile.path,
           text: 'hello world',
           lines: const [
-            OcrTextLine(text: 'hello world', left: 5, top: 5, width: 40, height: 12),
+            OcrTextLine(
+              text: 'hello world',
+              left: 5,
+              top: 5,
+              width: 40,
+              height: 12,
+            ),
           ],
         ),
       ],
@@ -64,14 +70,26 @@ void main() {
           imagePath: imageFile.path,
           text: 'first page',
           lines: const [
-            OcrTextLine(text: 'first page', left: 5, top: 5, width: 40, height: 12),
+            OcrTextLine(
+              text: 'first page',
+              left: 5,
+              top: 5,
+              width: 40,
+              height: 12,
+            ),
           ],
         ),
         ScannedPage(
           imagePath: imageFile.path,
           text: 'second page',
           lines: const [
-            OcrTextLine(text: 'second page', left: 5, top: 5, width: 40, height: 12),
+            OcrTextLine(
+              text: 'second page',
+              left: 5,
+              top: 5,
+              width: 40,
+              height: 12,
+            ),
           ],
         ),
         ScannedPage(imagePath: imageFile.path, text: '', lines: const []),

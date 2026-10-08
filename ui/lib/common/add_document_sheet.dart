@@ -126,18 +126,6 @@ Future<void> showAddDocumentSheet(
             if (onOpenCloud != null) ...[
               const Divider(indent: 20, endIndent: 20),
               _Option(
-                icon: Icons.cloud_outlined,
-                title: 'OneDrive',
-                onTap: () =>
-                    run(() async => onOpenCloud(CloudProviderId.oneDrive)),
-              ),
-              _Option(
-                icon: Icons.add_to_drive_outlined,
-                title: 'Google Drive',
-                onTap: () =>
-                    run(() async => onOpenCloud(CloudProviderId.googleDrive)),
-              ),
-              _Option(
                 icon: Icons.cloud_queue_outlined,
                 title: 'Dropbox',
                 onTap: () =>

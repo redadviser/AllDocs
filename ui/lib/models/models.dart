@@ -6,6 +6,7 @@ export 'document_category.dart';
 export 'document_export_result.dart';
 export 'document_file.dart';
 export 'import_result.dart';
+export 'plan.dart';
 export 'document_semantic_type.dart';
 export 'document_shelf.dart';
 export 'document_type.dart';

@@ -8,6 +8,7 @@ class DocumentAlbum {
     required this.position,
     required this.documentIds,
     this.coverDocumentId,
+    this.hidden = false,
   });
 
   final String id;
@@ -18,6 +19,10 @@ class DocumentAlbum {
   final int position;
   final List<String> documentIds;
   final String? coverDocumentId;
+
+  /// Kept out of the shelves, gallery and search; opened from "Hidden
+  /// albums" with its own PIN.
+  final bool hidden;
 
   int get documentCount => documentIds.length;
 
@@ -30,6 +35,7 @@ class DocumentAlbum {
     int? position,
     List<String>? documentIds,
     String? coverDocumentId,
+    bool? hidden,
   }) {
     return DocumentAlbum(
       id: id ?? this.id,
@@ -40,6 +46,7 @@ class DocumentAlbum {
       position: position ?? this.position,
       documentIds: documentIds ?? this.documentIds,
       coverDocumentId: coverDocumentId ?? this.coverDocumentId,
+      hidden: hidden ?? this.hidden,
     );
   }
 
@@ -57,6 +64,7 @@ class DocumentAlbum {
       position: json['position'] is int ? json['position'] as int : 0,
       documentIds: ids is List ? ids.map((id) => id.toString()).toList() : [],
       coverDocumentId: json['cover_document_id']?.toString(),
+      hidden: json['hidden'] == true,
     );
   }
 
@@ -70,6 +78,7 @@ class DocumentAlbum {
       'position': position,
       'document_ids': documentIds,
       'cover_document_id': coverDocumentId,
+      if (hidden) 'hidden': true,
     };
   }
 }

@@ -1,6 +1,6 @@
 -- =============================================================
--- AllDocs Backend - database schema: accounts, devices (later
--- vaults/documents_metadata/reminders/subscriptions per the roadmap).
+-- AllDocs Backend - database schema: accounts, devices, subscriptions
+-- (later vaults/documents_metadata/reminders per the roadmap).
 -- Idempotent: applied by the server on every start (src/lib/schema.ts) and
 -- by the local docker-compose on first boot.
 -- =============================================================
@@ -50,5 +50,26 @@ CREATE TABLE IF NOT EXISTS devices (
 );
 
 CREATE INDEX IF NOT EXISTS idx_devices_user ON devices (user_id);
+
+-- Subscriptions (bought in the app through Adapty). profiles.plan is the
+-- paid plan; plan_expires_at is when the current period ends (NULL = no
+-- end known: free, lifetime or renewing in a grace period). An expired
+-- plan reads as 'free' (see effectivePlanColumn in src/lib/plans.ts).
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS plan_billing_period TEXT NOT NULL DEFAULT 'monthly';
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS plan_expires_at TIMESTAMPTZ;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS plan_updated_at TIMESTAMPTZ;
+
+-- Every Adapty webhook received, as sent, for support and debugging.
+CREATE TABLE IF NOT EXISTS subscription_events (
+  id BIGSERIAL PRIMARY KEY,
+  user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+  customer_user_id TEXT,
+  event_type TEXT NOT NULL,
+  environment TEXT,
+  payload JSONB NOT NULL,
+  received_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_subscription_events_user ON subscription_events (user_id, received_at DESC);
 
 COMMIT;

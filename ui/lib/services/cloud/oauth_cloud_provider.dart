@@ -7,7 +7,7 @@ import 'cloud_config.dart';
 import 'cloud_provider.dart';
 
 /// Shared OAuth 2.0 (authorization code + PKCE, via flutter_appauth) token
-/// handling for OneDrive and Dropbox: stores tokens in the keystore,
+/// handling for Dropbox: stores tokens in the keystore,
 /// refreshes them before they expire, and retries a request once after a
 /// 401.
 abstract class OAuthCloudProvider extends CloudProvider {

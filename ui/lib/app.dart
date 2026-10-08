@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'common/app_constants.dart';
+import 'common/office_thumbnail_host.dart';
 import 'screens/auth/auth_gate.dart';
 import 'theme/app_theme.dart';
 
@@ -50,7 +51,22 @@ class _AllDocsAppState extends State<AllDocsApp> {
                 data: mediaQuery.copyWith(
                   textScaler: TextScaler.linear(AppTheme.textScaleFactor.value),
                 ),
-                child: child ?? const SizedBox.shrink(),
+                child: Stack(
+                  children: [
+                    Positioned.fill(child: child ?? const SizedBox.shrink()),
+                    // Draws Word/PowerPoint/Excel thumbnails for the
+                    // document cards; 2 px, above every screen so it keeps
+                    // working whichever page is open.
+                    if (OfficeThumbnailHost.supported)
+                      const Positioned(
+                        left: 0,
+                        bottom: 0,
+                        width: 2,
+                        height: 2,
+                        child: OfficeThumbnailHost(),
+                      ),
+                  ],
+                ),
               );
 
               if (!AppTheme.highContrastMode.value) return scaledChild;

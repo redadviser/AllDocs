@@ -12,7 +12,7 @@ Recommended local stack for the next implementation step:
 - device file picker for imports
 - camera/document scanner plugin for scans
 - OS biometric APIs for app lock
-- Google Drive/OneDrive/iCloud integrations only as optional import/backup providers
+- Google Drive/Dropbox/iCloud integrations only as optional import/backup providers
 
 ## On-device classification and expiry reminders (Phase 1: no backend needed)
 
@@ -99,9 +99,20 @@ A new Google email creates a `users` row with an unusable random password
 hash (the column is `NOT NULL`). Setup: see "Cloud integrations" below —
 the same Google OAuth clients serve sign-in and Drive.
 
+**One phone, several accounts.** Everything local is per account
+(`CurrentUser`, a hash of the email, set by the `AuthGate`): the library
+lives in `<library root>/users/<account>/` (state + document files), and
+the PIN/biometrics, cloud connections and backup settings are stored under
+account-specific keys. Signing in with another account on the same phone
+starts from an empty library (plus the starter shelf). The library, PIN
+and settings saved before this existed go to the first account that signs
+in after the update.
+
 **First run.** Once signed in, a library with no shelves gets a starter
-"Personal" shelf with Contracts and Invoices albums, in the app's language
-(`LocalDocumentsStore.ensureStarterShelf`, once per library).
+"Personal" shelf with Contracts, Invoices and Identification albums, in
+the app's language (`LocalDocumentsStore.ensureStarterShelf`, once per
+library; albums added to the starter set later are added to an existing
+starter shelf, never re-adding one the user deleted).
 
 Known gap: no automated test covers the real network branches (password or
 Google) — `LocalModeConfig.isLocalOnly` is a hardcoded `const`.
@@ -133,12 +144,12 @@ test on real iOS hardware in the session that evaluated it. Revisit as part
 of the roadmap's Phase 6 (hardening) before a paid iOS launch, testing
 candidates on a real device/simulator first.
 
-## Cloud integrations (Google Drive, OneDrive, Dropbox)
+## Cloud integrations (Google Drive, Dropbox)
 
 Each provider needs an app registration of our own. The ids live in the
 **backend's `.env`** (`GOOGLE_SIGNIN_WEB_CLIENT_ID`,
 `GOOGLE_SIGNIN_IOS_CLIENT_ID`, `GOOGLE_SIGNIN_ANDROID_CLIENT_ID`,
-`ONEDRIVE_CLIENT_ID`, `DROPBOX_APP_KEY`) and reach the app through the public
+`DROPBOX_APP_KEY`) and reach the app through the public
 `GET /api/config/cloud` (they're public PKCE client ids, not secrets). The
 app (`CloudKeys`) fetches them at startup and caches them for offline use, so
 adding or rotating a key needs no new build. A provider without its id shows
@@ -156,15 +167,18 @@ Two things stay build-time:
   `ui/cloud_keys.example.json`) wins over the backend's value, e.g. to test
   other registrations.
 
-OAuth redirect for OneDrive and Dropbox: `com.alldocs.app:/oauth2redirect`
+OAuth redirect for Dropbox: `com.alldocs.app:/oauth2redirect`
 (`CloudConfig.redirectUri`, already wired in `build.gradle.kts` and
 `Info.plist`).
 
 **Google Drive** (Google Cloud console, same project as "Sign in with Google"):
 1. Enable the Google Drive API.
-2. OAuth consent screen: add the scopes `drive.readonly` and `drive.appdata`.
-   `drive.readonly` is a *restricted* scope — fine for test users while the
-   app is in "Testing", but publishing needs Google's verification.
+2. OAuth consent screen: add the scopes `drive.file` and `drive.appdata`
+   (both non-sensitive: no Google verification needed, same as AllPhotos).
+   Don't add `drive.readonly`/`drive`: they're *restricted* and bring back
+   the "unverified app" warning. That's why Drive is backup-only in the app
+   (`GoogleDriveProvider.canBrowseFiles == false`); Drive files are imported
+   through the system file picker.
 3. Credentials: a **Web** client (→ `GOOGLE_SIGNIN_WEB_CLIENT_ID`), an
    **Android** client for `com.alldocs.app` with the SHA-1 of
    every signing key (debug, upload, Play app signing), and an **iOS**
@@ -175,18 +189,9 @@ OAuth redirect for OneDrive and Dropbox: `com.alldocs.app:/oauth2redirect`
    `ui/ios/Flutter/CloudKeys.xcconfig` — `Info.plist` already registers it
    as a URL scheme.
 
-Backups go to Drive's hidden app-data folder (not visible in the Drive UI).
-
-**OneDrive** (Microsoft Entra admin center → App registrations):
-1. New registration, "Accounts in any organizational directory and personal
-   Microsoft accounts".
-2. Authentication → add platform "Mobile and desktop applications" with the
-   redirect URI above; allow public client flows.
-3. API permissions (Microsoft Graph, delegated): `Files.ReadWrite`,
-   `User.Read`, `offline_access`.
-4. The Application (client) id → `ONEDRIVE_CLIENT_ID`.
-
-Backups go to `Apps/AllDocs` (the app folder) in the user's OneDrive.
+Backups go to an "AllDocs Backups" folder in My Drive (`drive.file` scope;
+found by an `appProperties` marker, so renaming it is harmless). Zip
+backups from older versions are still read from the hidden app-data folder.
 
 **Dropbox** (dropbox.com/developers/apps):
 1. Create app → Scoped access → Full Dropbox (browsing/import needs it).
@@ -196,5 +201,18 @@ Backups go to `Apps/AllDocs` (the app folder) in the user's OneDrive.
 4. App key → `DROPBOX_APP_KEY` (PKCE, no secret in the app). Until the app
    is approved for production only the developer + up to 500 users can link.
 
-Backups go to `/AllDocs Backups`. Every provider keeps the latest 3 backups
-(`BackupService.keptCloudBackups`); older ones are deleted after each upload.
+Backups go to `/AllDocs Backups`.
+
+**Backup layout** (`BackupService`, same idea as AllPhotos' Drive backups),
+identical on the phone (a picked folder) and in every cloud:
+
+    AllDocs Backups/
+      Current/                     the library now: Gallery/, Archive/ and
+                                   one folder per album (+ alldocs-current.json)
+      Removed/                     deleted files an older backup still lists
+      Backup YYYY-MM-DD HH-MM-SS/  alldocs-backup.json + alldocs-state.json
+
+Only `Current` holds files and each run sends just what changed (renames and
+archiving are moves, album folders are server-side copies). Each run adds a
+restore point; the latest 10 are kept (`BackupService.keptBackups`), and
+`Removed` is emptied of files none of them needs.

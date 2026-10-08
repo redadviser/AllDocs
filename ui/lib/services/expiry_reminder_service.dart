@@ -99,6 +99,23 @@ class ExpiryReminderService {
     );
   }
 
+  /// Schedules the reminders [ReminderScheduler.pick] chooses for
+  /// [documents] (at most [limit]) and cancels every other one.
+  Future<void> syncAll(Iterable<DocumentFile> documents, {int? limit}) async {
+    await _ensureInitialized();
+    final keep = {
+      for (final document in _scheduler.pick(documents, limit: limit))
+        document.id,
+    };
+    for (final document in documents) {
+      if (keep.contains(document.id)) {
+        await syncReminder(document);
+      } else if (document.validityDate != null) {
+        await _plugin.cancel(stableNotificationId(document.id));
+      }
+    }
+  }
+
   Future<void> cancelReminder(String documentId) async {
     await _ensureInitialized();
     await _plugin.cancel(stableNotificationId(documentId));

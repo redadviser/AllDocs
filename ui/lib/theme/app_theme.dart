@@ -34,6 +34,10 @@ class AppTheme {
 
   static const double radius = 14;
 
+  /// The app's typeface (bundled in assets/fonts, SIL Open Font License):
+  /// warmer and less mechanical than the platform default.
+  static const String fontFamily = 'Figtree';
+
   // Bookshelf (albums screen), same construction as AllPhotos' shelves in
   // this app's neutral palette.
   static const Color shelfBack = Color(0xFF1A1F26);
@@ -44,6 +48,12 @@ class AppTheme {
     if (highContrastMode.value) return Colors.white;
     return primaryColor.value ?? primary;
   }
+
+  /// Text/icons drawn on top of an [accent] fill (filled buttons, count
+  /// badges, the switch thumb). White normally, black in high contrast mode,
+  /// where the accent itself turns white.
+  static Color get onAccent =>
+      highContrastMode.value ? Colors.black : Colors.white;
 
   /// Dark backdrop, hue-matched to whatever primary color the user picked
   /// (falls back to the fixed defaults when none is set, for an exact match
@@ -72,7 +82,13 @@ class AppTheme {
   }
 
   static ThemeData get darkTheme {
-    final base = ThemeData.dark(useMaterial3: true);
+    // fontFamily here reaches every text style Material builds (buttons,
+    // fields, dialogs, snack bars), not just the text theme.
+    final base = ThemeData(
+      brightness: Brightness.dark,
+      useMaterial3: true,
+      fontFamily: fontFamily,
+    );
     final shape = RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(radius),
     );
@@ -83,12 +99,13 @@ class AppTheme {
         seedColor: accent,
         brightness: Brightness.dark,
         primary: accent,
+        onPrimary: onAccent,
         surface: highContrastMode.value ? Colors.black : surface,
       ),
       textTheme: base.textTheme.apply(
         bodyColor: text,
         displayColor: text,
-        fontFamily: 'Roboto',
+        fontFamily: fontFamily,
       ),
       iconTheme: const IconThemeData(color: primarySoft),
       dividerTheme: DividerThemeData(
@@ -108,7 +125,7 @@ class AppTheme {
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           backgroundColor: accent,
-          foregroundColor: Colors.white,
+          foregroundColor: onAccent,
           minimumSize: const Size(0, 46),
           shape: shape,
           textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
@@ -181,7 +198,7 @@ class AppTheme {
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.resolveWith(
           (states) =>
-              states.contains(WidgetState.selected) ? Colors.white : mutedText,
+              states.contains(WidgetState.selected) ? onAccent : mutedText,
         ),
         trackColor: WidgetStateProperty.resolveWith(
           (states) =>

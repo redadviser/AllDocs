@@ -16,7 +16,10 @@ Future<void> showCloudQuickSheet(
   DocumentsService documentsService, {
   required void Function(CloudProviderId? provider) onOpenCloud,
 }) async {
-  final providers = documentsService.cloud.providers;
+  final providers = [
+    for (final provider in documentsService.cloud.providers)
+      if (provider.canBrowseFiles) provider,
+  ];
   final status = <CloudProviderId, String>{};
   for (final provider in providers) {
     status[provider.id] = !provider.isConfigured
@@ -92,7 +95,6 @@ Future<void> showCloudQuickSheet(
 }
 
 String _shortName(CloudProviderId id) => switch (id) {
-  CloudProviderId.oneDrive => 'OneDrive',
   CloudProviderId.googleDrive => 'Google Drive',
   CloudProviderId.dropbox => 'Dropbox',
 };

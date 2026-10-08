@@ -10,6 +10,9 @@ enum DocumentSource {
   scan,
   device,
   shared,
+
+  /// Imported from OneDrive before that integration was removed; kept so
+  /// those documents still load.
   oneDrive,
   googleDrive,
   dropbox,

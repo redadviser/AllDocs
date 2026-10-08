@@ -30,7 +30,7 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-        // OAuth redirect scheme for OneDrive/Dropbox sign-in (flutter_appauth).
+        // OAuth redirect scheme for Dropbox sign-in (flutter_appauth).
         // Must match CloudConfig.redirectUri on the Dart side.
         manifestPlaceholders["appAuthRedirectScheme"] = "com.alldocs.app"
     }

@@ -61,17 +61,33 @@ dependencies:
   receive_sharing_intent: ^1.9.0
   flutter_appauth: ^12.1.0
   image: ^4.10.1
+  webview_flutter: ^4.14.1
+  # Subscriptions (App Store / Google Play billing), same SDK as AllPhotos.
+  adapty_flutter: ^3.17.0
+  pdf_manipulator: ^5.0.1
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_launcher_icons: ^0.13.0
   flutter_lints: ^6.0.0
+  flutter_native_splash: ^2.4.6
 
 flutter_launcher_icons:
   android: true
   ios: true
   image_path: "assets/images/docs_icon.png"
+
+# Native launch screen, shown while Flutter starts. Same dark backdrop as
+# AppTheme.background so it hands over to the login/PIN screen without a
+# flash. Regenerate with: dart run flutter_native_splash:create
+flutter_native_splash:
+  color: "#111418"
+  image: assets/splash/logo.png
+  android_12:
+    color: "#111418"
+    image: assets/splash/logo_android12.png
+    icon_background_color: "#1D355C"
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -87,6 +103,24 @@ flutter:
   assets:
     - assets/translations/
     - assets/images/
+    # In-app viewer for Word/Excel/PowerPoint (OfficeDocumentView).
+    - assets/viewer/
+    - assets/viewer/lib/
+    # Figtree's license, shown on the app's licenses page.
+    - assets/fonts/figtree/OFL.txt
+
+  fonts:
+    - family: Figtree
+      fonts:
+        - asset: assets/fonts/figtree/Figtree-Regular.ttf
+        - asset: assets/fonts/figtree/Figtree-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/figtree/Figtree-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/figtree/Figtree-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/figtree/Figtree-ExtraBold.ttf
+          weight: 800
 
   # To add assets to your application, add an assets section, like this:
   # assets:

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:flutter/foundation.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -12,12 +13,40 @@ import 'cloud/cloud_provider.dart';
 import 'cloud/cloud_service.dart';
 import 'document_scanner_service.dart';
 import 'local_documents_store.dart';
+import 'pdf_tools.dart';
+import 'plan_service.dart';
 import 'secure_zip_extractor.dart';
 import 'security_lock_service.dart';
+import 'thumbnail_cache.dart';
+
+/// An import that doesn't fit in the space the plan allows.
+class StorageFullException implements Exception {
+  const StorageFullException({
+    required this.summary,
+    required this.neededBytes,
+  });
+
+  final StorageSummary summary;
+
+  /// What the import would have added (0 when it isn't known up front,
+  /// like a camera scan, and the library is already full).
+  final int neededBytes;
+
+  @override
+  String toString() => 'StorageFullException($neededBytes bytes)';
+}
 
 class DocumentsService {
   DocumentsService.local() : _store = const LocalDocumentsStore() {
     LocalDocumentsStore.onBackgroundUpdate = _notifyChangedSoon;
+    PlanService.current.addListener(_onPlanChanged);
+  }
+
+  // A new plan changes the storage limit (shown and enforced) and how many
+  // expiry reminders may be scheduled.
+  void _onPlanChanged() {
+    _notifyChanged();
+    unawaited(_store.syncAllReminders());
   }
 
   final revision = ValueNotifier<int>(0);
@@ -56,22 +85,44 @@ class DocumentsService {
   ) async {
     final name = await AuthService.displayName();
     final email = await AuthService.email();
-    final plan = await AuthService.plan();
     final avatarUrl = await AuthService.avatarUrl();
+    final plan = PlanService.current.value;
 
     return snapshot.copyWith(
       profile: snapshot.profile.copyWith(
         name: name,
         email: email,
-        planName: plan == null ? null : _planLabel(plan),
+        planName: plan.name,
         avatarUrl: avatarUrl,
+        storageSummary: snapshot.profile.storageSummary.withLimit(
+          plan.storageBytes,
+        ),
       ),
     );
   }
 
-  String _planLabel(String plan) {
-    if (plan.isEmpty) return plan;
-    return plan[0].toUpperCase() + plan.substring(1);
+  /// Throws [StorageFullException] unless [bytes] more fit in the plan's
+  /// space. With [bytes] unknown (0), only a library that is already full
+  /// is refused.
+  Future<void> ensureRoomFor(int bytes) async {
+    final summary = (await loadSnapshot()).profile.storageSummary;
+    final fits = bytes <= 0 ? !summary.isFull : summary.hasRoomFor(bytes);
+    if (!fits) {
+      throw StorageFullException(summary: summary, neededBytes: bytes);
+    }
+  }
+
+  static Future<int> _sizeOfPaths(Iterable<String?> paths) async {
+    var total = 0;
+    for (final path in paths) {
+      if (path == null || path.isEmpty) continue;
+      try {
+        total += await File(path).length();
+      } catch (_) {
+        // Unreadable here; the import itself will skip or report it.
+      }
+    }
+    return total;
   }
 
   // Import --------------------------------------------------------------
@@ -88,7 +139,8 @@ class DocumentsService {
   Future<ImportResult> importPickedFiles(
     List<PlatformFile> files, {
     String? albumId,
-  }) {
+  }) async {
+    await ensureRoomFor(files.fold(0, (sum, file) => sum + file.size));
     return _notifyIfImported(_store.importPickedFiles(files, albumId: albumId));
   }
 
@@ -96,7 +148,8 @@ class DocumentsService {
     List<String> paths, {
     String? albumId,
     DocumentSource source = DocumentSource.shared,
-  }) {
+  }) async {
+    await ensureRoomFor(await _sizeOfPaths(paths));
     return _notifyIfImported(
       _store.importFilePaths(paths, albumId: albumId, source: source),
     );
@@ -113,7 +166,10 @@ class DocumentsService {
   Future<ImportResult> importExtractedZipEntries(
     List<ExtractedZipEntry> entries, {
     String? albumId,
-  }) {
+  }) async {
+    await ensureRoomFor(
+      entries.fold(0, (sum, entry) => sum + entry.bytes.length),
+    );
     return _notifyIfImported(
       _store.importExtractedZipEntries(entries, albumId: albumId),
     );
@@ -122,7 +178,9 @@ class DocumentsService {
   Future<ImportResult> scanDocumentWithCamera({
     String? albumId,
     ScanFilterChooser? chooseFilter,
-  }) {
+  }) async {
+    // A scan's size is only known afterwards; refuse only a full library.
+    await ensureRoomFor(0);
     return _notifyIfImported(
       SecurityLockService.withoutAutoLock(
         () => _store.scanDocumentWithCamera(
@@ -160,7 +218,10 @@ class DocumentsService {
   Future<ImportResult> importScannedDocuments(
     List<DocumentFile> documents, {
     String? albumId,
-  }) {
+  }) async {
+    await ensureRoomFor(
+      await _sizeOfPaths(documents.map((document) => document.localPath)),
+    );
     return _notifyIfImported(
       _store.importScannedDocuments(documents, albumId: albumId),
     );
@@ -171,7 +232,10 @@ class DocumentsService {
     List<CloudItem> items, {
     String? albumId,
     void Function(int done, int total)? onProgress,
-  }) {
+  }) async {
+    await ensureRoomFor(
+      items.fold(0, (sum, item) => sum + (item.sizeBytes ?? 0)),
+    );
     return _notifyIfImported(
       cloud.importItems(
         provider,
@@ -194,7 +258,7 @@ class DocumentsService {
 
   Future<void> ensureStarterShelf(
     String shelfName,
-    List<({String name, String iconName})> albums,
+    List<StarterAlbum> albums,
   ) async {
     if (await _store.ensureStarterShelf(shelfName, albums)) _notifyChanged();
   }
@@ -233,6 +297,10 @@ class DocumentsService {
         iconName: iconName,
       ),
     );
+  }
+
+  Future<void> setAlbumHidden(String albumId, bool hidden) {
+    return _mutate(_store.setAlbumHidden(albumId, hidden));
   }
 
   Future<void> reorderShelves(List<String> shelfIds) {
@@ -274,6 +342,16 @@ class DocumentsService {
   Future<void> moveDocumentToInbox(String documentId) {
     return _mutate(_store.moveDocumentToInbox(documentId));
   }
+
+  Future<void> addTagToDocuments(String tag, List<String> documentIds) {
+    return _mutate(_store.addTagToDocuments(tag, documentIds));
+  }
+
+  Future<void> renameTag(String from, String to) {
+    return _mutate(_store.renameTag(from, to));
+  }
+
+  Future<void> deleteTag(String tag) => _mutate(_store.deleteTag(tag));
 
   Future<void> updateDocument(
     String documentId, {
@@ -329,8 +407,12 @@ class DocumentsService {
     return cloud.checkForUpdates(documents);
   }
 
-  Future<void> applyCloudUpdate(CloudUpdate update) {
-    return _mutate(cloud.applyUpdate(update));
+  Future<void> applyCloudUpdate(CloudUpdate update) async {
+    await cloud.applyUpdate(update);
+    // Same path, new content: draw its card thumbnail again.
+    final path = update.document.localPath;
+    if (path != null) ThumbnailCache.instance.evict(path);
+    _notifyChanged();
   }
 
   Future<void> keepCurrentVersion(CloudUpdate update) {
@@ -352,6 +434,113 @@ class DocumentsService {
     return SecurityLockService.withoutAutoLock(
       () => _store.openDocument(document),
     );
+  }
+
+  // PDF tools (Folio and up) ----------------------------------------------
+
+  /// [documents] (PDFs) joined in order into a new document called [title],
+  /// filed in the first one's albums. Null if it already exists.
+  Future<DocumentFile?> mergePdfs(
+    List<DocumentFile> documents, {
+    required String title,
+  }) async {
+    final bytes = await PdfTools.merge([
+      for (final document in documents) document.localPath!,
+    ]);
+    return _importGenerated(bytes, title, documents.first.albumIds);
+  }
+
+  /// Pages [from]–[to] (from 1, inclusive) of [document] as a new document.
+  Future<DocumentFile?> extractPdfPages(
+    DocumentFile document, {
+    required int from,
+    required int to,
+    required String title,
+  }) async {
+    final bytes = await PdfTools.extractPages(document.localPath!, from, to);
+    return _importGenerated(bytes, title, document.albumIds);
+  }
+
+  /// A signed copy of [document] as a new document; the original stays.
+  Future<DocumentFile?> signPdf(
+    DocumentFile document, {
+    required Uint8List signaturePng,
+    required double aspectRatio,
+    required int page,
+    required SignatureCorner corner,
+    required String title,
+  }) async {
+    final bytes = await PdfTools.sign(
+      document.localPath!,
+      signaturePng: signaturePng,
+      aspectRatio: aspectRatio,
+      page: page,
+      corner: corner,
+    );
+    return _importGenerated(bytes, title, document.albumIds);
+  }
+
+  /// Compresses [document]'s file in place. Returns its size before and
+  /// after; a file that wouldn't get smaller is left as it was.
+  Future<({int before, int after})> compressPdf(DocumentFile document) async {
+    final path = document.localPath!;
+    final before = await File(path).length();
+    final bytes = await PdfTools.compress(path);
+    if (bytes.length >= before) return (before: before, after: before);
+    await _store.replaceDocumentContent(document.id, bytes);
+    _notifyChanged();
+    return (before: before, after: bytes.length);
+  }
+
+  /// Shares a copy of [document] with [watermark] over every page (an
+  /// image is turned into a PDF first). The copy isn't kept in the library.
+  Future<void> shareWatermarkedCopy(
+    DocumentFile document, {
+    required Future<Uint8List> Function(double width, double height) overlay,
+    required String fileName,
+  }) async {
+    final temp = await getTemporaryDirectory();
+    var source = document.localPath!;
+    if (document.type != DocumentType.pdf) {
+      final pdf = File('${temp.path}/watermark_source.pdf');
+      await pdf.writeAsBytes(await PdfTools.imageToPdf(source));
+      source = pdf.path;
+    }
+    final copy = File('${temp.path}/$fileName');
+    await copy.writeAsBytes(
+      await PdfTools.watermark(source, overlay: overlay),
+      flush: true,
+    );
+    await SecurityLockService.withoutAutoLock(
+      () => SharePlus.instance.share(
+        ShareParams(files: [XFile(copy.path, name: fileName)]),
+      ),
+    );
+  }
+
+  Future<DocumentFile?> _importGenerated(
+    Uint8List bytes,
+    String title,
+    List<String> albumIds,
+  ) async {
+    final temp = await getTemporaryDirectory();
+    final name = title.toLowerCase().endsWith('.pdf') ? title : '$title.pdf';
+    final file = File('${temp.path}/${name.replaceAll('/', '-')}');
+    await file.writeAsBytes(bytes, flush: true);
+    try {
+      final result = await importFilePaths(
+        [file.path],
+        albumId: albumIds.firstOrNull,
+        source: DocumentSource.local,
+      );
+      final created = result.documents.firstOrNull;
+      if (created != null && albumIds.length > 1) {
+        await setDocumentAlbums(created.id, albumIds);
+      }
+      return created;
+    } finally {
+      if (await file.exists()) await file.delete();
+    }
   }
 
   Future<void> shareDocuments(List<DocumentFile> documents) async {
@@ -387,6 +576,7 @@ class DocumentsService {
     if (LocalDocumentsStore.onBackgroundUpdate == _notifyChangedSoon) {
       LocalDocumentsStore.onBackgroundUpdate = null;
     }
+    PlanService.current.removeListener(_onPlanChanged);
     revision.dispose();
   }
 

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
@@ -237,6 +238,7 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
   bool _enableBiometrics = false;
   bool _submitting = false;
   String? _errorText;
+  int _errorCount = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -251,40 +253,21 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _PinDots(length: _pin.length, hasError: _errorText != null),
-          const SizedBox(height: 18),
-          Text(
-            _confirming
-                ? AppConstants.securityConfirmPin.tr()
-                : AppConstants.securityPin.tr(),
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: AppTheme.mutedText,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
+          _PinDots(
+            length: _pin.length,
+            hasError: _errorText != null,
+            errorCount: _errorCount,
           ),
-          if (widget.canUseBiometrics) ...[
-            const SizedBox(height: 16),
+          _PinMessage(text: _errorText),
+          if (widget.canUseBiometrics)
             _BiometricChoice(
               value: _enableBiometrics,
               onChanged: (value) => setState(() => _enableBiometrics = value),
             ),
-          ],
-          if (_errorText != null) ...[
-            const SizedBox(height: 14),
-            Text(
-              _errorText!,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: AppTheme.destructive,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-          const SizedBox(height: 20),
+          const SizedBox(height: 8),
           _PinKeyboard(
             enabled: !_submitting,
+            canDelete: _pin.isNotEmpty,
             onDigit: _addDigit,
             onDelete: _deleteDigit,
           ),
@@ -331,6 +314,7 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
       setState(() {
         _pin = '';
         _errorText = AppConstants.securityPinMismatch.tr();
+        _errorCount++;
       });
       return;
     }
@@ -373,6 +357,7 @@ class _PinUnlockScreenState extends State<PinUnlockScreen> {
   String _pin = '';
   bool _submitting = false;
   String? _errorText;
+  int _errorCount = 0;
 
   bool get _showBiometrics =>
       widget.biometricEnabled && widget.canUseBiometrics;
@@ -388,21 +373,16 @@ class _PinUnlockScreenState extends State<PinUnlockScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _PinDots(length: _pin.length, hasError: _errorText != null),
-          if (_errorText != null) ...[
-            const SizedBox(height: 14),
-            Text(
-              _errorText!,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: AppTheme.destructive,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-          const SizedBox(height: 22),
+          _PinDots(
+            length: _pin.length,
+            hasError: _errorText != null,
+            errorCount: _errorCount,
+          ),
+          _PinMessage(text: _errorText),
+          const SizedBox(height: 8),
           _PinKeyboard(
             enabled: !_submitting,
+            canDelete: _pin.isNotEmpty,
             biometricEnabled: _showBiometrics,
             onDigit: _addDigit,
             onDelete: _deleteDigit,
@@ -452,7 +432,10 @@ class _PinUnlockScreenState extends State<PinUnlockScreen> {
     setState(() {
       _submitting = false;
       _errorText = ok ? null : AppConstants.securityInvalidPin.tr();
-      if (!ok) _pin = '';
+      if (!ok) {
+        _pin = '';
+        _errorCount++;
+      }
     });
   }
 
@@ -470,6 +453,279 @@ class _PinUnlockScreenState extends State<PinUnlockScreen> {
   }
 }
 
+enum _PinChangeStep { current, fresh, confirm }
+
+/// Settings → Security → Change PIN: the current PIN first, then the new
+/// one twice. Pops with true once the new PIN is saved.
+class PinChangeScreen extends StatefulWidget {
+  const PinChangeScreen({super.key, required this.userName, this.avatarUrl});
+
+  final String userName;
+  final String? avatarUrl;
+
+  @override
+  State<PinChangeScreen> createState() => _PinChangeScreenState();
+}
+
+class _PinChangeScreenState extends State<PinChangeScreen> {
+  final SecurityLockService _securityLockService = SecurityLockService();
+  _PinChangeStep _step = _PinChangeStep.current;
+  String _pin = '';
+  String _newPin = '';
+  bool _submitting = false;
+  String? _errorText;
+  int _errorCount = 0;
+
+  String get _title => switch (_step) {
+    _PinChangeStep.current => AppConstants.securityChangePinCurrent.tr(),
+    _PinChangeStep.fresh => AppConstants.securityChangePinNew.tr(),
+    _PinChangeStep.confirm => AppConstants.securityChangePinConfirm.tr(),
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    return _SecurityShell(
+      greeting: '',
+      title: _title,
+      subtitle: _step == _PinChangeStep.current
+          ? ''
+          : AppConstants.securityChangePinSubtitle.tr(),
+      userName: widget.userName,
+      avatarUrl: widget.avatarUrl,
+      onBack: () => Navigator.of(context).pop(false),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _PinDots(
+            length: _pin.length,
+            hasError: _errorText != null,
+            errorCount: _errorCount,
+          ),
+          _PinMessage(text: _errorText),
+          const SizedBox(height: 8),
+          _PinKeyboard(
+            enabled: !_submitting,
+            canDelete: _pin.isNotEmpty,
+            onDigit: _addDigit,
+            onDelete: _deleteDigit,
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _addDigit(String digit) {
+    if (_submitting || _pin.length >= 4) return;
+    HapticFeedback.selectionClick();
+    setState(() {
+      _pin += digit;
+      _errorText = null;
+    });
+    if (_pin.length == 4) {
+      Future<void>.delayed(const Duration(milliseconds: 120), _advance);
+    }
+  }
+
+  void _deleteDigit() {
+    if (_submitting || _pin.isEmpty) return;
+    HapticFeedback.selectionClick();
+    setState(() {
+      _pin = _pin.substring(0, _pin.length - 1);
+      _errorText = null;
+    });
+  }
+
+  void _fail(String message, {_PinChangeStep? step}) {
+    HapticFeedback.mediumImpact();
+    setState(() {
+      _pin = '';
+      _errorText = message;
+      _errorCount++;
+      _submitting = false;
+      if (step != null) _step = step;
+    });
+  }
+
+  Future<void> _advance() async {
+    if (!mounted || _pin.length != 4) return;
+    switch (_step) {
+      case _PinChangeStep.current:
+        setState(() => _submitting = true);
+        final valid = await _securityLockService.verifyPin(_pin);
+        if (!mounted) return;
+        if (!valid) return _fail(AppConstants.securityInvalidPin.tr());
+        setState(() {
+          _submitting = false;
+          _pin = '';
+          _step = _PinChangeStep.fresh;
+        });
+      case _PinChangeStep.fresh:
+        setState(() {
+          _newPin = _pin;
+          _pin = '';
+          _step = _PinChangeStep.confirm;
+        });
+      case _PinChangeStep.confirm:
+        // A mismatch starts the new PIN over, so it's chosen again in full.
+        if (_pin != _newPin) {
+          return _fail(
+            AppConstants.securityPinMismatch.tr(),
+            step: _PinChangeStep.fresh,
+          );
+        }
+        setState(() => _submitting = true);
+        await _securityLockService.setPin(_newPin);
+        if (mounted) Navigator.of(context).pop(true);
+    }
+  }
+}
+
+enum _HiddenPinStep { enter, create, confirm }
+
+/// The hidden albums' own PIN: asked before they open, or chosen (twice)
+/// the first time an album is hidden. Pops with true once it's right.
+class HiddenAlbumsPinScreen extends StatefulWidget {
+  const HiddenAlbumsPinScreen({super.key, required this.create});
+
+  /// Choose a new PIN instead of entering the existing one.
+  final bool create;
+
+  @override
+  State<HiddenAlbumsPinScreen> createState() => _HiddenAlbumsPinScreenState();
+}
+
+class _HiddenAlbumsPinScreenState extends State<HiddenAlbumsPinScreen> {
+  late _HiddenPinStep _step = widget.create
+      ? _HiddenPinStep.create
+      : _HiddenPinStep.enter;
+  String _pin = '';
+  String _newPin = '';
+  bool _submitting = false;
+  String? _errorText;
+  int _errorCount = 0;
+
+  String get _title => switch (_step) {
+    _HiddenPinStep.enter => AppConstants.hiddenEnterPin.tr(),
+    _HiddenPinStep.create => AppConstants.hiddenCreatePinTitle.tr(),
+    _HiddenPinStep.confirm => AppConstants.hiddenConfirmPin.tr(),
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    return _SecurityShell(
+      greeting: '',
+      title: _title,
+      subtitle: _step == _HiddenPinStep.enter
+          ? ''
+          : AppConstants.hiddenCreatePinSubtitle.tr(),
+      userName: '',
+      onBack: () => Navigator.of(context).pop(false),
+      leading: Align(
+        child: Container(
+          width: 76,
+          height: 76,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: AppTheme.premium.withValues(alpha: 0.18),
+            border: Border.all(color: AppTheme.premium.withValues(alpha: 0.4)),
+          ),
+          child: const Icon(
+            Icons.visibility_off_rounded,
+            color: AppTheme.premium,
+            size: 32,
+          ),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _PinDots(
+            length: _pin.length,
+            hasError: _errorText != null,
+            errorCount: _errorCount,
+          ),
+          _PinMessage(text: _errorText),
+          const SizedBox(height: 8),
+          _PinKeyboard(
+            enabled: !_submitting,
+            canDelete: _pin.isNotEmpty,
+            onDigit: _addDigit,
+            onDelete: _deleteDigit,
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _addDigit(String digit) {
+    if (_submitting || _pin.length >= 4) return;
+    HapticFeedback.selectionClick();
+    setState(() {
+      _pin += digit;
+      _errorText = null;
+    });
+    if (_pin.length == 4) {
+      Future<void>.delayed(const Duration(milliseconds: 120), _advance);
+    }
+  }
+
+  void _deleteDigit() {
+    if (_submitting || _pin.isEmpty) return;
+    HapticFeedback.selectionClick();
+    setState(() {
+      _pin = _pin.substring(0, _pin.length - 1);
+      _errorText = null;
+    });
+  }
+
+  void _fail(String message, {_HiddenPinStep? step}) {
+    HapticFeedback.mediumImpact();
+    setState(() {
+      _pin = '';
+      _errorText = message;
+      _errorCount++;
+      _submitting = false;
+      if (step != null) _step = step;
+    });
+  }
+
+  Future<void> _advance() async {
+    if (!mounted || _pin.length != 4) return;
+    setState(() => _submitting = true);
+    switch (_step) {
+      case _HiddenPinStep.enter:
+        final valid = await HiddenAlbumsLock.verifyPin(_pin);
+        if (!mounted) return;
+        if (!valid) return _fail(AppConstants.securityInvalidPin.tr());
+        Navigator.of(context).pop(true);
+      case _HiddenPinStep.create:
+        // The app PIN would defeat the point of a second lock.
+        if (await SecurityLockService().verifyPin(_pin)) {
+          return _fail(AppConstants.hiddenSameAsApp.tr());
+        }
+        if (!mounted) return;
+        setState(() {
+          _newPin = _pin;
+          _pin = '';
+          _submitting = false;
+          _step = _HiddenPinStep.confirm;
+        });
+      case _HiddenPinStep.confirm:
+        if (_pin != _newPin) {
+          return _fail(
+            AppConstants.securityPinMismatch.tr(),
+            step: _HiddenPinStep.create,
+          );
+        }
+        await HiddenAlbumsLock.setPin(_newPin);
+        if (mounted) Navigator.of(context).pop(true);
+    }
+  }
+}
+
+/// The lock screens' layout: who is unlocking at the top, the PIN and its
+/// keypad at the bottom, within reach of the thumb. Nothing boxed in, like
+/// the phone's own lock screen and most banking apps.
 class _SecurityShell extends StatelessWidget {
   const _SecurityShell({
     required this.greeting,
@@ -477,8 +733,16 @@ class _SecurityShell extends StatelessWidget {
     required this.subtitle,
     required this.userName,
     this.avatarUrl,
+    this.onBack,
+    this.leading,
     required this.child,
   });
+
+  /// Shows a back arrow (screens opened from settings, not the lock).
+  final VoidCallback? onBack;
+
+  /// Shown instead of the user's photo.
+  final Widget? leading;
 
   final String greeting;
   final String title;
@@ -501,120 +765,157 @@ class _SecurityShell extends StatelessWidget {
           ),
         ),
         child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 430),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          width: 38,
-                          height: 38,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(13),
-                            border: Border.all(color: AppTheme.border),
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(13),
-                            child: Image.asset(
-                              'assets/images/docs_icon.png',
-                              fit: BoxFit.cover,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Text(
-                          AppConstants.appTitle.tr(),
-                          style: const TextStyle(
-                            color: AppTheme.text,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 28),
-                    _SecurityAvatar(userName: userName, avatarUrl: avatarUrl),
-                    const SizedBox(height: 18),
-                    if (showText) ...[
-                      if (title.isEmpty)
-                        Text(
-                          greeting,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: AppTheme.text,
-                            fontSize: 27,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        )
-                      else ...[
-                        Text(
-                          greeting,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: AppTheme.primarySoft,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          title,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: AppTheme.text,
-                            fontSize: 27,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                      if (subtitle.isNotEmpty) ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          subtitle,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: AppTheme.mutedText,
-                            fontSize: 13,
-                            height: 1.35,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 24),
-                    ],
-                    Container(
-                      padding: const EdgeInsets.fromLTRB(18, 20, 18, 18),
-                      decoration: BoxDecoration(
-                        color: AppTheme.surface.withValues(alpha: 0.86),
-                        borderRadius: BorderRadius.circular(26),
-                        border: Border.all(
-                          color: AppTheme.border.withValues(alpha: 0.75),
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.28),
-                            blurRadius: 28,
-                            offset: const Offset(0, 16),
-                          ),
-                        ],
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              // The width is fixed outside IntrinsicHeight so text is
+              // measured at the width it will really have.
+              const horizontal = 28.0;
+              const vertical = 20.0;
+              final width = math.min(
+                400.0,
+                constraints.maxWidth - horizontal * 2,
+              );
+              return SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(vertical: vertical),
+                child: Center(
+                  child: SizedBox(
+                    width: width,
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minHeight: constraints.maxHeight - vertical * 2,
                       ),
-                      child: child,
+                      child: IntrinsicHeight(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            if (onBack == null)
+                              const _SecurityBrand()
+                            else
+                              Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  const _SecurityBrand(),
+                                  Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: IconButton(
+                                      onPressed: onBack,
+                                      tooltip: MaterialLocalizations.of(
+                                        context,
+                                      ).backButtonTooltip,
+                                      icon: const Icon(
+                                        Icons.arrow_back_rounded,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            const SizedBox(height: 28),
+                            leading ??
+                                _SecurityAvatar(
+                                  userName: userName,
+                                  avatarUrl: avatarUrl,
+                                ),
+                            const SizedBox(height: 18),
+                            if (showText) ..._texts(),
+                            const Spacer(),
+                            const SizedBox(height: 24),
+                            child,
+                            if (LocalModeConfig.isLocalOnly) ...[
+                              const SizedBox(height: 12),
+                              const _SecurityFootnote(),
+                            ],
+                          ],
+                        ),
+                      ),
                     ),
-                    const SizedBox(height: 16),
-                    const _SecurityFootnote(),
-                  ],
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
           ),
         ),
       ),
+    );
+  }
+
+  List<Widget> _texts() {
+    return [
+      if (title.isEmpty)
+        Text(
+          greeting,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: AppTheme.text,
+            fontSize: 26,
+            fontWeight: FontWeight.w700,
+          ),
+        )
+      else ...[
+        if (greeting.isNotEmpty) ...[
+          Text(
+            greeting,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: AppTheme.primarySoft,
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 6),
+        ],
+        Text(
+          title,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: AppTheme.text,
+            fontSize: 26,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+      if (subtitle.isNotEmpty) ...[
+        const SizedBox(height: 8),
+        Text(
+          subtitle,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: AppTheme.mutedText,
+            fontSize: 14,
+            height: 1.4,
+          ),
+        ),
+      ],
+    ];
+  }
+}
+
+class _SecurityBrand extends StatelessWidget {
+  const _SecurityBrand();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(9),
+          child: Image.asset(
+            'assets/images/docs_icon.png',
+            width: 30,
+            height: 30,
+            fit: BoxFit.cover,
+          ),
+        ),
+        const SizedBox(width: 9),
+        Text(
+          AppConstants.appTitle.tr(),
+          style: const TextStyle(
+            color: AppTheme.text,
+            fontSize: 17,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -632,118 +933,133 @@ class _SecurityAvatar extends StatelessWidget {
     final isLocalPhoto = photoUrl != null && !isNetworkPhoto;
 
     return Align(
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Container(
-            width: 92,
-            height: 92,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: photoUrl == null
-                  ? const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [Color(0xFF4F9DFF), Color(0xFF12306A)],
-                    )
-                  : null,
-              image: isNetworkPhoto
-                  ? DecorationImage(
-                      image: NetworkImage(photoUrl),
-                      fit: BoxFit.cover,
-                    )
-                  : isLocalPhoto
-                  ? DecorationImage(
-                      image: FileImage(File(photoUrl)),
-                      fit: BoxFit.cover,
-                    )
-                  : null,
-              border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
-              boxShadow: [
-                BoxShadow(
-                  color: AppTheme.accent.withValues(alpha: 0.26),
-                  blurRadius: 28,
-                  offset: const Offset(0, 14),
+      child: Container(
+        width: 76,
+        height: 76,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: photoUrl == null
+              ? const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF4F9DFF), Color(0xFF12306A)],
+                )
+              : null,
+          image: isNetworkPhoto
+              ? DecorationImage(
+                  image: NetworkImage(photoUrl),
+                  fit: BoxFit.cover,
+                )
+              : isLocalPhoto
+              ? DecorationImage(
+                  image: FileImage(File(photoUrl)),
+                  fit: BoxFit.cover,
+                )
+              : null,
+          border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+        ),
+        child: photoUrl == null
+            ? Center(
+                child: Text(
+                  initialsFromName(userName),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-              ],
-            ),
-            child: photoUrl == null
-                ? Center(
-                    child: Text(
-                      initialsFromName(userName),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 26,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  )
-                : null,
-          ),
-          Positioned(
-            right: -2,
-            bottom: 2,
-            child: Container(
-              width: 34,
-              height: 34,
-              decoration: BoxDecoration(
-                color: AppTheme.success,
-                shape: BoxShape.circle,
-                border: Border.all(color: AppTheme.background, width: 3),
-              ),
-              child: const Icon(
-                Icons.lock_rounded,
-                color: Colors.white,
-                size: 18,
-              ),
-            ),
-          ),
-        ],
+              )
+            : null,
       ),
     );
   }
 }
 
+/// Four dots that fill as the PIN is typed, and shake when it's wrong.
 class _PinDots extends StatelessWidget {
-  const _PinDots({required this.length, required this.hasError});
+  const _PinDots({
+    required this.length,
+    required this.hasError,
+    required this.errorCount,
+  });
 
   final int length;
   final bool hasError;
 
+  /// Grows with every wrong PIN; each new value plays the shake once.
+  final int errorCount;
+
   @override
   Widget build(BuildContext context) {
-    return Row(
+    final filledColor = hasError ? AppTheme.destructive : AppTheme.text;
+    final dots = Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        for (var index = 0; index < 4; index++) ...[
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 160),
-            width: index < length ? 18 : 14,
-            height: index < length ? 18 : 14,
-            decoration: BoxDecoration(
-              color: index < length
-                  ? (hasError ? AppTheme.destructive : AppTheme.accent)
-                  : Colors.transparent,
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: hasError ? AppTheme.destructive : AppTheme.primarySoft,
-                width: 1.7,
+        for (var index = 0; index < 4; index++)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 11),
+            child: AnimatedScale(
+              scale: index < length ? 1 : 0.86,
+              duration: const Duration(milliseconds: 140),
+              curve: Curves.easeOutBack,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 140),
+                width: 14,
+                height: 14,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: index < length
+                      ? filledColor
+                      : AppTheme.text.withValues(alpha: 0.18),
+                ),
               ),
-              boxShadow: index < length
-                  ? [
-                      BoxShadow(
-                        color:
-                            (hasError ? AppTheme.destructive : AppTheme.accent)
-                                .withValues(alpha: 0.28),
-                        blurRadius: 12,
-                      ),
-                    ]
-                  : null,
             ),
           ),
-          if (index != 3) const SizedBox(width: 16),
-        ],
       ],
+    );
+
+    if (errorCount == 0 || MediaQuery.disableAnimationsOf(context)) {
+      return dots;
+    }
+    return TweenAnimationBuilder<double>(
+      key: ValueKey(errorCount),
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 420),
+      builder: (context, t, child) => Transform.translate(
+        offset: Offset(math.sin(t * math.pi * 5) * 10 * (1 - t), 0),
+        child: child,
+      ),
+      child: dots,
+    );
+  }
+}
+
+/// The line under the dots: empty, or why the PIN wasn't accepted. Keeps
+/// its height either way so the keypad doesn't jump.
+class _PinMessage extends StatelessWidget {
+  const _PinMessage({required this.text});
+
+  final String? text;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 44,
+      child: Center(
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 180),
+          child: Text(
+            text ?? '',
+            key: ValueKey(text),
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: AppTheme.destructive,
+              fontSize: 13.5,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -757,18 +1073,10 @@ class _BiometricChoice extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(14),
       onTap: () => onChanged(!value),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: value
-              ? AppTheme.accent.withValues(alpha: 0.16)
-              : AppTheme.surfaceStrong.withValues(alpha: 0.48),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: value ? AppTheme.accent : AppTheme.border),
-        ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         child: Row(
           children: [
             const Icon(Icons.fingerprint_rounded, color: AppTheme.primarySoft),
@@ -776,11 +1084,7 @@ class _BiometricChoice extends StatelessWidget {
             Expanded(
               child: Text(
                 AppConstants.securityEnableBiometrics.tr(),
-                style: const TextStyle(
-                  color: AppTheme.text,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: const TextStyle(color: AppTheme.text, fontSize: 14),
               ),
             ),
             Switch(value: value, onChanged: onChanged),
@@ -791,9 +1095,12 @@ class _BiometricChoice extends StatelessWidget {
   }
 }
 
+/// A phone-style keypad: plain digits, a soft circle where a key is
+/// pressed, biometrics bottom-left and delete bottom-right.
 class _PinKeyboard extends StatelessWidget {
   const _PinKeyboard({
     required this.enabled,
+    required this.canDelete,
     required this.onDigit,
     required this.onDelete,
     this.biometricEnabled = false,
@@ -801,6 +1108,7 @@ class _PinKeyboard extends StatelessWidget {
   });
 
   final bool enabled;
+  final bool canDelete;
   final ValueChanged<String> onDigit;
   final VoidCallback onDelete;
   final bool biometricEnabled;
@@ -808,57 +1116,55 @@ class _PinKeyboard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final keySize = (MediaQuery.sizeOf(context).height * 0.095).clamp(
+      60.0,
+      78.0,
+    );
+    Widget digit(String value) => _KeypadButton(
+      size: keySize,
+      label: value,
+      enabled: enabled,
+      onTap: () => onDigit(value),
+    );
+
     return Column(
       children: [
         for (final row in const [
           ['1', '2', '3'],
           ['4', '5', '6'],
           ['7', '8', '9'],
-        ]) ...[
-          Row(
-            children: [
-              for (final digit in row) ...[
-                Expanded(
-                  child: _KeypadButton(
-                    label: digit,
-                    enabled: enabled,
-                    onTap: () => onDigit(digit),
-                  ),
-                ),
-                if (digit != row.last) const SizedBox(width: 12),
-              ],
-            ],
+        ])
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [for (final value in row) digit(value)],
+            ),
           ),
-          const SizedBox(height: 12),
-        ],
         Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            Expanded(
-              child: biometricEnabled
-                  ? _KeypadButton(
-                      icon: Icons.fingerprint_rounded,
-                      semanticLabel: AppConstants.securityUseBiometrics.tr(),
-                      enabled: enabled,
-                      onTap: onBiometric,
-                    )
-                  : const SizedBox(height: 58),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
+            biometricEnabled
+                ? _KeypadButton(
+                    size: keySize,
+                    icon: Icons.fingerprint_rounded,
+                    semanticLabel: AppConstants.securityUseBiometrics.tr(),
+                    enabled: enabled,
+                    onTap: onBiometric,
+                  )
+                : SizedBox.square(dimension: keySize),
+            digit('0'),
+            // Only there once there is something to delete.
+            AnimatedOpacity(
+              opacity: canDelete ? 1 : 0,
+              duration: const Duration(milliseconds: 150),
               child: _KeypadButton(
-                label: '0',
-                enabled: enabled,
-                onTap: () => onDigit('0'),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _KeypadButton(
+                size: keySize,
                 icon: Icons.backspace_outlined,
                 semanticLabel: MaterialLocalizations.of(
                   context,
                 ).deleteButtonTooltip,
-                enabled: enabled,
+                enabled: enabled && canDelete,
                 onTap: onDelete,
               ),
             ),
@@ -871,6 +1177,7 @@ class _PinKeyboard extends StatelessWidget {
 
 class _KeypadButton extends StatelessWidget {
   const _KeypadButton({
+    required this.size,
     this.label,
     this.icon,
     this.semanticLabel,
@@ -878,6 +1185,7 @@ class _KeypadButton extends StatelessWidget {
     required this.onTap,
   });
 
+  final double size;
   final String? label;
   final IconData? icon;
   final String? semanticLabel;
@@ -889,32 +1197,30 @@ class _KeypadButton extends StatelessWidget {
     final child = icon == null
         ? Text(
             label ?? '',
-            style: const TextStyle(
+            style: TextStyle(
               color: AppTheme.text,
-              fontSize: 24,
-              fontWeight: FontWeight.w700,
+              fontSize: size * 0.4,
+              fontWeight: FontWeight.w500,
+              fontFeatures: const [FontFeature.tabularFigures()],
             ),
           )
-        : Icon(icon, color: AppTheme.primarySoft, size: 25);
+        : Icon(icon, color: AppTheme.primarySoft, size: size * 0.36);
 
     return Semantics(
       button: true,
       label: semanticLabel ?? label,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: enabled ? onTap : null,
-        child: AnimatedOpacity(
-          opacity: enabled ? 1 : 0.45,
-          duration: const Duration(milliseconds: 160),
-          child: Container(
-            height: 58,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: AppTheme.surfaceStrong.withValues(alpha: 0.58),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: AppTheme.border.withValues(alpha: 0.7)),
-            ),
-            child: child,
+      child: SizedBox.square(
+        dimension: size,
+        child: Material(
+          type: MaterialType.transparency,
+          shape: const CircleBorder(),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: enabled ? onTap : null,
+            customBorder: const CircleBorder(),
+            splashColor: AppTheme.text.withValues(alpha: 0.12),
+            highlightColor: AppTheme.text.withValues(alpha: 0.08),
+            child: Center(child: child),
           ),
         ),
       ),

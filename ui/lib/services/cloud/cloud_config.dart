@@ -11,13 +11,8 @@ class CloudConfig {
 
   /// Must match `appAuthRedirectScheme` in android/app/build.gradle.kts (and
   /// CFBundleURLSchemes on iOS), and be registered as a redirect URI in the
-  /// Microsoft and Dropbox app consoles.
+  /// Dropbox App Console.
   static const redirectUri = 'com.alldocs.app:/oauth2redirect';
-
-  /// Microsoft Entra (Azure AD) app registration → "Application (client)
-  /// ID". Platform: "Mobile and desktop", redirect URI = [redirectUri].
-  /// Delegated permissions: Files.ReadWrite, User.Read, offline_access.
-  static String get oneDriveClientId => CloudKeys.oneDriveClientId ?? '';
 
   /// Dropbox App Console → "App key" (no secret needed, PKCE is used).
   /// Permissions: files.metadata.read, files.content.read,

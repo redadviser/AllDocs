@@ -7,6 +7,7 @@ import '../theme/app_theme.dart';
 import 'app_constants.dart';
 import 'app_sheet.dart';
 import 'document_actions.dart';
+import 'plan_prompts.dart';
 import 'document_file_icon.dart';
 import 'document_import_flow.dart';
 
@@ -321,9 +322,12 @@ class _DeviceScanSheetState extends State<_DeviceScanSheet> {
     final zips = chosen.where((d) => d.type == DocumentType.archive).toList();
     final files = chosen.where((d) => d.type != DocumentType.archive).toList();
 
-    var result = await widget.documentsService.importScannedDocuments(
-      files,
-      albumId: widget.albumId,
+    var result = await guardStorage(
+      context,
+      () => widget.documentsService.importScannedDocuments(
+        files,
+        albumId: widget.albumId,
+      ),
     );
     for (final zip in zips) {
       final path = zip.localPath;

@@ -7,7 +7,9 @@ import '../theme/app_theme.dart';
 import 'album_dialog.dart';
 import 'app_constants.dart';
 import 'app_sheet.dart';
+import 'bookshelf.dart';
 import 'document_preview_card.dart';
+import 'tag_picker_sheet.dart';
 
 /// Name, albums, tags and favorite for one or more documents. Shown right
 /// after importing ("Document imported — where should it go?") and from a
@@ -55,7 +57,6 @@ class _DocumentDetailsSheetState extends State<_DocumentDetailsSheet> {
   late final TextEditingController _titleController = TextEditingController(
     text: _single ? widget.documents.first.title : '',
   );
-  final TextEditingController _tagController = TextEditingController();
   late final Set<String> _albumIds = _single
       ? widget.documents.first.albumIds.toSet()
       : {};
@@ -63,7 +64,7 @@ class _DocumentDetailsSheetState extends State<_DocumentDetailsSheet> {
       ? [...widget.documents.first.tags]
       : [];
   late bool _favorite = _single && widget.documents.first.isFavorite;
-  late List<DocumentAlbum> _albums = widget.snapshot.albums;
+  late DocumentsSnapshot _snapshot = widget.snapshot;
   bool _saving = false;
 
   @override
@@ -74,7 +75,7 @@ class _DocumentDetailsSheetState extends State<_DocumentDetailsSheet> {
     if (widget.afterImport && _single && _albumIds.isEmpty) {
       final type = widget.documents.first.semanticType;
       if (type != null) {
-        final album = albumForSemanticType(type, _albums);
+        final album = albumForSemanticType(type, _snapshot.albums);
         if (album != null) _albumIds.add(album.id);
       }
     }
@@ -83,17 +84,12 @@ class _DocumentDetailsSheetState extends State<_DocumentDetailsSheet> {
   @override
   void dispose() {
     _titleController.dispose();
-    _tagController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final first = widget.documents.first;
-    final suggestedTags = widget.snapshot.tags
-        .where((tag) => !_tags.contains(tag))
-        .take(8)
-        .toList();
 
     return Padding(
       padding: EdgeInsets.only(
@@ -183,76 +179,50 @@ class _DocumentDetailsSheetState extends State<_DocumentDetailsSheet> {
                 ),
               ],
             ),
-            if (_albums.isEmpty)
+            if (_snapshot.albums.isEmpty)
               Text(
                 AppConstants.detailsNoAlbums.tr(),
                 style: const TextStyle(color: AppTheme.mutedText),
               )
             else
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (final album in _albums)
-                    FilterChip(
-                      avatar: Icon(
-                        albumIconFor(album.iconName),
-                        size: 16,
-                        color: Color(album.colorValue),
-                      ),
-                      label: Text(album.name),
-                      selected: _albumIds.contains(album.id),
-                      onSelected: (selected) => setState(() {
-                        selected
-                            ? _albumIds.add(album.id)
-                            : _albumIds.remove(album.id);
-                      }),
-                    ),
-                ],
+              AlbumShelfPicker(
+                shelves: _snapshot.shelves,
+                isSelected: _albumIds.contains,
+                countFor: (albumId) =>
+                    _snapshot.documentsForAlbum(albumId).length,
+                onToggle: (album) => setState(() {
+                  _albumIds.contains(album.id)
+                      ? _albumIds.remove(album.id)
+                      : _albumIds.add(album.id);
+                }),
               ),
             const SizedBox(height: 18),
-            _Label(AppConstants.detailsTags.tr()),
-            const SizedBox(height: 8),
-            if (_tags.isNotEmpty) ...[
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (final tag in _tags)
-                    InputChip(
-                      label: Text(tag),
-                      onDeleted: () => setState(() => _tags.remove(tag)),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 10),
-            ],
-            TextField(
-              controller: _tagController,
-              textInputAction: TextInputAction.done,
-              decoration: InputDecoration(
-                hintText: AppConstants.detailsAddTag.tr(),
-                prefixIcon: const Icon(Icons.sell_outlined, size: 20),
-              ),
-              onSubmitted: (value) {
-                _addTag(value);
-              },
+            Row(
+              children: [
+                Expanded(child: _Label(AppConstants.detailsTags.tr())),
+                TextButton.icon(
+                  onPressed: _createTag,
+                  icon: const Icon(Icons.add_rounded, size: 18),
+                  label: Text(AppConstants.tagsNew.tr()),
+                ),
+              ],
             ),
-            if (suggestedTags.isNotEmpty) ...[
-              const SizedBox(height: 10),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (final tag in suggestedTags)
-                    ActionChip(
-                      label: Text(tag),
-                      avatar: const Icon(Icons.add_rounded, size: 16),
-                      onPressed: () => _addTag(tag),
-                    ),
-                ],
-              ),
-            ],
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final tag in _tags)
+                  InputChip(
+                    label: Text('#$tag'),
+                    onDeleted: () => setState(() => _tags.remove(tag)),
+                  ),
+                ActionChip(
+                  avatar: const Icon(Icons.sell_outlined, size: 16),
+                  label: Text(AppConstants.tagsChoose.tr()),
+                  onPressed: _pickTags,
+                ),
+              ],
+            ),
             const SizedBox(height: 12),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
@@ -275,13 +245,39 @@ class _DocumentDetailsSheetState extends State<_DocumentDetailsSheet> {
     );
   }
 
-  void _addTag(String value) {
-    final tag = value.trim();
-    if (tag.isEmpty) return;
+  Future<void> _createTag() async {
+    final name = await showNameDialog(
+      context,
+      title: AppConstants.tagsNew.tr(),
+      label: AppConstants.tagsName.tr(),
+      actionLabel: AppConstants.commonCreate.tr(),
+    );
+    final tag = cleanTagName(name ?? '');
+    if (tag.isEmpty || !mounted) return;
+    // Reuse the existing spelling if the tag is already in use.
+    final key = normalizeForSearch(tag);
+    final existing = [
+      ..._snapshot.tags,
+      ..._tags,
+    ].where((t) => normalizeForSearch(t) == key);
+    final picked = existing.isEmpty ? tag : existing.first;
     setState(() {
-      if (!_tags.contains(tag)) _tags.add(tag);
-      _tagController.clear();
+      if (!_tags.contains(picked)) _tags.add(picked);
     });
+  }
+
+  Future<void> _pickTags() async {
+    final picked = await showTagPickerSheet(
+      context,
+      allTags: _snapshot.tags,
+      selected: _tags,
+    );
+    if (picked == null || !mounted) return;
+    setState(
+      () => _tags
+        ..clear()
+        ..addAll(picked),
+    );
   }
 
   Future<void> _createAlbum() async {
@@ -296,13 +292,12 @@ class _DocumentDetailsSheetState extends State<_DocumentDetailsSheet> {
     final snapshot = await widget.documentsService.loadSnapshot();
     if (!mounted) return;
     setState(() {
-      _albums = snapshot.albums;
+      _snapshot = snapshot;
       if (id != null) _albumIds.add(id);
     });
   }
 
   Future<void> _save() async {
-    if (_tagController.text.trim().isNotEmpty) _addTag(_tagController.text);
     setState(() => _saving = true);
     for (final document in widget.documents) {
       await widget.documentsService.updateDocument(

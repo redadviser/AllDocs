@@ -82,9 +82,7 @@ void main() {
     });
 
     test('extracts an English "expiry date" for a passport', () {
-      final result = classifier.classify(
-        'PASSPORT\nExpiry Date: 01/12/2030',
-      );
+      final result = classifier.classify('PASSPORT\nExpiry Date: 01/12/2030');
       expect(result.validityDate, DateTime(2030, 12, 1));
     });
 
@@ -103,15 +101,15 @@ void main() {
     });
 
     test('does not extract a date for types where it is not relevant', () {
-      final result = classifier.classify(
-        'RECEIPT\nValid until: 01/01/2030',
-      );
+      final result = classifier.classify('RECEIPT\nValid until: 01/01/2030');
       expect(result.semanticType, DocumentSemanticType.receipt);
       expect(result.validityDate, isNull);
     });
 
     test('returns null when no date follows the validity keyword', () {
-      final result = classifier.classify('CARTÃO DE CIDADÃO\nValidade: em breve');
+      final result = classifier.classify(
+        'CARTÃO DE CIDADÃO\nValidade: em breve',
+      );
       expect(result.validityDate, isNull);
     });
 
