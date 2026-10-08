@@ -25,6 +25,13 @@ export class RequestError extends Error {
   }
 }
 
+// The address people see in the link. A short domain pointed at this same
+// server (e.g. https://alldocs.eupasoft.com) reads better than the API host.
+function requestsBaseUrl(requestOrigin: string): string {
+  const configured = process.env.REQUESTS_PUBLIC_URL?.trim().replace(/\/+$/, '')
+  return configured || publicBaseUrl(requestOrigin)
+}
+
 function hashToken(token: string): string {
   return crypto.createHash('sha256').update(token).digest('hex')
 }
@@ -49,7 +56,8 @@ export async function createRequest(
   const albumId = typeof input.albumId === 'string' && input.albumId ? input.albumId : null
 
   const id = crypto.randomUUID()
-  const token = crypto.randomBytes(24).toString('base64url')
+  // 128 bits: unguessable, and 22 characters keep the link short.
+  const token = crypto.randomBytes(16).toString('base64url')
   const expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000)
   await sql`
     INSERT INTO document_requests (id, user_id, token_hash, title, message, language, album_id, expires_at)
@@ -57,7 +65,7 @@ export async function createRequest(
   `
   return {
     id,
-    url: `${publicBaseUrl(requestOrigin)}/r/${token}`,
+    url: `${requestsBaseUrl(requestOrigin)}/r/${token}`,
     expiresAt,
   }
 }

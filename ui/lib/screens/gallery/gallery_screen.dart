@@ -18,6 +18,7 @@ import '../../models/models.dart';
 import '../../services/services.dart';
 import '../../theme/app_theme.dart';
 import '../albums/album_detail_screen.dart';
+import '../requests/requests_screen.dart';
 import '../viewer/document_viewer_screen.dart';
 
 class GalleryScreen extends StatefulWidget {
@@ -136,6 +137,8 @@ class _GalleryScreenState extends State<GalleryScreen> {
                               snapshot.archivedDocuments.length +
                               snapshot.trashDocuments.length,
                           onOpenArchive: widget.onOpenArchive,
+                          onOpenRequests: () =>
+                              openDocumentRequests(context, _service),
                           onOpenClouds: () => showCloudQuickSheet(
                             context,
                             _service,
@@ -552,11 +555,13 @@ class _Header extends StatelessWidget {
   const _Header({
     required this.archivedCount,
     required this.onOpenArchive,
+    required this.onOpenRequests,
     required this.onOpenClouds,
   });
 
   final int archivedCount;
   final VoidCallback onOpenArchive;
+  final VoidCallback onOpenRequests;
   final VoidCallback onOpenClouds;
 
   @override
@@ -581,6 +586,16 @@ class _Header extends StatelessWidget {
             foregroundColor: AppTheme.text,
           ),
           icon: const Icon(Icons.cloud_outlined),
+        ),
+        const SizedBox(width: 8),
+        IconButton.filledTonal(
+          tooltip: AppConstants.requestsTitle.tr(),
+          onPressed: onOpenRequests,
+          style: IconButton.styleFrom(
+            backgroundColor: AppTheme.surfaceStrong,
+            foregroundColor: AppTheme.text,
+          ),
+          icon: const Icon(Icons.forward_to_inbox_outlined),
         ),
         const SizedBox(width: 8),
         IconButton.filledTonal(
