@@ -29,7 +29,7 @@ export class SyncError extends Error {
   }
 }
 
-type User = { id: string; plan: string }
+type User = { id: string; plan: string; deviceId?: string | null }
 
 function hash(value: string): string {
   return crypto.createHash('sha256').update(value).digest('hex')
@@ -98,6 +98,12 @@ export async function registerDevice(
   const pairingCode = typeof input.pairingCode === 'string' ? input.pairingCode : ''
   const maxDevices = getPlanById(user.plan).maxDevices
   const id = crypto.randomUUID()
+  const sessionDeviceId = user.deviceId ?? null
+
+  // This same phone was in sync before (reinstalled, signed in again):
+  // its old entry goes, instead of taking another of the plan's places.
+  // If it was the only one, the old sync ends and this one starts anew.
+  if (sessionDeviceId) await releaseSessionDevices(user.id, [sessionDeviceId])
 
   return sql.begin(async (tx) => {
     await tx`SELECT pg_advisory_xact_lock(hashtext(${'sync:' + user.id}))`
@@ -106,8 +112,8 @@ export async function registerDevice(
       if (pairingCode) throw new SyncError(409, 'Sync was turned off on the other device', 'noCircle')
       await tx`INSERT INTO sync_circles (user_id, key_check) VALUES (${user.id}, ${keyCheck})`
       await tx`
-        INSERT INTO sync_devices (id, user_id, name, platform)
-        VALUES (${id}, ${user.id}, ${name}, ${platform})
+        INSERT INTO sync_devices (id, user_id, name, platform, session_device_id)
+        VALUES (${id}, ${user.id}, ${name}, ${platform}, ${sessionDeviceId})
       `
       return { deviceId: id, first: true }
     }
@@ -127,8 +133,8 @@ export async function registerDevice(
       throw new SyncError(409, `Up to ${maxDevices} devices`, 'tooMany')
     }
     await tx`
-      INSERT INTO sync_devices (id, user_id, name, platform, needs_snapshot)
-      VALUES (${id}, ${user.id}, ${name}, ${platform}, TRUE)
+      INSERT INTO sync_devices (id, user_id, name, platform, needs_snapshot, session_device_id)
+      VALUES (${id}, ${user.id}, ${name}, ${platform}, TRUE, ${sessionDeviceId})
     `
     await tx`UPDATE sync_pairings SET device_id = ${id} WHERE code_hash = ${hash(pairingCode)}`
     return { deviceId: id, first: false }
@@ -154,6 +160,24 @@ export async function removeDevice(user: User, deviceId: string) {
     await endSync(user.id)
   } else {
     await dropUnneededBlobs(user.id)
+  }
+}
+
+/// The phones whose sessions ended ([sessionDeviceIds]; null: all of the
+/// account's) leave sync, freeing their places.
+export async function releaseSessionDevices(userId: string, sessionDeviceIds: string[] | null) {
+  const rows = sessionDeviceIds === null
+    ? await sql`SELECT id FROM sync_devices WHERE user_id = ${userId}`
+    : sessionDeviceIds.length === 0
+      ? []
+      : await sql`
+          SELECT id FROM sync_devices
+          WHERE user_id = ${userId} AND session_device_id IN ${sql(sessionDeviceIds)}
+        `
+  for (const row of rows) {
+    await removeDevice({ id: userId, plan: 'free' }, row.id as string).catch((error) => {
+      if (!(error instanceof SyncError)) throw error
+    })
   }
 }
 

@@ -15,6 +15,7 @@ import 'api_helpers.dart';
 import 'google_auth_config.dart';
 import 'local_mode_config.dart';
 import 'plan_service.dart';
+import 'sync/sync_service.dart';
 
 class _GoogleIdToken {
   const _GoogleIdToken({
@@ -307,6 +308,12 @@ class AuthService {
         // Best effort; local sign-out must still work if this fails.
       }
     }
+
+    // Signing out also takes this phone out of device sync (the server
+    // does it with the session); forget it here while the account is known.
+    try {
+      await SyncService.instance.forgetOnSignOut();
+    } catch (_) {}
 
     if (!LocalModeConfig.isLocalOnly) {
       final token = await tokenStore.read();

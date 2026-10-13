@@ -28,9 +28,8 @@ async function registerDevice(userId: string, device?: DeviceInfo) {
     await sql`
       INSERT INTO devices (id, user_id, platform, name, last_seen_at)
       VALUES (${device.id}, ${userId}, ${device.platform ?? 'unknown'}, ${device.name ?? null}, NOW())
-      ON CONFLICT (id) DO UPDATE
-        SET user_id = EXCLUDED.user_id,
-            platform = EXCLUDED.platform,
+      ON CONFLICT (id, user_id) DO UPDATE
+        SET platform = EXCLUDED.platform,
             name = EXCLUDED.name,
             last_seen_at = NOW()
     `

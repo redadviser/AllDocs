@@ -286,6 +286,13 @@ class SyncService {
     await _forget();
   }
 
+  /// Signing out: the server takes this phone out of sync with the session;
+  /// here it forgets the key and its sync state (the documents stay).
+  Future<void> forgetOnSignOut() async {
+    if (await _load() == null) return;
+    await _forget();
+  }
+
   Future<void> _forget() async {
     await _secure.delete(key: _keyName);
     final file = await _stateFile();

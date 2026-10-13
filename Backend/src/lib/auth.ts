@@ -19,6 +19,8 @@ export interface AccountUser {
   displayName: string | null
   plan: string
   avatarUrl: string | null
+  /// The signed-in phone (the session's device), when the token has one.
+  deviceId?: string | null
 }
 
 export async function hashPassword(password: string): Promise<string> {
@@ -185,6 +187,7 @@ export async function getCurrentUserFromToken(
       displayName: (row.display_name as string | null) ?? null,
       plan: (row.plan as string | null) ?? 'free',
       avatarUrl: (row.avatar_url as string | null) ?? null,
+      deviceId: deviceId ?? null,
     }
   } catch {
     return null

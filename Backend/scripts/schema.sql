@@ -51,6 +51,23 @@ CREATE TABLE IF NOT EXISTS devices (
 
 CREATE INDEX IF NOT EXISTS idx_devices_user ON devices (user_id);
 
+-- One session per phone *and account*: a phone signed in to two accounts
+-- has a row for each. (The key used to be the phone alone, so signing in
+-- with a second account took the row over and broke the first account's
+-- session there.)
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'devices_pkey'
+      AND conrelid = 'devices'::regclass
+      AND array_length(conkey, 1) = 1
+  ) THEN
+    ALTER TABLE devices DROP CONSTRAINT devices_pkey;
+    ALTER TABLE devices ADD CONSTRAINT devices_pkey PRIMARY KEY (id, user_id);
+  END IF;
+END $$;
+
 -- Subscriptions (bought in the app through Adapty). profiles.plan is the
 -- paid plan; plan_expires_at is when the current period ends (NULL = no
 -- end known: free, lifetime or renewing in a grace period). An expired
@@ -172,6 +189,9 @@ CREATE TABLE IF NOT EXISTS sync_devices (
 );
 
 CREATE INDEX IF NOT EXISTS idx_sync_devices_user ON sync_devices (user_id);
+-- The phone's session (devices.id): ending that session — signing out,
+-- or from another phone — takes it out of sync too.
+ALTER TABLE sync_devices ADD COLUMN IF NOT EXISTS session_device_id TEXT;
 
 CREATE TABLE IF NOT EXISTS sync_pairings (
   code_hash TEXT PRIMARY KEY,

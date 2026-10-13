@@ -4,6 +4,8 @@ import {
   getCurrentUser,
   sessionCookieConfig,
 } from '../../lib/auth'
+import { sql } from '../../lib/db'
+import { releaseSessionDevices } from '../sync/sync.service'
 import * as authService from './auth.service'
 
 export async function login(req: Request, res: Response) {
@@ -63,7 +65,18 @@ export async function googleSignIn(req: Request, res: Response) {
   }
 }
 
-export async function logout(_req: Request, res: Response) {
+export async function logout(req: Request, res: Response) {
+  // Signing out ends this phone's session for good: off the devices list,
+  // and out of sync (its place is free for another phone).
+  const user = await getCurrentUser(req)
+  if (user?.deviceId) {
+    try {
+      await sql`DELETE FROM devices WHERE id = ${user.deviceId} AND user_id = ${user.id}`
+      await releaseSessionDevices(user.id, [user.deviceId])
+    } catch (error) {
+      console.error('Sign-out cleanup failed:', error)
+    }
+  }
   const cookie = clearSessionCookieConfig()
   res.clearCookie(cookie.name, cookie.options)
   res.json({ success: true })
