@@ -63,6 +63,14 @@ class LocalDocumentsStore {
   static void Function()? onBackgroundUpdate;
   static bool _indexing = false;
 
+  /// Called after every change to the library made on this phone (not the
+  /// ones device sync writes), so sync can send it. Set by SyncService.
+  static void Function()? onLocalChange;
+
+  // Bumped on every write: device sync only writes the library back if
+  // nothing changed it since sync read it.
+  static int _revision = 0;
+
   // Every mutation (favoriting, importing, moving a document, ...) used to
   // re-read and fully re-parse the whole state JSON from disk — and since
   // all tabs stay mounted (IndexedStack) and share one DocumentsService, a
@@ -1534,6 +1542,30 @@ class LocalDocumentsStore {
     return Map<String, dynamic>.from(jsonDecode(jsonEncode(state)) as Map);
   }
 
+  /// The library as device sync reads it, with the revision it is at.
+  Future<({Map<String, dynamic> state, int revision})>
+  exportStateForSync() async {
+    final state = await _readState();
+    return (
+      state: Map<String, dynamic>.from(jsonDecode(jsonEncode(state)) as Map),
+      revision: _revision,
+    );
+  }
+
+  /// Writes the library device sync built — only if it is still at
+  /// [revision] (otherwise the user changed something meanwhile, and sync
+  /// has to merge that first). Returns whether it was written.
+  Future<bool> applySyncedState(
+    Map<String, dynamic> state,
+    int revision,
+  ) async {
+    await _readState();
+    if (_revision != revision) return false;
+    _migrateState(state);
+    await _writeState(state, fromSync: true);
+    return true;
+  }
+
   /// Replaces the whole state with one from a backup. Stored file paths are
   /// rewritten to this device's documents folder (a backup made on another
   /// phone has that phone's absolute paths).
@@ -1587,8 +1619,13 @@ class LocalDocumentsStore {
     return initial;
   }
 
-  Future<void> _writeState(Map<String, dynamic> state) async {
+  Future<void> _writeState(
+    Map<String, dynamic> state, {
+    bool fromSync = false,
+  }) async {
     _cachedState = state;
+    _revision++;
+    if (!fromSync) onLocalChange?.call();
     await _writeStateFile(await _stateFile(), state);
   }
 

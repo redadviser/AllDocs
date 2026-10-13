@@ -589,7 +589,7 @@ class _Header extends StatelessWidget {
         ),
         const SizedBox(width: 8),
         IconButton.filledTonal(
-          tooltip: AppConstants.requestsTitle.tr(),
+          tooltip: AppConstants.linksTitle.tr(),
           onPressed: onOpenRequests,
           style: IconButton.styleFrom(
             backgroundColor: AppTheme.surfaceStrong,

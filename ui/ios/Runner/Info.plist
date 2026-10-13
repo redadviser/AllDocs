@@ -50,7 +50,7 @@
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>A AllDocs usa a câmara para digitalizar documentos localmente.</string>
+	<string>A AllDocs usa a câmara para digitalizar documentos localmente e para ler o código QR de ligação de outro aparelho.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>A AllDocs usa Face ID para desbloquear documentos protegidos no dispositivo.</string>
 	<key>UILaunchStoryboardName</key>

@@ -22,5 +22,9 @@ export 'plan_service.dart';
 export 'reminder_scheduler.dart';
 export 'scan_image_filter.dart';
 export 'searchable_pdf_builder.dart';
+export 'secure_shares_service.dart';
 export 'security_lock_service.dart';
 export 'storage_permission_service.dart';
+export 'sync/sync_api.dart'
+    show SyncProblem, SyncApiException, SyncDeviceInfo, SyncAccountStatus;
+export 'sync/sync_service.dart';

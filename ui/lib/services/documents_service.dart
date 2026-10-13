@@ -502,9 +502,10 @@ class DocumentsService {
     return (before: before, after: bytes.length);
   }
 
-  /// Shares a copy of [document] with [watermark] over every page (an
-  /// image is turned into a PDF first). The copy isn't kept in the library.
-  Future<void> shareWatermarkedCopy(
+  /// A copy of [document] with [overlay] over every page (an image is
+  /// turned into a PDF first), in the temporary folder as [fileName]. The
+  /// copy isn't kept in the library.
+  Future<File> watermarkedCopy(
     DocumentFile document, {
     required Future<Uint8List> Function(double width, double height) overlay,
     required String fileName,
@@ -520,6 +521,20 @@ class DocumentsService {
     await copy.writeAsBytes(
       await PdfTools.watermark(source, overlay: overlay),
       flush: true,
+    );
+    return copy;
+  }
+
+  /// Shares a watermarked copy of [document] (see [watermarkedCopy]).
+  Future<void> shareWatermarkedCopy(
+    DocumentFile document, {
+    required Future<Uint8List> Function(double width, double height) overlay,
+    required String fileName,
+  }) async {
+    final copy = await watermarkedCopy(
+      document,
+      overlay: overlay,
+      fileName: fileName,
     );
     await SecurityLockService.withoutAutoLock(
       () => SharePlus.instance.share(

@@ -13,6 +13,7 @@ import 'document_file_icon.dart';
 import 'assistant_flow.dart';
 import 'document_preview_card.dart';
 import 'pdf_tools_flow.dart';
+import 'secure_share_flow.dart';
 import 'sheet_quick_action.dart';
 
 void showSnack(BuildContext context, String message) {
@@ -226,6 +227,18 @@ Future<void> showDocumentActions(
                   ),
                 ),
               ],
+              if (document.localPath != null)
+                _Action(
+                  icon: Icons.link_rounded,
+                  label: AppConstants.sharesAction.tr(),
+                  onTap: () => run(
+                    () => shareWithSecureLink(
+                      context,
+                      documentsService,
+                      document,
+                    ),
+                  ),
+                ),
               if (isPdfDocument(document) ||
                   document.type == DocumentType.image)
                 _Action(

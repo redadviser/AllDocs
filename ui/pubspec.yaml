@@ -65,6 +65,10 @@ dependencies:
   # Subscriptions (App Store / Google Play billing), same SDK as AllPhotos.
   adapty_flutter: ^3.17.0
   pdf_manipulator: ^5.0.1
+  cryptography: ^2.9.0
+  cryptography_flutter: ^2.3.4
+  qr_flutter: ^4.1.0
+  mobile_scanner: ^7.4.2
 
 dev_dependencies:
   flutter_test:

@@ -13,6 +13,10 @@ import { adaptyWebhookRouter, plansRouter } from './modules/plans/plans.routes'
 import { assistantRouter } from './modules/assistant/assistant.routes'
 import { requestPageRouter, requestsRouter } from './modules/requests/requests.routes'
 import { purgeOld as purgeOldRequests } from './modules/requests/requests.service'
+import { sharePageRouter, sharesRouter } from './modules/shares/shares.routes'
+import { purgeOld as purgeOldShares } from './modules/shares/shares.service'
+import { syncRouter } from './modules/sync/sync.routes'
+import { purgeOld as purgeOldSync } from './modules/sync/sync.service'
 
 const app = express()
 
@@ -29,6 +33,7 @@ app.use(cookieParser())
 // Before the JSON/form parsers: an upload's body is the raw file, whatever
 // content type the browser gives it.
 app.use(requestPageRouter)
+app.use(sharePageRouter)
 app.use(express.json({ limit: '20mb' }))
 app.use(express.urlencoded({ extended: true, limit: '20mb' }))
 
@@ -61,6 +66,8 @@ app.use('/api/plans', plansRouter)
 app.use('/api/adapty', adaptyWebhookRouter)
 app.use('/api/assistant', assistantRouter)
 app.use('/api/requests', requestsRouter)
+app.use('/api/shares', sharesRouter)
+app.use('/api/sync', syncRouter)
 
 app.use((_req, res) => {
   res.status(404).json({ error: 'Not found' })
@@ -82,9 +89,17 @@ ensureSchema()
     app.listen(port, () => {
       console.log(`Server running on port ${port}`)
     })
-    // Uploaded files nobody collected, and long-expired requests.
-    const purge = () =>
-      purgeOldRequests().catch((error) => console.error('purgeOldRequests failed:', error))
+    // Uploaded files nobody collected, long-expired requests, files of
+    // share links that stopped working, and sync data every device has.
+    const purge = async () => {
+      for (const [name, run] of [
+        ['purgeOldRequests', purgeOldRequests],
+        ['purgeOldShares', purgeOldShares],
+        ['purgeOldSync', purgeOldSync],
+      ] as const) {
+        await run().catch((error) => console.error(`${name} failed:`, error))
+      }
+    }
     purge()
     setInterval(purge, 60 * 60 * 1000).unref()
   })

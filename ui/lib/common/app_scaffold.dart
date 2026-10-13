@@ -72,10 +72,16 @@ class _MainNavScreenState extends State<MainNavScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) collectRequestedDocuments(context, _documentsService);
     });
+    // Device sync (Vault), when this phone takes part. Only on the phones:
+    // it keeps timers running.
+    if (Platform.isAndroid || Platform.isIOS) {
+      SyncService.instance.start(_documentsService);
+    }
   }
 
   @override
   void dispose() {
+    if (Platform.isAndroid || Platform.isIOS) SyncService.instance.stop();
     _shareSubscription?.cancel();
     _documentsService.dispose();
     super.dispose();

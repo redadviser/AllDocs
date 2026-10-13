@@ -113,4 +113,116 @@ CREATE TABLE IF NOT EXISTS assistant_usage (
   PRIMARY KEY (user_id, month)
 );
 
+-- Secure shares (Vault): one of the user's documents behind a link that
+-- expires, can need a code and can be revoked. The file waits encrypted
+-- (stored_name, see src/lib/file-vault.ts) and is deleted once the link
+-- stops working. Only hashes of the link token and of the code are kept.
+CREATE TABLE IF NOT EXISTS document_shares (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token_hash TEXT NOT NULL UNIQUE,
+  title TEXT NOT NULL,
+  file_name TEXT NOT NULL,
+  content_type TEXT NOT NULL,
+  size_bytes BIGINT NOT NULL,
+  stored_name TEXT,
+  language TEXT NOT NULL DEFAULT 'pt',
+  code_hash TEXT,
+  failed_attempts INTEGER NOT NULL DEFAULT 0,
+  max_views INTEGER,
+  view_count INTEGER NOT NULL DEFAULT 0,
+  last_viewed_at TIMESTAMPTZ,
+  expires_at TIMESTAMPTZ NOT NULL,
+  revoked_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_document_shares_user ON document_shares (user_id, created_at DESC);
+
+-- Device sync (Vault). Everything a device sends is encrypted on the phone
+-- with a key only the user's devices have (it travels between them in a QR
+-- code); the server stores opaque bytes and relays them until every device
+-- has them.
+CREATE TABLE IF NOT EXISTS sync_circles (
+  user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  -- HMAC of a fixed text under the key: lets a joining device check it has
+  -- the right key without the server ever seeing it.
+  key_check TEXT NOT NULL,
+  -- Changes up to here were deleted (every device had them, or they were
+  -- too old): a device behind this needs a snapshot instead.
+  purged_upto BIGINT NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS sync_devices (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  platform TEXT,
+  -- Last change this device has applied (it asks for what comes after).
+  cursor BIGINT NOT NULL DEFAULT 0,
+  -- Joined (or fell too far behind) and waits for another device to send
+  -- it the whole library's state.
+  needs_snapshot BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_sync_devices_user ON sync_devices (user_id);
+
+CREATE TABLE IF NOT EXISTS sync_pairings (
+  code_hash TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_by TEXT NOT NULL,
+  device_id TEXT,
+  expires_at TIMESTAMPTZ NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS sync_changes (
+  seq BIGSERIAL PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  device_id TEXT NOT NULL,
+  payload BYTEA NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_sync_changes_user ON sync_changes (user_id, seq);
+
+-- Document files on their way between devices (encrypted on the phone).
+CREATE TABLE IF NOT EXISTS sync_blobs (
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  blob_id TEXT NOT NULL,
+  stored_name TEXT NOT NULL,
+  size_bytes BIGINT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (user_id, blob_id)
+);
+
+-- Which devices still have to download a blob; it's deleted when none do.
+CREATE TABLE IF NOT EXISTS sync_blob_needs (
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  blob_id TEXT NOT NULL,
+  device_id TEXT NOT NULL,
+  PRIMARY KEY (user_id, blob_id, device_id)
+);
+
+-- Files a device is missing and asked the others to send.
+CREATE TABLE IF NOT EXISTS sync_blob_requests (
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  blob_id TEXT NOT NULL,
+  device_id TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (user_id, blob_id, device_id)
+);
+
+-- The whole library's state, sent by one device for another that needs it.
+CREATE TABLE IF NOT EXISTS sync_snapshots (
+  device_id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  upto_seq BIGINT NOT NULL,
+  stored_name TEXT NOT NULL,
+  size_bytes BIGINT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 COMMIT;

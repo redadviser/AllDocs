@@ -3,7 +3,7 @@ import path from 'path'
 import { sql } from '../../lib/db'
 import { readDecrypted, removeStored, storeEncrypted } from '../../lib/file-vault'
 import { getPlanById } from '../../lib/plans'
-import { publicBaseUrl } from '../password/password.service'
+import { LINK_TOKEN_PATTERN, linksBaseUrl } from '../../lib/public-links'
 import { pickLang } from './requests.texts'
 
 export const MAX_FILE_BYTES = 25 * 1024 * 1024
@@ -23,13 +23,6 @@ export class RequestError extends Error {
   constructor(readonly status: number, message: string, readonly code?: string) {
     super(message)
   }
-}
-
-// The address people see in the link. A short domain pointed at this same
-// server (e.g. https://alldocs.eupasoft.com) reads better than the API host.
-function requestsBaseUrl(requestOrigin: string): string {
-  const configured = process.env.REQUESTS_PUBLIC_URL?.trim().replace(/\/+$/, '')
-  return configured || publicBaseUrl(requestOrigin)
 }
 
 function hashToken(token: string): string {
@@ -65,7 +58,7 @@ export async function createRequest(
   `
   return {
     id,
-    url: `${requestsBaseUrl(requestOrigin)}/r/${token}`,
+    url: `${linksBaseUrl(requestOrigin)}/r/${token}`,
     expiresAt,
   }
 }
@@ -172,7 +165,7 @@ export async function deleteRequest(userId: string, requestId: string) {
 
 /// The request a link points to, while it still takes files.
 export async function openRequestByToken(token: string) {
-  if (!/^[A-Za-z0-9_-]{20,64}$/.test(token)) return null
+  if (!LINK_TOKEN_PATTERN.test(token)) return null
   const rows = await sql`
     SELECT r.id, r.title, r.message, r.language, r.expires_at, p.display_name
     FROM document_requests r

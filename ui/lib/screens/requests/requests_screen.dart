@@ -12,19 +12,19 @@ import '../../models/models.dart';
 import '../../services/services.dart';
 import '../../theme/app_theme.dart';
 import '../albums/hidden_albums_screen.dart' show shelfDisplayName;
+import '../links/links_screen.dart';
 
+/// The Links screen on its "Ask" tab.
 Future<void> openDocumentRequests(
   BuildContext context,
   DocumentsService documentsService, {
   String? albumId,
 }) {
-  return Navigator.of(context).push(
-    MaterialPageRoute<void>(
-      builder: (_) => DocumentRequestsScreen(
-        documentsService: documentsService,
-        albumId: albumId,
-      ),
-    ),
+  return openLinks(
+    context,
+    documentsService,
+    tab: LinksTab.ask,
+    albumId: albumId,
   );
 }
 
@@ -55,9 +55,10 @@ Future<void> collectRequestedDocuments(
   }
 }
 
-/// "Send me X" links: the ones made, what came in, and a new one.
-class DocumentRequestsScreen extends StatefulWidget {
-  const DocumentRequestsScreen({
+/// "Send me X" links: the ones made, what came in, and a new one. The
+/// "Ask" tab of the Links screen.
+class DocumentRequestsTab extends StatefulWidget {
+  const DocumentRequestsTab({
     super.key,
     required this.documentsService,
     this.albumId,
@@ -69,10 +70,10 @@ class DocumentRequestsScreen extends StatefulWidget {
   final String? albumId;
 
   @override
-  State<DocumentRequestsScreen> createState() => _DocumentRequestsScreenState();
+  State<DocumentRequestsTab> createState() => _DocumentRequestsTabState();
 }
 
-class _DocumentRequestsScreenState extends State<DocumentRequestsScreen> {
+class _DocumentRequestsTabState extends State<DocumentRequestsTab> {
   List<DocumentRequest>? _requests;
   bool _failed = false;
 
@@ -219,98 +220,38 @@ class _DocumentRequestsScreenState extends State<DocumentRequestsScreen> {
   Widget build(BuildContext context) {
     final requests = _requests;
     return Scaffold(
-      backgroundColor: AppTheme.background,
+      backgroundColor: Colors.transparent,
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'requests',
         onPressed: _new,
         icon: const Icon(Icons.add_rounded),
         label: Text(AppConstants.requestsNew.tr()),
       ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(4, 8, 12, 4),
-              child: Row(
+      body: RefreshIndicator(
+        onRefresh: _refresh,
+        child: requests == null && !_failed
+            ? const Center(child: CircularProgressIndicator())
+            : ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
                 children: [
-                  const BackButton(),
-                  Expanded(
-                    child: Text(
-                      AppConstants.requestsTitle.tr(),
-                      style: const TextStyle(
-                        color: AppTheme.text,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
+                  if (_failed)
+                    LinksNote(text: AppConstants.requestsFailed.tr())
+                  else if (requests!.isEmpty)
+                    LinksNote(
+                      icon: Icons.forward_to_inbox_outlined,
+                      text: AppConstants.requestsEmpty.tr(),
+                    )
+                  else
+                    for (final request in requests) ...[
+                      _RequestCard(
+                        request: request,
+                        onTap: () => _menu(request),
                       ),
-                    ),
-                  ),
+                      const SizedBox(height: 10),
+                    ],
                 ],
               ),
-            ),
-            Expanded(
-              child: RefreshIndicator(
-                onRefresh: _refresh,
-                child: requests == null && !_failed
-                    ? const Center(child: CircularProgressIndicator())
-                    : ListView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
-                        children: [
-                          if (_failed)
-                            _Note(text: AppConstants.requestsFailed.tr())
-                          else if (requests!.isEmpty)
-                            _Note(
-                              icon: Icons.forward_to_inbox_outlined,
-                              text: AppConstants.requestsEmpty.tr(),
-                            )
-                          else
-                            for (final request in requests) ...[
-                              _RequestCard(
-                                request: request,
-                                onTap: () => _menu(request),
-                              ),
-                              const SizedBox(height: 10),
-                            ],
-                        ],
-                      ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _Note extends StatelessWidget {
-  const _Note({required this.text, this.icon});
-
-  final String text;
-  final IconData? icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 48, 16, 0),
-      child: Column(
-        children: [
-          if (icon != null) ...[
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppTheme.accent.withValues(alpha: 0.14),
-              ),
-              child: Icon(icon, color: AppTheme.accent, size: 30),
-            ),
-            const SizedBox(height: 16),
-          ],
-          Text(
-            text,
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: AppTheme.mutedText, height: 1.45),
-          ),
-        ],
       ),
     );
   }
@@ -370,26 +311,7 @@ class _RequestCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 9,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: color.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(99),
-                    ),
-                    child: Text(
-                      label,
-                      style: TextStyle(
-                        color: color == AppTheme.dimText
-                            ? AppTheme.mutedText
-                            : color,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
+                  LinkStatusChip(label: label, color: color),
                   const Icon(Icons.more_vert_rounded, color: AppTheme.dimText),
                 ],
               ),

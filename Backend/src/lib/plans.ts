@@ -90,10 +90,7 @@ export const PLANS: Plan[] = [
 
 // Features a plan lists that the app doesn't have yet; the app marks them
 // "coming soon". Remove one from here when it ships.
-export const COMING_SOON_FEATURES: PlanFeature[] = [
-  'deviceSync',
-  'secureSharing',
-]
+export const COMING_SOON_FEATURES: PlanFeature[] = []
 
 export function isPlanId(value: unknown): value is PlanId {
   return value === 'free' || value === 'premium' || value === 'pro'

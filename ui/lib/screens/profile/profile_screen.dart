@@ -24,6 +24,7 @@ import '../auth/security_gate.dart';
 import '../cloud/cloud_screen.dart';
 import '../security/devices_screen.dart';
 import '../support/faq_screen.dart';
+import '../sync/sync_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({
@@ -135,6 +136,8 @@ class _ProfileOverviewPage extends StatelessWidget {
         _StatsGrid(profile: profile, tagsCount: snapshot.tags.length),
         const SizedBox(height: 12),
         _BackupSection(documentsService: documentsService),
+        const SizedBox(height: 12),
+        const _SyncSection(),
         const SizedBox(height: 12),
         _StorageSection(summary: profile.storageSummary),
         const SizedBox(height: 24),
@@ -301,6 +304,66 @@ class _BackupSection extends StatelessWidget {
                     icon: Icons.cloud_outlined,
                     title: AppConstants.connectionsTitle.tr(),
                     onTap: () => openConnectionsPage(context, documentsService),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Device sync at a glance: on or off here, when it last ran, and the way
+/// into the devices screen.
+class _SyncSection extends StatelessWidget {
+  const _SyncSection();
+
+  @override
+  Widget build(BuildContext context) {
+    final sync = SyncService.instance;
+    return ValueListenableBuilder<SyncStatus>(
+      valueListenable: sync.status,
+      builder: (context, status, _) {
+        final String line;
+        if (!status.enabled) {
+          line = AppConstants.syncStatusOff.tr();
+        } else if (status.running) {
+          line = AppConstants.syncStatusSyncing.tr();
+        } else if (status.waitingForLibrary) {
+          line = AppConstants.syncWaitingLibrary.tr();
+        } else if (status.lastSyncAt != null) {
+          line = AppConstants.syncStatusSynced.tr(
+            namedArgs: {
+              'date': DateFormat.yMMMd().add_Hm().format(status.lastSyncAt!),
+            },
+          );
+        } else {
+          line = AppConstants.syncStatusNever.tr();
+        }
+        return SettingsSection(
+          icon: Icons.devices_rounded,
+          title: AppConstants.syncTitle.tr(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(line, style: const TextStyle(color: AppTheme.mutedText)),
+              const SizedBox(height: 10),
+              SettingsGrid(
+                children: [
+                  SettingsGridAction(
+                    icon: Icons.devices_rounded,
+                    title: AppConstants.syncDevices.tr(),
+                    onTap: () => openSyncScreen(context),
+                  ),
+                  SettingsGridAction(
+                    icon: Icons.sync_rounded,
+                    title: AppConstants.syncSyncNow.tr(),
+                    loading: status.running,
+                    onTap: status.enabled
+                        ? () => sync.syncNow()
+                        : () => openSyncScreen(context),
                   ),
                 ],
               ),

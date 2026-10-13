@@ -56,6 +56,8 @@ export const openApiSpec = {
     { name: 'Plans', description: 'Subscription plans (Pocket, Folio, Vault), bought through Adapty' },
     { name: 'Assistant', description: 'Document assistant (Vault plan), powered by Claude' },
     { name: 'Requests', description: 'Ask someone else for documents through a link (Vault plan)' },
+    { name: 'Shares', description: 'Share a document behind a secure link: expires, optional code, revocable (Vault plan)' },
+    { name: 'Sync', description: 'Device sync relay, end-to-end encrypted on the phones (Vault plan)' },
     { name: 'Config', description: 'Public app configuration' },
     { name: 'Health' },
   ],
@@ -789,6 +791,318 @@ export const openApiSpec = {
           },
           413: { description: 'File too large', content: { 'application/json': { schema: error } } },
         },
+      },
+    },
+    '/api/shares': {
+      get: {
+        tags: ['Shares'],
+        summary: "The user's secure links",
+        security: [{ sessionCookie: [] }],
+        responses: {
+          200: {
+            description: 'Shares, newest first',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    shares: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          id: { type: 'string', format: 'uuid' },
+                          title: { type: 'string' },
+                          fileName: { type: 'string' },
+                          sizeBytes: { type: 'integer' },
+                          hasCode: { type: 'boolean' },
+                          maxViews: { type: 'integer', nullable: true },
+                          viewCount: { type: 'integer' },
+                          lastViewedAt: { type: 'string', format: 'date-time', nullable: true },
+                          createdAt: { type: 'string', format: 'date-time' },
+                          expiresAt: { type: 'string', format: 'date-time' },
+                          status: { type: 'string', enum: ['active', 'expired', 'revoked', 'locked', 'used'] },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      post: {
+        tags: ['Shares'],
+        summary: 'Share a file behind a new link',
+        description: [
+          'Vault only (403 otherwise). The body is the file itself (up to 50 MB; PDF,',
+          'images, Office, text). Its details go in the X-Share-Meta header as base64url',
+          'JSON: {title, fileName, days (1-30), code (4-8 digits, optional), maxViews',
+          '(optional), language}. Stored encrypted; deleted once the link stops working.',
+          'Only hashes of the link token and of the code are kept, so the link is',
+          'returned once. Ten wrong codes lock the link for good.',
+        ].join('\n'),
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: 'X-Share-Meta', in: 'header', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: {
+          required: true,
+          content: { 'application/octet-stream': { schema: { type: 'string', format: 'binary' } } },
+        },
+        responses: {
+          200: {
+            description: 'Created',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string', format: 'uuid' },
+                    url: { type: 'string', example: 'https://requests.eupasoft.com/s/abc123' },
+                    expiresAt: { type: 'string', format: 'date-time' },
+                  },
+                },
+              },
+            },
+          },
+          403: { description: 'Not on the Vault plan', content: { 'application/json': { schema: error } } },
+          413: { description: 'File too large', content: { 'application/json': { schema: error } } },
+          415: { description: 'File type not accepted', content: { 'application/json': { schema: error } } },
+        },
+      },
+    },
+    '/api/shares/{id}/revoke': {
+      post: {
+        tags: ['Shares'],
+        summary: 'Stop the link now (the file is deleted)',
+        security: [{ sessionCookie: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { 200: { description: 'Revoked' }, 404: { description: 'Not found' } },
+      },
+    },
+    '/api/shares/{id}': {
+      delete: {
+        tags: ['Shares'],
+        summary: 'Delete a share (and its file, if still there)',
+        security: [{ sessionCookie: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { 200: { description: 'Deleted' }, 404: { description: 'Not found' } },
+      },
+    },
+    '/s/{token}': {
+      get: {
+        tags: ['Shares'],
+        summary: 'Public page of a secure link (HTML)',
+        parameters: [{ name: 'token', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: {
+          200: { description: 'Who shared what, until when; a form to open or download it', content: { 'text/html': {} } },
+          404: { description: 'Expired, revoked, used up or unknown (HTML page saying so)', content: { 'text/html': {} } },
+        },
+      },
+    },
+    '/s/{token}/file': {
+      post: {
+        tags: ['Shares'],
+        summary: "The page's form: opens (inline) or downloads the file",
+        description: 'Counts a view. A wrong code answers the page again (403) with the attempts left.',
+        parameters: [{ name: 'token', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          content: {
+            'application/x-www-form-urlencoded': {
+              schema: {
+                type: 'object',
+                properties: {
+                  code: { type: 'string' },
+                  mode: { type: 'string', enum: ['open', 'download'] },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: { description: 'The file', content: { 'application/octet-stream': { schema: { type: 'string', format: 'binary' } } } },
+          403: { description: 'Wrong code or locked (HTML page)' },
+          404: { description: 'Not available (HTML page)' },
+        },
+      },
+    },
+    '/api/sync': {
+      get: {
+        tags: ['Sync'],
+        summary: "The account's sync: on or off, its devices, the plan's device limit",
+        security: [{ sessionCookie: [] }],
+        responses: { 200: { description: '{enabled, keyCheck, maxDevices, devices[]}' } },
+      },
+    },
+    '/api/sync/devices': {
+      post: {
+        tags: ['Sync'],
+        summary: 'Add this phone to sync',
+        description: [
+          'The first device starts the sync and sets keyCheck (HMAC of a fixed text',
+          'under the key, which the server never sees). Next ones need a pairingCode',
+          'from a device already in (shown in its QR code) and the same keyCheck.',
+          'Errors (409): needsPairing, badCode, wrongKey, tooMany (plan device limit).',
+        ].join('\n'),
+        security: [{ sessionCookie: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['keyCheck'],
+                properties: {
+                  name: { type: 'string', example: 'iPhone 15' },
+                  platform: { type: 'string', enum: ['ios', 'android'] },
+                  keyCheck: { type: 'string', description: '64 hex characters' },
+                  pairingCode: { type: 'string' },
+                },
+              },
+            },
+          },
+        },
+        responses: { 200: { description: '{deviceId, first}' } },
+      },
+    },
+    '/api/sync/devices/{id}': {
+      delete: {
+        tags: ['Sync'],
+        summary: 'Take a device out of sync (the last one out turns sync off and deletes everything)',
+        security: [{ sessionCookie: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { 200: { description: 'Removed' }, 404: { description: 'Not found' } },
+      },
+    },
+    '/api/sync/pairings': {
+      post: {
+        tags: ['Sync'],
+        summary: 'A one-time code (10 minutes) for the QR that brings in another device',
+        security: [{ sessionCookie: [] }],
+        parameters: [{ name: 'X-Sync-Device', in: 'header', required: true, schema: { type: 'string' } }],
+        responses: { 200: { description: '{code, expiresAt}' } },
+      },
+    },
+    '/api/sync/pairings/status': {
+      post: {
+        tags: ['Sync'],
+        summary: 'Whether a device joined with a code yet',
+        security: [{ sessionCookie: [] }],
+        responses: { 200: { description: '{joined, deviceName, expired}' } },
+      },
+    },
+    '/api/sync/changes': {
+      get: {
+        tags: ['Sync'],
+        summary: "Other devices' encrypted change batches after a sequence number",
+        description: [
+          'Also acknowledges everything up to `after`, and says what the device should',
+          'do next: requestedBlobs (files others asked for), snapshotFor (devices',
+          'waiting for the library), needsSnapshot / snapshotReady (for itself).',
+        ].join('\n'),
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: 'X-Sync-Device', in: 'header', required: true, schema: { type: 'string' } },
+          { name: 'after', in: 'query', schema: { type: 'integer' } },
+        ],
+        responses: { 200: { description: '{changes[{seq, deviceId, payload(base64)}], hasMore, latest, ...}' } },
+      },
+      post: {
+        tags: ['Sync'],
+        summary: 'Add an encrypted batch after `base` (409 behind when another device added one since)',
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: 'X-Sync-Device', in: 'header', required: true, schema: { type: 'string' } },
+          { name: 'base', in: 'query', required: true, schema: { type: 'integer' } },
+        ],
+        requestBody: {
+          required: true,
+          content: { 'application/octet-stream': { schema: { type: 'string', format: 'binary' } } },
+        },
+        responses: { 200: { description: '{seq}' }, 409: { description: 'behind: pull first' } },
+      },
+    },
+    '/api/sync/blobs/{blobId}': {
+      put: {
+        tags: ['Sync'],
+        summary: 'Upload an encrypted document file (streamed, up to 1 GB)',
+        description: '`for=all`: every other device needs it; otherwise only the devices that asked. 507 quota when too much is waiting.',
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: 'X-Sync-Device', in: 'header', required: true, schema: { type: 'string' } },
+          { name: 'blobId', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'for', in: 'query', schema: { type: 'string', enum: ['all'] } },
+        ],
+        requestBody: {
+          required: true,
+          content: { 'application/octet-stream': { schema: { type: 'string', format: 'binary' } } },
+        },
+        responses: { 200: { description: 'Stored' } },
+      },
+      get: {
+        tags: ['Sync'],
+        summary: 'Download an encrypted document file',
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: 'X-Sync-Device', in: 'header', required: true, schema: { type: 'string' } },
+          { name: 'blobId', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        responses: { 200: { description: 'The file' }, 404: { description: 'Not on the server' } },
+      },
+    },
+    '/api/sync/blobs/{blobId}/ack': {
+      post: {
+        tags: ['Sync'],
+        summary: 'This device has the file (deleted once no device needs it)',
+        security: [{ sessionCookie: [] }],
+        parameters: [{ name: 'blobId', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { 200: { description: 'OK' } },
+      },
+    },
+    '/api/sync/blobs/requests': {
+      post: {
+        tags: ['Sync'],
+        summary: 'Files this device is missing: marks the ones on the server, asks the others for the rest',
+        security: [{ sessionCookie: [] }],
+        responses: { 200: { description: '{available[]}' } },
+      },
+    },
+    '/api/sync/blobs/existing': {
+      post: {
+        tags: ['Sync'],
+        summary: 'Which of these files are already on the server',
+        security: [{ sessionCookie: [] }],
+        responses: { 200: { description: '{existing[]}' } },
+      },
+    },
+    '/api/sync/snapshots/{deviceId}': {
+      put: {
+        tags: ['Sync'],
+        summary: "Send the whole library's encrypted state to a device that joined",
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: 'deviceId', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'upto', in: 'query', required: true, schema: { type: 'integer' } },
+        ],
+        responses: { 200: { description: 'Stored' } },
+      },
+    },
+    '/api/sync/snapshot': {
+      get: {
+        tags: ['Sync'],
+        summary: 'The snapshot sent for this device (X-Upto-Seq: the change it goes up to)',
+        security: [{ sessionCookie: [] }],
+        responses: { 200: { description: 'Encrypted snapshot' }, 404: { description: 'Not ready' } },
+      },
+    },
+    '/api/sync/snapshot/ack': {
+      post: {
+        tags: ['Sync'],
+        summary: 'Snapshot loaded: carry on from its sequence number',
+        security: [{ sessionCookie: [] }],
+        responses: { 200: { description: 'OK' } },
       },
     },
     '/api/config/cloud': {
