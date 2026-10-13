@@ -33,6 +33,12 @@ class SecurityGate extends StatefulWidget {
     return completer.future;
   }
 
+  /// Set by the account gate: whether the session is still valid (false
+  /// once it has signed this phone out). Asked before the PIN and the
+  /// fingerprint prompt, so a phone whose session was ended elsewhere goes
+  /// straight to the sign-in screen instead of asking for them first.
+  static Future<bool> Function()? sessionCheck;
+
   const SecurityGate({
     super.key,
     required this.userName,
@@ -61,6 +67,21 @@ class _SecurityGateState extends State<SecurityGate>
   bool _biometricEnabled = false;
   bool _canUseBiometrics = false;
   bool _promptedBiometrics = false;
+
+  /// Waits for the session check (at most a few seconds: offline, the
+  /// library still opens). False when the session was ended.
+  Future<bool> _sessionStillValid() async {
+    final check = SecurityGate.sessionCheck;
+    if (check == null) return true;
+    try {
+      return await check().timeout(
+        const Duration(seconds: 3),
+        onTimeout: () => true,
+      );
+    } catch (_) {
+      return true;
+    }
+  }
 
   @override
   void initState() {
@@ -99,12 +120,10 @@ class _SecurityGateState extends State<SecurityGate>
       setState(() {
         _unlocked = false;
         _promptedBiometrics = false;
+        // The lock screen waits (spinner) for the session check.
+        _loading = true;
       });
-      if (_biometricEnabled && _canUseBiometrics) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted && !_unlocked) _unlockWithBiometrics();
-        });
-      }
+      _promptAfterSessionCheck();
     }
   }
 
@@ -196,10 +215,23 @@ class _SecurityGateState extends State<SecurityGate>
     );
   }
 
+  Future<void> _promptAfterSessionCheck() async {
+    if (!await _sessionStillValid() || !mounted) return;
+    setState(() => _loading = false);
+    if (_biometricEnabled && _canUseBiometrics) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_unlocked) _unlockWithBiometrics();
+      });
+    }
+  }
+
   Future<void> _loadSecurityState() async {
     final hasPin = await _securityLockService.hasPin();
     final biometricEnabled = await _securityLockService.isBiometricEnabled();
     final canUseBiometrics = await _securityLockService.canUseBiometrics();
+    // Ended elsewhere? Then no PIN or fingerprint: the account gate is
+    // already taking this phone to the sign-in screen.
+    if (hasPin && !await _sessionStillValid()) return;
     if (!mounted) return;
 
     setState(() {

@@ -34,18 +34,49 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
   Timer? _sessionTimer;
   bool _endingSession = false;
 
+  Future<bool>? _checking;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    SecurityGate.sessionCheck = _checkSession;
     _loadSession();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    if (SecurityGate.sessionCheck == _checkSession) {
+      SecurityGate.sessionCheck = null;
+    }
     _sessionTimer?.cancel();
     super.dispose();
+  }
+
+  /// Whether the session is still valid; signs this phone out (to the
+  /// sign-in screen) when it isn't. One check at a time.
+  Future<bool> _checkSession() {
+    return _checking ??= _runSessionCheck().whenComplete(
+      () => _checking = null,
+    );
+  }
+
+  Future<bool> _runSessionCheck() async {
+    if (!_signedIn || _endingSession) return !_endingSession;
+    if (await AuthService.checkSession() != false || !mounted) return true;
+    _endingSession = true;
+    _sessionTimer?.cancel();
+    await AuthService.logout();
+    if (mounted) {
+      Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (_) => AuthGate(notice: AppConstants.authSessionEnded.tr()),
+        ),
+        (route) => false,
+      );
+    }
+    return false;
   }
 
   @override
@@ -66,20 +97,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     _verifySession();
   }
 
-  Future<void> _verifySession() async {
-    if (!_signedIn || _endingSession) return;
-    if (await AuthService.checkSession() != false || !mounted) return;
-    _endingSession = true;
-    _sessionTimer?.cancel();
-    await AuthService.logout();
-    if (!mounted) return;
-    Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
-      MaterialPageRoute(
-        builder: (_) => AuthGate(notice: AppConstants.authSessionEnded.tr()),
-      ),
-      (route) => false,
-    );
-  }
+  Future<void> _verifySession() => _checkSession();
 
   Future<void> _loadSession() async {
     final signedIn = await AuthService.isSignedIn();

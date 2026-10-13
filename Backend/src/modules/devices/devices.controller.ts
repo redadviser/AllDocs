@@ -37,8 +37,11 @@ export async function revokeDevice(req: Request, res: Response) {
     res.status(404).json({ error: 'Device not found' })
     return
   }
-  // An ended session's phone leaves sync too, freeing its place.
-  await releaseSessionDevices(userId, [id])
+  // An ended session's phone leaves sync too, freeing its place. The
+  // session is already over: a hiccup here mustn't report a failure.
+  await releaseSessionDevices(userId, [id]).catch((error) =>
+    console.error('Releasing the ended session from sync failed:', error)
+  )
 
   res.json({ success: true })
 }
@@ -46,6 +49,8 @@ export async function revokeDevice(req: Request, res: Response) {
 export async function revokeAllDevices(req: Request, res: Response) {
   const userId = req.user!.id
   await sql`DELETE FROM devices WHERE user_id = ${userId}`
-  await releaseSessionDevices(userId, null)
+  await releaseSessionDevices(userId, null).catch((error) =>
+    console.error('Releasing the ended sessions from sync failed:', error)
+  )
   res.json({ success: true })
 }

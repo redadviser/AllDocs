@@ -53,7 +53,14 @@ class _DevicesScreenState extends State<DevicesScreen> {
     if (confirmed != true || !mounted) return;
 
     try {
-      await AuthService.revokeDevice(device.id);
+      try {
+        await AuthService.revokeDevice(device.id);
+      } catch (_) {
+        // The reply got lost or failed after the session was ended: what
+        // counts is whether it's still listed.
+        final still = await AuthService.listDevices();
+        if (still.any((d) => d.id == device.id)) rethrow;
+      }
       if (!mounted) return;
       if (device.isCurrentDevice) {
         await _signOutAndReturnToLogin();
