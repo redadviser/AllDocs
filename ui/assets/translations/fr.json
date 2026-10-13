@@ -37,7 +37,8 @@
     "or_divider": "ou",
     "login_error": "Connexion impossible. Vérifie tes informations et réessaie.",
     "offline": "Mode local actif",
-    "language": "Langue"
+    "language": "Langue",
+    "session_ended": "Votre session a été fermée depuis un autre appareil. Reconnectez-vous pour continuer."
   },
   "security": {
     "greeting_morning": "Bonjour, {name}",

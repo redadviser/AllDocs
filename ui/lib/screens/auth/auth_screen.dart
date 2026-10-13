@@ -20,7 +20,12 @@ class AuthScreen extends StatefulWidget {
     required this.onLogin,
     required this.onSignup,
     required this.onGoogleSignIn,
+    this.notice,
   });
+
+  /// Why the user is back here (e.g. the session was ended on another
+  /// device), shown above the form.
+  final String? notice;
 
   final Future<void> Function(String email, String password) onLogin;
   final Future<void> Function(String email, String password, String displayName)
@@ -264,6 +269,40 @@ class _AuthScreenState extends State<AuthScreen> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (widget.notice case final notice?) ...[
+            Container(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+              decoration: BoxDecoration(
+                color: AppTheme.warning.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: AppTheme.warning.withValues(alpha: 0.4),
+                ),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(
+                    Icons.logout_rounded,
+                    size: 18,
+                    color: AppTheme.warning,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      notice,
+                      style: const TextStyle(
+                        color: AppTheme.text,
+                        fontSize: 13,
+                        height: 1.35,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
           if (!isLogin) ...[
             TextField(
               controller: _displayNameController,

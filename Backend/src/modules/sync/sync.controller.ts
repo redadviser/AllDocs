@@ -1,4 +1,5 @@
 import type { Request, Response } from 'express'
+import { waitForNews } from './sync.events'
 import * as service from './sync.service'
 
 async function handle(res: Response, work: () => Promise<unknown>) {
@@ -49,6 +50,27 @@ export function pairingStatus(req: Request, res: Response) {
   return handle(res, async () => {
     service.requireSync(req.user!)
     return service.pairingStatus(req.user!, req.body?.code)
+  })
+}
+
+// How long a wait hangs before answering "nothing new" (under the proxies'
+// usual 60 s read timeout).
+const WAIT_MS = 25_000
+
+/// Long poll: answers {changed: true} as soon as there's something for this
+/// device to do, or {changed: false} after WAIT_MS.
+export function wait(req: Request, res: Response) {
+  return handle(res, async () => {
+    const caller = await device(req)
+    const after = Math.max(0, Number(req.query.after) || 0)
+    // A device waiting for the library only wakes when it arrives.
+    if (!caller.needsSnapshot && (await service.hasChangesAfter(req.user!, caller.id, after))) {
+      return { changed: true }
+    }
+    const changed = await waitForNews(req.user!.id, caller.id, WAIT_MS, (cancel) =>
+      req.on('close', cancel)
+    )
+    return { changed }
   })
 }
 

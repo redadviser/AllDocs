@@ -1054,6 +1054,24 @@ export const openApiSpec = {
         responses: { 200: { description: '{seq}' }, 409: { description: 'behind: pull first' } },
       },
     },
+    '/api/sync/wait': {
+      get: {
+        tags: ['Sync'],
+        summary: 'Long poll: answers as soon as another device has something for this one (max ~25 s)',
+        description: [
+          'The open app keeps one of these hanging. It answers {changed: true} right away',
+          'when there are changes after `after`, or the moment another device pushes',
+          'changes, asks for or uploads a file, joins or is removed; {changed: false}',
+          'after ~25 s otherwise. A device waiting for the library only wakes when it arrives.',
+        ].join('\n'),
+        security: [{ sessionCookie: [] }],
+        parameters: [
+          { name: 'X-Sync-Device', in: 'header', required: true, schema: { type: 'string' } },
+          { name: 'after', in: 'query', schema: { type: 'integer' } },
+        ],
+        responses: { 200: { description: '{changed}' } },
+      },
+    },
     '/api/sync/blobs/{blobId}': {
       put: {
         tags: ['Sync'],

@@ -168,6 +168,13 @@ class SyncService {
   _Lifecycle? _lifecycle;
   bool _hurry = false;
 
+  // The long poll (see SyncApi.wait): while the app is in front, one request
+  // waits on the server and is answered the moment another device sends
+  // something, so changes show up here within a second or two.
+  bool _foreground = true;
+  bool _waiting = false;
+  int? _cursor;
+
   String get _keyName => CurrentUser.scoped('sync.key.v1');
 
   // ---------------------------------------------------------------------
@@ -298,6 +305,7 @@ class SyncService {
     final file = await _stateFile();
     if (await file.exists()) await file.delete();
     _api.deviceId = null;
+    _cursor = null;
     status.value = const SyncStatus();
   }
 
@@ -312,7 +320,13 @@ class SyncService {
   void start(DocumentsService documents) {
     _documents = documents;
     LocalDocumentsStore.onLocalChange = _onLocalChange;
-    _lifecycle ??= _Lifecycle(onResume: () => unawaited(syncNow()));
+    _lifecycle ??= _Lifecycle(
+      onResume: () {
+        _foreground = true;
+        unawaited(syncNow());
+      },
+      onPause: () => _foreground = false,
+    );
     WidgetsBinding.instance.addObserver(_lifecycle!);
     _schedule();
     unawaited(_refreshEnabled().then((_) => syncNow()));
@@ -331,7 +345,10 @@ class SyncService {
   void _onLocalChange() {
     if (!status.value.enabled) return;
     _debounce?.cancel();
-    _debounce = Timer(const Duration(seconds: 4), () => unawaited(syncNow()));
+    _debounce = Timer(
+      const Duration(milliseconds: 1500),
+      () => unawaited(syncNow()),
+    );
   }
 
   void _schedule() {
@@ -412,6 +429,48 @@ class SyncService {
       );
     }
     if (_hurry != wasHurrying && _timer != null) _schedule();
+    _startWaiting();
+  }
+
+  void _startWaiting() {
+    if (_waiting || !_foreground || _documents == null) return;
+    if (!status.value.enabled || _cursor == null) return;
+    _waiting = true;
+    unawaited(_waitLoop().whenComplete(() => _waiting = false));
+  }
+
+  Future<void> _waitLoop() async {
+    var failures = 0;
+    while (_foreground && _documents != null && status.value.enabled) {
+      final cursor = _cursor;
+      if (cursor == null) return;
+      try {
+        final news = await _api.wait(cursor);
+        failures = 0;
+        if (news && _foreground) {
+          await syncNow();
+          // News that a sync couldn't take in (it failed): don't spin.
+          if (_cursor == cursor) {
+            await Future<void>.delayed(const Duration(seconds: 5));
+          }
+        }
+      } on SyncApiException catch (error) {
+        if (error.problem == SyncProblem.deviceRemoved ||
+            error.problem == SyncProblem.notIncluded) {
+          // The next sync handles it (and stops this loop).
+          await syncNow();
+          return;
+        }
+        // Offline: back off (2, 4, 8... up to 30 s).
+        failures++;
+        await Future<void>.delayed(
+          Duration(seconds: (1 << failures.clamp(1, 5)).clamp(2, 30)),
+        );
+      } catch (_) {
+        failures++;
+        await Future<void>.delayed(const Duration(seconds: 10));
+      }
+    }
   }
 
   // ---------------------------------------------------------------------
@@ -434,6 +493,7 @@ class SyncService {
       // joined, or was away so long the changes it missed are gone).
       status.value = status.value.copyWith(waitingForLibrary: true);
       _hurry = true;
+      _cursor = local.cursor;
       await _save(local);
       return;
     }
@@ -470,6 +530,7 @@ class SyncService {
     // 7. Write the library.
     await _write(local, documentsDir);
     local.lastSyncAt = DateTime.now();
+    _cursor = local.cursor;
     await _save(local);
 
     _hurry =
@@ -829,12 +890,17 @@ class SyncService {
 }
 
 class _Lifecycle with WidgetsBindingObserver {
-  _Lifecycle({required this.onResume});
+  _Lifecycle({required this.onResume, required this.onPause});
 
   final VoidCallback onResume;
+  final VoidCallback onPause;
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) onResume();
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
+      onPause();
+    }
   }
 }

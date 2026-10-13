@@ -15,6 +15,7 @@ syncRouter.delete('/devices/:id', controller.removeDevice)
 syncRouter.post('/pairings', controller.createPairing)
 syncRouter.post('/pairings/status', controller.pairingStatus)
 syncRouter.get('/changes', controller.pull)
+syncRouter.get('/wait', controller.wait)
 syncRouter.post(
   '/changes',
   express.raw({ type: () => true, limit: MAX_CHANGE_BYTES }),

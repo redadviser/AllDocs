@@ -140,6 +140,26 @@ class AuthService {
     }
   }
 
+  /// Whether the server still accepts this phone's session: true, false
+  /// (ended — from another device, or expired), or null when it can't be
+  /// told (offline: the library works without the server, so nothing
+  /// changes).
+  static Future<bool?> checkSession() async {
+    if (LocalModeConfig.isLocalOnly) return null;
+    final token = await tokenStore.read();
+    if (token == null) return null;
+    try {
+      final res = await ApiHelpers.get(
+        '/api/auth/me',
+        headers: ApiHelpers.headersWithToken(token),
+      );
+      if (res.statusCode == 401) return false;
+      return res.statusCode == 200 ? true : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// The signed-in user's photo — the Google account picture for Google
   /// sign-in, or a manually uploaded one otherwise. Null until set.
   static Future<String?> avatarUrl() async {

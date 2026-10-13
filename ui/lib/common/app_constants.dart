@@ -20,6 +20,7 @@ class AppConstants {
   static const authSubtitle = 'auth.subtitle';
   static const authSubtitleSignup = 'auth.subtitle_signup';
   static const authTagline = 'auth.tagline';
+  static const authSessionEnded = 'auth.session_ended';
   static const authFeatureSearch = 'auth.feature_search';
   static const authFeatureReminders = 'auth.feature_reminders';
   static const authFeatureBackup = 'auth.feature_backup';

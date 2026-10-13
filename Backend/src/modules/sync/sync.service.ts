@@ -3,6 +3,7 @@ import type { Readable } from 'stream'
 import { BlobTooLargeError, openBlob, removeBlob, saveStream } from '../../lib/blob-store'
 import { sql } from '../../lib/db'
 import { getPlanById } from '../../lib/plans'
+import { notifyDevices } from './sync.events'
 
 // Device sync relay (Vault). The phones do the syncing: each one sends its
 // library's changes as encrypted batches, numbered here in one sequence per
@@ -105,7 +106,7 @@ export async function registerDevice(
   // If it was the only one, the old sync ends and this one starts anew.
   if (sessionDeviceId) await releaseSessionDevices(user.id, [sessionDeviceId])
 
-  return sql.begin(async (tx) => {
+  const registered = await sql.begin(async (tx) => {
     await tx`SELECT pg_advisory_xact_lock(hashtext(${'sync:' + user.id}))`
     const circles = await tx`SELECT key_check FROM sync_circles WHERE user_id = ${user.id}`
     if (circles.length === 0) {
@@ -139,6 +140,9 @@ export async function registerDevice(
     await tx`UPDATE sync_pairings SET device_id = ${id} WHERE code_hash = ${hash(pairingCode)}`
     return { deviceId: id, first: false }
   })
+  // The others send the newcomer the library.
+  notifyDevices(user.id, id)
+  return registered
 }
 
 /// Takes a device out of sync (itself, or another one of the account's).
@@ -155,6 +159,7 @@ export async function removeDevice(user: User, deviceId: string) {
   `
   for (const s of snapshots) await removeBlob(s.stored_name as string)
 
+  notifyDevices(user.id)
   const left = await sql`SELECT COUNT(*)::int AS n FROM sync_devices WHERE user_id = ${user.id}`
   if (Number(left[0].n) === 0) {
     await endSync(user.id)
@@ -299,7 +304,7 @@ export async function pull(user: User, device: { id: string; needsSnapshot: bool
 export async function push(user: User, deviceId: string, baseSeq: number, body: unknown) {
   if (!Buffer.isBuffer(body) || body.length === 0) throw new SyncError(400, 'Empty batch')
   if (body.length > MAX_CHANGE_BYTES) throw new SyncError(413, 'Batch too large', 'tooBig')
-  return sql.begin(async (tx) => {
+  const result = await sql.begin(async (tx) => {
     await tx`SELECT pg_advisory_xact_lock(hashtext(${'sync:' + user.id}))`
     const latest = await tx`
       SELECT COALESCE(MAX(seq), 0) AS seq FROM sync_changes WHERE user_id = ${user.id}
@@ -316,6 +321,18 @@ export async function push(user: User, deviceId: string, baseSeq: number, body: 
     await tx`UPDATE sync_devices SET cursor = ${seq} WHERE id = ${deviceId}`
     return { seq }
   })
+  notifyDevices(user.id, deviceId)
+  return result
+}
+
+/// Whether there are changes after [after] for this device to pull.
+export async function hasChangesAfter(user: User, deviceId: string, after: number) {
+  const rows = await sql`
+    SELECT 1 FROM sync_changes
+    WHERE user_id = ${user.id} AND seq > ${after} AND device_id <> ${deviceId}
+    LIMIT 1
+  `
+  return rows.length > 0
 }
 
 // ---- Blobs (document files) ---------------------------------------------
@@ -391,6 +408,8 @@ export async function putBlob(
   `
   await sql`DELETE FROM sync_blob_requests WHERE user_id = ${user.id} AND blob_id = ${blobId}`
   await dropUnneededBlobs(user.id, blobId)
+  // Whoever needs it can download it now.
+  notifyDevices(user.id, deviceId)
 }
 
 export async function getBlob(user: User, blobId: string) {
@@ -440,6 +459,8 @@ export async function requestBlobs(user: User, deviceId: string, ids: unknown) {
       `
     }
   }
+  // The devices that have the missing files send them.
+  if (available.size < list.length) notifyDevices(user.id, deviceId)
   return { available: [...available] }
 }
 
@@ -489,6 +510,7 @@ export async function putSnapshot(
     INSERT INTO sync_snapshots (device_id, user_id, upto_seq, stored_name, size_bytes)
     VALUES (${targetDeviceId}, ${user.id}, ${uptoSeq}, ${saved.name}, ${saved.size})
   `
+  notifyDevices(user.id)
 }
 
 export async function getSnapshot(deviceId: string) {

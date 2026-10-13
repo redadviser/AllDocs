@@ -1,4 +1,9 @@
+import 'dart:async';
+
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+
+import '../../common/app_constants.dart';
 
 import '../../common/app_scaffold.dart';
 import '../../common/storage_permission_gate.dart';
@@ -8,24 +13,72 @@ import 'auth_screen.dart';
 import 'security_gate.dart';
 
 class AuthGate extends StatefulWidget {
-  const AuthGate({super.key});
+  const AuthGate({super.key, this.notice});
+
+  /// Shown once over the sign-in screen (why the user is back there).
+  final String? notice;
 
   @override
   State<AuthGate> createState() => _AuthGateState();
 }
 
-class _AuthGateState extends State<AuthGate> {
+class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
   static const _fallbackUserName = 'AllDocs';
+  static const _sessionCheckInterval = Duration(minutes: 1);
 
   bool _loadingSession = true;
   bool _signedIn = false;
   String _userName = _fallbackUserName;
   String? _avatarUrl;
 
+  Timer? _sessionTimer;
+  bool _endingSession = false;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadSession();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _sessionTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _verifySession();
+  }
+
+  /// The library works without the server, so a session ended on another
+  /// device (Security → Devices) would otherwise go unnoticed here: the app
+  /// asks on start, when it comes back, and every minute while open.
+  void _watchSession() {
+    _sessionTimer?.cancel();
+    if (!_signedIn) return;
+    _sessionTimer = Timer.periodic(
+      _sessionCheckInterval,
+      (_) => _verifySession(),
+    );
+    _verifySession();
+  }
+
+  Future<void> _verifySession() async {
+    if (!_signedIn || _endingSession) return;
+    if (await AuthService.checkSession() != false || !mounted) return;
+    _endingSession = true;
+    _sessionTimer?.cancel();
+    await AuthService.logout();
+    if (!mounted) return;
+    Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+      MaterialPageRoute(
+        builder: (_) => AuthGate(notice: AppConstants.authSessionEnded.tr()),
+      ),
+      (route) => false,
+    );
   }
 
   Future<void> _loadSession() async {
@@ -42,6 +95,7 @@ class _AuthGateState extends State<AuthGate> {
       _avatarUrl = avatarUrl;
       _loadingSession = false;
     });
+    _watchSession();
   }
 
   Future<void> _completeAuth(Future<String> Function() action) async {
@@ -55,6 +109,7 @@ class _AuthGateState extends State<AuthGate> {
       _avatarUrl = avatarUrl;
       _signedIn = true;
     });
+    _watchSession();
   }
 
   /// Everything kept per account on this phone (documents, PIN, cloud
@@ -83,6 +138,7 @@ class _AuthGateState extends State<AuthGate> {
     // SecurityGate trata da criação do PIN e biometria, como já está
     // implementado.
     return AuthScreen(
+      notice: widget.notice,
       onLogin: (email, password) =>
           _completeAuth(() => AuthService.login(email, password)),
       onSignup: (email, password, displayName) => _completeAuth(

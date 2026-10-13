@@ -37,7 +37,8 @@
     "or_divider": "or",
     "login_error": "We couldn't sign you in. Check your details and try again.",
     "offline": "Local mode active",
-    "language": "Language"
+    "language": "Language",
+    "session_ended": "Your session was ended from another device. Sign in again to continue."
   },
   "security": {
     "greeting_morning": "Good morning, {name}",

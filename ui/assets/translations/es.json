@@ -37,7 +37,8 @@
     "or_divider": "o",
     "login_error": "No se pudo iniciar sesión. Comprueba tus datos e inténtalo de nuevo.",
     "offline": "Modo local activo",
-    "language": "Idioma"
+    "language": "Idioma",
+    "session_ended": "Tu sesión se cerró desde otro dispositivo. Vuelve a entrar para continuar."
   },
   "security": {
     "greeting_morning": "Buenos días, {name}",

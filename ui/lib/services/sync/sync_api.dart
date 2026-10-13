@@ -286,6 +286,27 @@ class SyncApi {
     );
   }
 
+  /// Long poll: waits (up to ~25 s, server side) until another device has
+  /// something for this one. True when there's news.
+  Future<bool> wait(int after) async {
+    final http.Response response;
+    try {
+      response = await _client
+          .get(_uri('/wait?after=$after'), headers: await _headers())
+          .timeout(const Duration(seconds: 40));
+    } on TimeoutException {
+      return false;
+    } on SocketException {
+      throw const SyncApiException(SyncProblem.unavailable);
+    } on http.ClientException {
+      throw const SyncApiException(SyncProblem.unavailable);
+    } on HandshakeException {
+      throw const SyncApiException(SyncProblem.unavailable);
+    }
+    _check(response.statusCode, response.body);
+    return _json(response)['changed'] == true;
+  }
+
   /// Returns the batch's sequence number.
   Future<int> push(int base, Uint8List sealed) async {
     final data = _json(
