@@ -124,7 +124,7 @@ class AssistantSummary {
   }
 }
 
-/// The Vault plan's document assistant (Claude, through the AllDocs
+/// The Vault plan's document assistant (OpenAI, through the AllDocs
 /// backend). The library stays on the phone: for a question, the few
 /// documents that matter are picked here and only their text is sent; for
 /// a summary or the fields of a document, only that document's text.
@@ -136,7 +136,9 @@ class AssistantService {
   static const maxDocumentChars = 24000;
   static const _timeout = Duration(seconds: 90);
 
-  static String get _consentKey => CurrentUser.scoped('assistant.consent.v1');
+  // v2: the assistant moved to OpenAI, so earlier consent (given for
+  // another provider) doesn't carry over.
+  static String get _consentKey => CurrentUser.scoped('assistant.consent.v2');
 
   /// Whether the user agreed to send document text to the assistant.
   static Future<bool> hasConsent() async {

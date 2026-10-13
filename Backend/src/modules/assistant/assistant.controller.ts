@@ -1,6 +1,6 @@
-import Anthropic from '@anthropic-ai/sdk'
 import type { Request, Response } from 'express'
 import {
+  AssistantApi,
   AssistantIncompleteError,
   AssistantRefusedError,
   isAssistantConfigured,
@@ -21,9 +21,9 @@ async function handle(res: Response, work: () => Promise<unknown>) {
       res.status(422).json({ error: error.message, code: 'refused' })
     } else if (error instanceof AssistantIncompleteError) {
       res.status(502).json({ error: error.message, code: 'incomplete' })
-    } else if (error instanceof Anthropic.RateLimitError) {
+    } else if (error instanceof AssistantApi.RateLimitError) {
       res.status(503).json({ error: 'The assistant is busy, try again shortly' })
-    } else if (error instanceof Anthropic.APIError) {
+    } else if (error instanceof AssistantApi.APIError) {
       console.error('Assistant API error:', error.status, error.message)
       res.status(502).json({ error: 'The assistant could not answer right now' })
     } else {

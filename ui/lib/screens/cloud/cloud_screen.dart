@@ -596,42 +596,7 @@ class CloudScreenState extends State<CloudScreen> {
       ),
     );
     if (chosen == null || !mounted) return;
-
-    final confirmed = await showConfirmDialog(
-      context,
-      title: AppConstants.backupRestoreTitle.tr(),
-      message: AppConstants.backupRestoreMessage.tr(),
-      actionLabel: AppConstants.backupRestore.tr(),
-    );
-    if (!confirmed || !mounted) return;
-
-    setState(() => _backingUp = true);
-    try {
-      final info = await widget.documentsService.restoreBackup(
-        widget.documentsService.backup.restoreSnapshot(chosen),
-      );
-      if (info != null && mounted) {
-        showSnack(
-          context,
-          info.missingCount > 0
-              ? AppConstants.backupRestoredMissing.tr(
-                  namedArgs: {
-                    'count': '${info.documentCount}',
-                    'missing': '${info.missingCount}',
-                  },
-                )
-              : AppConstants.backupRestored.tr(
-                  namedArgs: {'count': '${info.documentCount}'},
-                ),
-        );
-      }
-    } on InvalidBackupException {
-      if (mounted) showSnack(context, AppConstants.backupInvalid.tr());
-    } catch (_) {
-      if (mounted) showSnack(context, AppConstants.backupFailed.tr());
-    } finally {
-      if (mounted) setState(() => _backingUp = false);
-    }
+    await restoreBackupSnapshot(context, widget.documentsService, chosen);
   }
 }
 

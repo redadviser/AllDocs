@@ -500,7 +500,14 @@
     "history_title": "¿Qué copia quieres restaurar?",
     "latest": "Más reciente",
     "legacy": "Formato antiguo (.zip)",
-    "pick_restore_folder": "Elige la carpeta donde guardaste la copia"
+    "pick_restore_folder": "Elige la carpeta donde guardaste la copia",
+    "restore_synced": "La sincronización llevará esta versión también a tus otros dispositivos.",
+    "restoring": "Restaurando… Puede tardar un poco.",
+    "history": "Historial",
+    "history_empty": "Aún no hay copias en {provider}.",
+    "history_connect": "Conecta Google Drive o Dropbox para ver aquí el historial de copias y restaurar cualquiera.",
+    "history_failed": "No se pudo cargar el historial.",
+    "retry": "Reintentar"
   },
   "settings": {
     "auto_lock": "Bloquear automáticamente",
@@ -661,7 +668,7 @@
     "usage": "{used} de {limit} solicitudes este mes",
     "no_documents": "No encontré documentos sobre eso. Prueba con otras palabras, como el nombre del documento.",
     "consent_title": "Antes de empezar",
-    "consent_message": "Para responder, el asistente envía a Claude (Anthropic) solo el texto de los documentos relevantes para cada petición. AllDocs no guarda tus preguntas ni ese texto.",
+    "consent_message": "Para responder, el asistente envía a OpenAI solo el texto de los documentos relevantes para cada petición. AllDocs no guarda tus preguntas ni ese texto.",
     "consent_accept": "Acepto",
     "locked": "El asistente está incluido en el plan Vault.",
     "allowance_used": "Has usado todas las solicitudes de este mes. Se renuevan a principios del próximo mes.",

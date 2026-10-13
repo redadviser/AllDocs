@@ -1,21 +1,21 @@
-import Anthropic from '@anthropic-ai/sdk'
+import OpenAI from 'openai'
 
-// The Vault plan's document assistant runs on Claude. Only what the app
+// The Vault plan's document assistant runs on OpenAI. Only what the app
 // sends for one request reaches it — the excerpts of the few documents
 // that matter to a question, or one document's text — never the library.
-// Requests go through the Anthropic API under the account's data
-// retention settings; nothing here is stored beyond a monthly usage count.
+// Requests go through the OpenAI API with `store: false` (not kept for
+// later retrieval); nothing here is stored beyond a monthly usage count.
 
-export const ASSISTANT_MODEL = process.env.ASSISTANT_MODEL?.trim() || 'claude-opus-5-5'
+export const ASSISTANT_MODEL = process.env.ASSISTANT_MODEL?.trim() || 'gpt-5.4-mini'
 
-let client: Anthropic | null = null
+let client: OpenAI | null = null
 
 export function isAssistantConfigured(): boolean {
-  return Boolean(process.env.ANTHROPIC_API_KEY?.trim())
+  return Boolean(process.env.OPENAI_API_KEY?.trim())
 }
 
-function anthropic(): Anthropic {
-  return (client ??= new Anthropic())
+function openai(): OpenAI {
+  return (client ??= new OpenAI())
 }
 
 export class AssistantRefusedError extends Error {
@@ -30,11 +30,13 @@ export class AssistantIncompleteError extends Error {
   }
 }
 
+export { OpenAI as AssistantApi }
+
 type JsonSchema = Record<string, unknown>
 
-/// One request with a JSON-schema answer. A safety decline is retried on
-/// Anthropic's recommended fallback model (`fallbacks: "default"`); if the
-/// whole chain declines, AssistantRefusedError.
+/// One request whose answer must match [schema] (structured outputs,
+/// strict). A refusal or a content-filter stop is AssistantRefusedError;
+/// running out of tokens, AssistantIncompleteError.
 export async function askForJson<T>(options: {
   system: string
   user: string
@@ -42,25 +44,36 @@ export async function askForJson<T>(options: {
   effort: 'low' | 'medium' | 'high'
   maxTokens: number
 }): Promise<T> {
-  const response = await anthropic().beta.messages.create({
+  const response = await openai().responses.create({
     model: ASSISTANT_MODEL,
-    max_tokens: options.maxTokens,
-    betas: ['server-side-fallback-2026-07-01'],
-    fallbacks: 'default',
-    system: options.system,
-    messages: [{ role: 'user', content: options.user }],
-    output_config: {
-      effort: options.effort,
-      format: { type: 'json_schema', schema: options.schema },
+    instructions: options.system,
+    input: options.user,
+    max_output_tokens: options.maxTokens,
+    reasoning: { effort: options.effort },
+    store: false,
+    text: {
+      format: {
+        type: 'json_schema',
+        name: 'answer',
+        schema: options.schema,
+        strict: true,
+      },
     },
   })
 
-  if (response.stop_reason === 'refusal') throw new AssistantRefusedError()
-  if (response.stop_reason === 'max_tokens') throw new AssistantIncompleteError()
-  const text = response.content
-    .flatMap((block) => (block.type === 'text' ? [block.text] : []))
-    .join('')
-  return JSON.parse(text) as T
+  if (response.status === 'incomplete') {
+    if (response.incomplete_details?.reason === 'content_filter') {
+      throw new AssistantRefusedError()
+    }
+    throw new AssistantIncompleteError()
+  }
+  for (const item of response.output) {
+    if (item.type !== 'message') continue
+    if (item.content.some((part) => part.type === 'refusal')) {
+      throw new AssistantRefusedError()
+    }
+  }
+  return JSON.parse(response.output_text) as T
 }
 
 /// Wraps a document's text so the model reads it as material, not as

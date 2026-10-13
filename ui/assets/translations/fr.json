@@ -500,7 +500,14 @@
     "history_title": "Quelle sauvegarde veux-tu restaurer ?",
     "latest": "La plus récente",
     "legacy": "Ancien format (.zip)",
-    "pick_restore_folder": "Choisis le dossier où tu as enregistré la sauvegarde"
+    "pick_restore_folder": "Choisis le dossier où tu as enregistré la sauvegarde",
+    "restore_synced": "La synchronisation appliquera aussi cette version à vos autres appareils.",
+    "restoring": "Restauration… Cela peut prendre un moment.",
+    "history": "Historique",
+    "history_empty": "Pas encore de sauvegarde sur {provider}.",
+    "history_connect": "Connectez Google Drive ou Dropbox pour voir ici l’historique des sauvegardes et en restaurer une.",
+    "history_failed": "Impossible de charger l’historique.",
+    "retry": "Réessayer"
   },
   "settings": {
     "auto_lock": "Verrouiller automatiquement",
@@ -661,7 +668,7 @@
     "usage": "{used} sur {limit} demandes ce mois-ci",
     "no_documents": "Je n'ai trouvé aucun document à ce sujet. Essayez d'autres mots, comme le nom du document.",
     "consent_title": "Avant de commencer",
-    "consent_message": "Pour répondre, l'assistant envoie à Claude (Anthropic) uniquement le texte des documents utiles à chaque demande. AllDocs ne conserve ni vos questions ni ce texte.",
+    "consent_message": "Pour répondre, l'assistant envoie à OpenAI uniquement le texte des documents utiles à chaque demande. AllDocs ne conserve ni vos questions ni ce texte.",
     "consent_accept": "J'accepte",
     "locked": "L'assistant est inclus dans le forfait Vault.",
     "allowance_used": "Vous avez utilisé toutes les demandes de ce mois. Elles se renouvellent au début du mois prochain.",

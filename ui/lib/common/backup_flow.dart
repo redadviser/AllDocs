@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../services/services.dart';
 import '../theme/app_theme.dart';
+import 'album_dialog.dart' show showConfirmDialog;
 import 'app_constants.dart';
 import 'app_sheet.dart';
 import 'document_actions.dart';
@@ -188,6 +189,65 @@ Future<void> saveBackupToDevice(
   } catch (_) {
     if (context.mounted) showSnack(context, AppConstants.backupFailed.tr());
   }
+}
+
+/// Restores [snapshot] after asking: the library and its organization
+/// become what they were when that backup was made. Returns whether it was
+/// restored.
+Future<bool> restoreBackupSnapshot(
+  BuildContext context,
+  DocumentsService documentsService,
+  BackupSnapshot snapshot,
+) async {
+  final synced = SyncService.instance.status.value.enabled;
+  final confirmed = await showConfirmDialog(
+    context,
+    title: AppConstants.backupRestoreTitle.tr(),
+    message: [
+      AppConstants.backupRestoreMessage.tr(),
+      // A restore is a change like any other: sync takes it everywhere.
+      if (synced) AppConstants.backupRestoreSynced.tr(),
+    ].join('\n\n'),
+    actionLabel: AppConstants.backupRestore.tr(),
+  );
+  if (!confirmed || !context.mounted) return false;
+
+  BackupInfo? info;
+  Object? failure;
+  await _withProgress(context, AppConstants.backupRestoring.tr(), () async {
+    try {
+      info = await documentsService.restoreBackup(
+        documentsService.backup.restoreSnapshot(snapshot),
+      );
+    } catch (error) {
+      failure = error;
+    }
+  });
+  if (!context.mounted) return info != null;
+  final restored = info;
+  if (restored != null) {
+    showSnack(
+      context,
+      restored.missingCount > 0
+          ? AppConstants.backupRestoredMissing.tr(
+              namedArgs: {
+                'count': '${restored.documentCount}',
+                'missing': '${restored.missingCount}',
+              },
+            )
+          : AppConstants.backupRestored.tr(
+              namedArgs: {'count': '${restored.documentCount}'},
+            ),
+    );
+    return true;
+  }
+  showSnack(
+    context,
+    failure is InvalidBackupException
+        ? AppConstants.backupInvalid.tr()
+        : AppConstants.backupFailed.tr(),
+  );
+  return false;
 }
 
 /// Blocks the screen with a spinner while [task] runs — a backup zips and

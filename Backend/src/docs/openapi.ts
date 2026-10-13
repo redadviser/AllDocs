@@ -54,7 +54,7 @@ export const openApiSpec = {
     { name: 'Auth', description: 'AllDocs accounts and sessions' },
     { name: 'Devices', description: 'Signed-in devices (sessions) of the current user' },
     { name: 'Plans', description: 'Subscription plans (Pocket, Folio, Vault), bought through Adapty' },
-    { name: 'Assistant', description: 'Document assistant (Vault plan), powered by Claude' },
+    { name: 'Assistant', description: 'Document assistant (Vault plan), powered by OpenAI' },
     { name: 'Requests', description: 'Ask someone else for documents through a link (Vault plan)' },
     { name: 'Shares', description: 'Share a document behind a secure link: expires, optional code, revocable (Vault plan)' },
     { name: 'Sync', description: 'Device sync relay, end-to-end encrypted on the phones (Vault plan)' },

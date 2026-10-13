@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../common/app_constants.dart';
 import '../../common/app_sheet.dart';
 import '../../common/backup_flow.dart';
+import '../../common/backup_history.dart';
 import '../../common/language_picker.dart';
 import '../../common/settings_grid.dart';
 import '../../common/zip_preview_sheet.dart' show formatBytes;
@@ -307,6 +308,8 @@ class _BackupSection extends StatelessWidget {
                   ),
                 ],
               ),
+              const SizedBox(height: 16),
+              BackupHistory(documentsService: documentsService),
             ],
           ),
         );

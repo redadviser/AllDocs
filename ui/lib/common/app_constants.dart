@@ -496,6 +496,13 @@ class AppConstants {
   static const backupHistoryTitle = 'backup.history_title';
   static const backupLatest = 'backup.latest';
   static const backupLegacy = 'backup.legacy';
+  static const backupRestoreSynced = 'backup.restore_synced';
+  static const backupRestoring = 'backup.restoring';
+  static const backupHistory = 'backup.history';
+  static const backupHistoryEmpty = 'backup.history_empty';
+  static const backupHistoryConnect = 'backup.history_connect';
+  static const backupHistoryFailed = 'backup.history_failed';
+  static const backupRetry = 'backup.retry';
   static const backupPickRestoreFolder = 'backup.pick_restore_folder';
   static const settingsAutoLock = 'settings.auto_lock';
   static const settingsAutoLockHint = 'settings.auto_lock_hint';

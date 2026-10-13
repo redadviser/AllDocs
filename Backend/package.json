@@ -8,7 +8,6 @@
     "start": "node dist/main.js"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.132.1",
     "bcryptjs": "^2.4.3",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
@@ -17,6 +16,7 @@
     "google-auth-library": "^9.15.0",
     "jose": "^5.9.6",
     "nodemailer": "^10.0.10",
+    "openai": "^7.32.0",
     "postgres": "^3.4.7",
     "swagger-ui-express": "^5.0.1",
     "zod": "^3.24.1"

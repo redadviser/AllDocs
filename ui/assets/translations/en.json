@@ -500,7 +500,14 @@
     "history_title": "Which backup do you want to restore?",
     "latest": "Latest",
     "legacy": "Old format (.zip)",
-    "pick_restore_folder": "Choose the folder you saved the backup to"
+    "pick_restore_folder": "Choose the folder you saved the backup to",
+    "restore_synced": "Sync will bring this version to your other devices too.",
+    "restoring": "Restoring… This can take a while.",
+    "history": "History",
+    "history_empty": "No backups in {provider} yet.",
+    "history_connect": "Connect Google Drive or Dropbox to see your backup history here and restore any of them.",
+    "history_failed": "Couldn't load the history.",
+    "retry": "Try again"
   },
   "settings": {
     "auto_lock": "Lock automatically",
@@ -661,7 +668,7 @@
     "usage": "{used} of {limit} requests this month",
     "no_documents": "I couldn't find documents about that. Try other words, like the document's name.",
     "consent_title": "Before you start",
-    "consent_message": "To answer, the assistant sends Claude (Anthropic) only the text of the documents relevant to each request. AllDocs doesn't keep your questions or that text.",
+    "consent_message": "To answer, the assistant sends OpenAI only the text of the documents relevant to each request. AllDocs doesn't keep your questions or that text.",
     "consent_accept": "I agree",
     "locked": "The assistant is included in the Vault plan.",
     "allowance_used": "You've used this month's requests. They renew at the start of next month.",
