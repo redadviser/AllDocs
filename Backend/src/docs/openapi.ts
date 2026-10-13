@@ -470,6 +470,36 @@ export const openApiSpec = {
         },
       },
     },
+    '/api/plans/debug': {
+      post: {
+        tags: ['Plans'],
+        summary: 'Testers only: pick the plan by hand (debug builds of the app)',
+        description: [
+          'Allowed on a non-production server, or for the emails in PLAN_SWITCH_EMAILS',
+          '(403 notAllowed otherwise). A hand-picked plan has no expiry and syncing from',
+          'the store leaves it alone; planId null goes back to what the store says. A',
+          'real purchase (Adapty webhook) replaces it.',
+        ].join('\n'),
+        security: [{ sessionCookie: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  planId: { type: 'string', enum: ['free', 'premium', 'pro'], nullable: true },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: { description: 'Same as GET /api/plans, with pickedByHand' },
+          403: { description: 'Not allowed for this account', content: { 'application/json': { schema: error } } },
+        },
+      },
+    },
     '/api/assistant/usage': {
       get: {
         tags: ['Assistant'],
@@ -1101,6 +1131,51 @@ export const openApiSpec = {
       post: {
         tags: ['Sync'],
         summary: 'Snapshot loaded: carry on from its sequence number',
+        security: [{ sessionCookie: [] }],
+        responses: { 200: { description: 'OK' } },
+      },
+    },
+    '/api/security/hidden-pin-reset': {
+      get: {
+        tags: ['Auth'],
+        summary: "Where the hidden albums' PIN reset is: none, codeSent, waiting or ready",
+        security: [{ sessionCookie: [] }],
+        responses: { 200: { description: '{state, codeExpiresAt?, attemptsLeft?, readyAt?, cancelled}' } },
+      },
+    },
+    '/api/security/hidden-pin-reset/request': {
+      post: {
+        tags: ['Auth'],
+        summary: "Email a 6-digit code to reset the hidden albums' PIN (15 min, 5 per day)",
+        security: [{ sessionCookie: [] }],
+        responses: { 200: { description: 'Status' }, 429: { description: 'tooManyRequests' } },
+      },
+    },
+    '/api/security/hidden-pin-reset/verify': {
+      post: {
+        tags: ['Auth'],
+        summary: 'Confirm the code: the 24 h wait starts and a warning email with a cancel link goes out',
+        security: [{ sessionCookie: [] }],
+        responses: {
+          200: { description: 'Status (waiting)' },
+          400: { description: 'wrongCode (attemptsLeft)' },
+          410: { description: 'expired' },
+          429: { description: 'tooManyAttempts' },
+        },
+      },
+    },
+    '/api/security/hidden-pin-reset/complete': {
+      post: {
+        tags: ['Auth'],
+        summary: 'The wait is over: the app may set the new PIN (single use; 409 notReady before)',
+        security: [{ sessionCookie: [] }],
+        responses: { 200: { description: 'OK' }, 409: { description: 'notReady' } },
+      },
+    },
+    '/api/security/hidden-pin-reset/cancel': {
+      post: {
+        tags: ['Auth'],
+        summary: 'Cancel the reset from the app',
         security: [{ sessionCookie: [] }],
         responses: { 200: { description: 'OK' } },
       },

@@ -10,6 +10,13 @@ import 'api_helpers.dart';
 import 'auth_service.dart';
 import 'local_mode_config.dart';
 
+class PlanSwitchException implements Exception {
+  const PlanSwitchException({required this.notAllowed});
+
+  /// The server doesn't let this account switch by hand.
+  final bool notAllowed;
+}
+
 /// The signed-in account's plan and the plans on offer.
 ///
 /// The plan itself is decided by the backend (from Adapty's webhook or
@@ -26,6 +33,9 @@ class PlanService {
   static final current = ValueNotifier<AppPlan>(
     PlanCatalog.builtIn.byId(AppPlan.free),
   );
+
+  /// Whether the plan was picked by hand (debug builds' plan switch).
+  static final pickedByHand = ValueNotifier<bool>(false);
 
   static Future<void>? _refreshing;
   static Timer? _profileChangeDebounce;
@@ -106,18 +116,42 @@ class PlanService {
         debugPrint('[Plans] $path answered ${res.statusCode}');
         return false;
       }
-      final data = jsonDecode(res.body) as Map<String, dynamic>;
-      catalog = PlanCatalog.fromJson(data);
-      final planId = data['currentPlanId']?.toString() ?? AppPlan.free;
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_catalogKey, jsonEncode(catalog.toJson()));
-      await AuthService.setPlan(planId);
-      current.value = catalog.byId(planId);
+      await _apply(jsonDecode(res.body) as Map<String, dynamic>);
       return true;
     } catch (error) {
       debugPrint('[Plans] $path failed: $error');
       return false;
     }
+  }
+
+  static Future<void> _apply(Map<String, dynamic> data) async {
+    catalog = PlanCatalog.fromJson(data);
+    final planId = data['currentPlanId']?.toString() ?? AppPlan.free;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_catalogKey, jsonEncode(catalog.toJson()));
+    await AuthService.setPlan(planId);
+    pickedByHand.value = data['pickedByHand'] == true;
+    current.value = catalog.byId(planId);
+  }
+
+  /// Debug builds only: has the backend set the plan to [planId] (null:
+  /// back to what the store says), to try each plan's limits. Throws
+  /// [PlanSwitchException].
+  static Future<void> switchByHand(String? planId) async {
+    assert(kDebugMode, 'The plan switch is for debug builds only');
+    final token = await AuthService.tokenStore.read();
+    final res = await ApiHelpers.post(
+      '/api/plans/debug',
+      headers: ApiHelpers.headersWithToken(token),
+      body: jsonEncode({'planId': planId}),
+    ).catchError((_) => throw const PlanSwitchException(notAllowed: false));
+    if (res.statusCode == 403) {
+      throw const PlanSwitchException(notAllowed: true);
+    }
+    if (res.statusCode != 200) {
+      throw const PlanSwitchException(notAllowed: false);
+    }
+    await _apply(jsonDecode(res.body) as Map<String, dynamic>);
   }
 
   /// Buys [product] and, once the store confirms, has the backend apply it.

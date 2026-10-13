@@ -80,7 +80,11 @@
     "devices_end_all": "Mettre fin à toutes les sessions",
     "devices_end_all_confirm_title": "Mettre fin à toutes les sessions ?",
     "devices_end_all_confirm_message": "Tous les appareils, y compris celui-ci, seront déconnectés immédiatement.",
-    "devices_end_all_error": "Impossible de mettre fin à toutes les sessions."
+    "devices_end_all_error": "Impossible de mettre fin à toutes les sessions.",
+    "forgot_pin": "Code PIN oublié ?",
+    "forgot_title": "Créer un nouveau code PIN",
+    "forgot_message": "Pour créer un nouveau code PIN, confirmez votre identité en vous reconnectant à votre compte (mot de passe ou Google). Tous vos documents restent sur ce téléphone.",
+    "forgot_action": "Se reconnecter"
   },
   "common": {
     "continue": "Continuer",
@@ -507,7 +511,9 @@
     "history_empty": "Pas encore de sauvegarde sur {provider}.",
     "history_connect": "Connectez Google Drive ou Dropbox pour voir ici l’historique des sauvegardes et en restaurer une.",
     "history_failed": "Impossible de charger l’historique.",
-    "retry": "Réessayer"
+    "retry": "Réessayer",
+    "see_all": "Voir toutes les sauvegardes ({count})",
+    "history_page": "Historique des sauvegardes"
   },
   "settings": {
     "auto_lock": "Verrouiller automatiquement",
@@ -830,5 +836,28 @@
     "camera_denied": "Pas d’accès à la caméra. Autorisez-le dans les réglages du téléphone.",
     "turned_on": "Synchronisation activée.",
     "joined_self": "Connecté. Réception de la bibliothèque…"
+  },
+  "hidden_reset": {
+    "title": "Réinitialiser le code PIN des albums masqués",
+    "intro": "Comme les albums masqués sont presque un coffre-fort, réinitialiser ce code se fait en deux étapes : un code envoyé à l’e-mail du compte puis, par sécurité, une attente de 24 heures. Si ce n’était pas vous, vous annulez depuis l’e-mail.",
+    "send": "Envoyer le code à {email}",
+    "code_label": "Code à 6 chiffres",
+    "code_hint": "Nous avons envoyé un code à {email}. Il expire dans 15 minutes.",
+    "confirm": "Confirmer",
+    "resend": "Envoyer un autre code",
+    "wrong": "Code incorrect. Il reste {count} essais.",
+    "expired": "Le code a expiré. Demandez-en un autre.",
+    "too_many_attempts": "Trop d’essais incorrects. Demandez un autre code.",
+    "too_many_requests": "Vous avez demandé trop de codes aujourd’hui. Réessayez demain.",
+    "waiting_title": "Demande confirmée",
+    "waiting_body": "Par sécurité, vous pourrez créer le nouveau code à partir du {date}. Nous avons envoyé un avertissement à votre e-mail : si ce n’était pas vous, annulez-le là.",
+    "remaining": "Encore {time}",
+    "cancel": "Annuler la demande",
+    "cancelled_note": "La dernière demande a été annulée depuis l’e-mail.",
+    "ready_title": "Vous pouvez créer le nouveau code",
+    "ready_body": "Vos albums masqués restent tels quels ; seul le code change.",
+    "create": "Créer le nouveau code",
+    "done": "Code des albums masqués modifié.",
+    "failed": "Impossible de joindre le serveur. Réessayez."
   }
 }

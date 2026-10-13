@@ -80,7 +80,11 @@
     "devices_end_all": "End all sessions",
     "devices_end_all_confirm_title": "End all sessions?",
     "devices_end_all_confirm_message": "Every device, including this one, will be signed out immediately.",
-    "devices_end_all_error": "Could not end all sessions."
+    "devices_end_all_error": "Could not end all sessions.",
+    "forgot_pin": "Forgot your PIN?",
+    "forgot_title": "Create a new PIN",
+    "forgot_message": "To create a new PIN, confirm it's you by signing in to your account again (password or Google). All your documents stay on this phone.",
+    "forgot_action": "Sign in again"
   },
   "common": {
     "continue": "Continue",
@@ -507,7 +511,9 @@
     "history_empty": "No backups in {provider} yet.",
     "history_connect": "Connect Google Drive or Dropbox to see your backup history here and restore any of them.",
     "history_failed": "Couldn't load the history.",
-    "retry": "Try again"
+    "retry": "Try again",
+    "see_all": "See all backups ({count})",
+    "history_page": "Backup history"
   },
   "settings": {
     "auto_lock": "Lock automatically",
@@ -830,5 +836,28 @@
     "camera_denied": "No camera access. Allow it in the phone's settings.",
     "turned_on": "Sync turned on.",
     "joined_self": "Connected. Receiving the library…"
+  },
+  "hidden_reset": {
+    "title": "Reset the hidden albums PIN",
+    "intro": "Since hidden albums are almost a vault, resetting this PIN takes two steps: a code sent to your account's email and, for your security, a 24-hour wait. If it wasn't you, you cancel it from the email.",
+    "send": "Send code to {email}",
+    "code_label": "6-digit code",
+    "code_hint": "We sent a code to {email}. It expires in 15 minutes.",
+    "confirm": "Confirm",
+    "resend": "Send another code",
+    "wrong": "Wrong code. {count} attempts left.",
+    "expired": "The code expired. Ask for another one.",
+    "too_many_attempts": "Too many wrong attempts. Ask for another code.",
+    "too_many_requests": "You asked for too many codes today. Try tomorrow.",
+    "waiting_title": "Request confirmed",
+    "waiting_body": "For your security, you can set the new PIN from {date}. We sent a warning to your email: if it wasn't you, cancel it there.",
+    "remaining": "{time} left",
+    "cancel": "Cancel request",
+    "cancelled_note": "The last request was cancelled from the email.",
+    "ready_title": "You can set the new PIN now",
+    "ready_body": "Your hidden albums stay as they are; only the PIN changes.",
+    "create": "Set new PIN",
+    "done": "Hidden albums PIN changed.",
+    "failed": "Couldn't reach the server. Try again."
   }
 }

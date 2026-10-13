@@ -16,6 +16,7 @@ export 'document_text_indexer.dart';
 export 'documents_service.dart';
 export 'expiry_reminder_service.dart';
 export 'hidden_albums_lock.dart';
+export 'hidden_pin_reset_service.dart';
 export 'local_documents_store.dart';
 export 'local_mode_config.dart';
 export 'plan_service.dart';

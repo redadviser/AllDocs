@@ -85,6 +85,17 @@ class SecurityLockService {
     await prefs.remove(_legacyPinKey);
   }
 
+  /// Forgets this account's PIN (and the biometrics that stood in for it),
+  /// so the next unlock asks for a new one. Only after the user proved who
+  /// they are some other way — signing in to the account again.
+  Future<void> clearPin() async {
+    final prefs = await _prefs();
+    await prefs.remove(_pinHashKey);
+    await prefs.remove(_pinSaltKey);
+    await prefs.remove(_legacyPinKey);
+    await prefs.remove(_biometricEnabledKey);
+  }
+
   Future<bool> verifyPin(String pin) async {
     final prefs = await _prefs();
     final pinHash = prefs.getString(_pinHashKey);

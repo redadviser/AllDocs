@@ -58,6 +58,9 @@ CREATE INDEX IF NOT EXISTS idx_devices_user ON devices (user_id);
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS plan_billing_period TEXT NOT NULL DEFAULT 'monthly';
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS plan_expires_at TIMESTAMPTZ;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS plan_updated_at TIMESTAMPTZ;
+-- 'debug' while a tester picked the plan by hand (POST /api/plans/debug):
+-- syncing from the store then leaves it alone until they go back.
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS plan_source TEXT NOT NULL DEFAULT 'store';
 
 -- Every Adapty webhook received, as sent, for support and debugging.
 CREATE TABLE IF NOT EXISTS subscription_events (
@@ -224,5 +227,25 @@ CREATE TABLE IF NOT EXISTS sync_snapshots (
   size_bytes BIGINT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Resetting the hidden albums' PIN (it lives on the phone): a code sent to
+-- the account's email, then a wait (24 h) before the app may set a new one,
+-- with a warning email that can cancel it. Only hashes of the code and of
+-- the cancel link's token are kept.
+CREATE TABLE IF NOT EXISTS hidden_pin_resets (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  code_hash TEXT NOT NULL,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  code_expires_at TIMESTAMPTZ NOT NULL,
+  verified_at TIMESTAMPTZ,
+  ready_at TIMESTAMPTZ,
+  cancel_token_hash TEXT UNIQUE,
+  cancelled_at TIMESTAMPTZ,
+  completed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_hidden_pin_resets_user ON hidden_pin_resets (user_id, created_at DESC);
 
 COMMIT;

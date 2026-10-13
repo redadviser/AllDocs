@@ -10,6 +10,8 @@ import '../../common/app_constants.dart';
 import '../../common/user_initials.dart';
 import '../../services/services.dart';
 import '../../theme/app_theme.dart';
+import '../albums/hidden_pin_reset_screen.dart';
+import 'auth_gate.dart';
 
 class SecurityGate extends StatefulWidget {
   /// True while the user is past the PIN / biometrics. Work that must not
@@ -159,6 +161,38 @@ class _SecurityGateState extends State<SecurityGate>
       canUseBiometrics: _canUseBiometrics,
       onUnlockWithPin: _unlockWithPin,
       onUnlockWithBiometrics: _unlockWithBiometrics,
+      onForgotPin: _forgotPin,
+    );
+  }
+
+  /// A new PIN needs the account: the user signs in again (password or
+  /// Google), then sets one. The library stays on the phone.
+  Future<void> _forgotPin() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        title: Text(AppConstants.securityForgotTitle.tr()),
+        content: Text(AppConstants.securityForgotMessage.tr()),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(AppConstants.commonCancel.tr()),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(AppConstants.securityForgotAction.tr()),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    await _securityLockService.clearPin();
+    await AuthService.logout();
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const AuthGate()),
+      (route) => false,
     );
   }
 
@@ -339,6 +373,7 @@ class PinUnlockScreen extends StatefulWidget {
     required this.canUseBiometrics,
     required this.onUnlockWithPin,
     required this.onUnlockWithBiometrics,
+    this.onForgotPin,
   });
 
   final String greeting;
@@ -348,6 +383,7 @@ class PinUnlockScreen extends StatefulWidget {
   final bool canUseBiometrics;
   final Future<bool> Function(String pin) onUnlockWithPin;
   final Future<bool> Function() onUnlockWithBiometrics;
+  final VoidCallback? onForgotPin;
 
   @override
   State<PinUnlockScreen> createState() => _PinUnlockScreenState();
@@ -388,6 +424,13 @@ class _PinUnlockScreenState extends State<PinUnlockScreen> {
             onDelete: _deleteDigit,
             onBiometric: _submitBiometrics,
           ),
+          if (widget.onForgotPin != null)
+            Center(
+              child: TextButton(
+                onPressed: _submitting ? null : widget.onForgotPin,
+                child: Text(AppConstants.securityForgotPin.tr()),
+              ),
+            ),
         ],
       ),
     );
@@ -585,10 +628,18 @@ enum _HiddenPinStep { enter, create, confirm }
 /// The hidden albums' own PIN: asked before they open, or chosen (twice)
 /// the first time an album is hidden. Pops with true once it's right.
 class HiddenAlbumsPinScreen extends StatefulWidget {
-  const HiddenAlbumsPinScreen({super.key, required this.create});
+  const HiddenAlbumsPinScreen({
+    super.key,
+    required this.create,
+    this.beforeSave,
+  });
 
   /// Choose a new PIN instead of entering the existing one.
   final bool create;
+
+  /// Asked right before a new PIN is saved; false stops it (a reset the
+  /// server no longer allows).
+  final Future<bool> Function()? beforeSave;
 
   @override
   State<HiddenAlbumsPinScreen> createState() => _HiddenAlbumsPinScreenState();
@@ -652,9 +703,24 @@ class _HiddenAlbumsPinScreenState extends State<HiddenAlbumsPinScreen> {
             onDigit: _addDigit,
             onDelete: _deleteDigit,
           ),
+          // Resetting goes through the account's email (not in local mode).
+          if (_step == _HiddenPinStep.enter && !LocalModeConfig.isLocalOnly)
+            Center(
+              child: TextButton(
+                onPressed: _submitting ? null : _forgot,
+                child: Text(AppConstants.securityForgotPin.tr()),
+              ),
+            ),
         ],
       ),
     );
+  }
+
+  Future<void> _forgot() async {
+    final reset = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => const HiddenPinResetScreen()),
+    );
+    if (reset == true && mounted) Navigator.of(context).pop(true);
   }
 
   void _addDigit(String digit) {
@@ -714,6 +780,14 @@ class _HiddenAlbumsPinScreenState extends State<HiddenAlbumsPinScreen> {
         if (_pin != _newPin) {
           return _fail(
             AppConstants.securityPinMismatch.tr(),
+            step: _HiddenPinStep.create,
+          );
+        }
+        final beforeSave = widget.beforeSave;
+        if (beforeSave != null && !await beforeSave()) {
+          if (!mounted) return;
+          return _fail(
+            AppConstants.hiddenResetFailed.tr(),
             step: _HiddenPinStep.create,
           );
         }

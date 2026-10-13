@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express'
 import { isAdaptyWebhookAuthorized } from '../../lib/adapty'
+import { isPlanId } from '../../lib/plans'
 import * as service from './plans.service'
 
 export async function getPlans(req: Request, res: Response) {
@@ -16,6 +17,24 @@ export async function syncPlan(req: Request, res: Response) {
     }
     console.error('Plan sync failed:', error)
     res.status(502).json({ error: 'Could not reach the subscription service' })
+  }
+}
+
+export async function switchPlan(req: Request, res: Response) {
+  const raw = req.body?.planId
+  if (raw !== null && !isPlanId(raw)) {
+    res.status(400).json({ error: 'planId must be free, premium, pro or null' })
+    return
+  }
+  try {
+    res.json(await service.switchPlanByHand(req.user!, raw))
+  } catch (error) {
+    if (error instanceof service.PlanSwitchNotAllowedError) {
+      res.status(403).json({ error: error.message, code: 'notAllowed' })
+      return
+    }
+    console.error('Plan switch failed:', error)
+    res.status(500).json({ error: 'Internal server error' })
   }
 }
 

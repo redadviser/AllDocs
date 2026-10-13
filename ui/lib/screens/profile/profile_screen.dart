@@ -309,7 +309,7 @@ class _BackupSection extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 16),
-              BackupHistory(documentsService: documentsService),
+              BackupHistory(documentsService: documentsService, limit: 3),
             ],
           ),
         );

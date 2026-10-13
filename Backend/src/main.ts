@@ -16,6 +16,7 @@ import { purgeOld as purgeOldRequests } from './modules/requests/requests.servic
 import { sharePageRouter, sharesRouter } from './modules/shares/shares.routes'
 import { purgeOld as purgeOldShares } from './modules/shares/shares.service'
 import { syncRouter } from './modules/sync/sync.routes'
+import { hiddenPinPageRouter, hiddenPinRouter } from './modules/hidden-pin/hidden-pin.routes'
 import { purgeOld as purgeOldSync } from './modules/sync/sync.service'
 
 const app = express()
@@ -68,6 +69,8 @@ app.use('/api/assistant', assistantRouter)
 app.use('/api/requests', requestsRouter)
 app.use('/api/shares', sharesRouter)
 app.use('/api/sync', syncRouter)
+app.use('/api/security/hidden-pin-reset', hiddenPinRouter)
+app.use(hiddenPinPageRouter)
 
 app.use((_req, res) => {
   res.status(404).json({ error: 'Not found' })

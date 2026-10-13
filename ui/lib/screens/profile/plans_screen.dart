@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -320,6 +321,11 @@ class _PlansPanelState extends State<PlansPanel> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // Compiled out of release builds.
+        if (kDebugMode) ...[
+          const _DebugPlanSwitch(),
+          const SizedBox(height: 12),
+        ],
         if (summary != null) ...[
           _UsageBar(summary: summary, plan: current),
           const SizedBox(height: 12),
@@ -1042,6 +1048,121 @@ class _Badge extends StatelessWidget {
           fontWeight: FontWeight.w700,
         ),
       ),
+    );
+  }
+}
+
+/// Debug builds only: switches this account's plan on the server, to try
+/// each plan's limits without buying it. Not translated: testers only.
+class _DebugPlanSwitch extends StatefulWidget {
+  const _DebugPlanSwitch();
+
+  @override
+  State<_DebugPlanSwitch> createState() => _DebugPlanSwitchState();
+}
+
+class _DebugPlanSwitchState extends State<_DebugPlanSwitch> {
+  bool _busy = false;
+
+  Future<void> _switch(String? planId) async {
+    setState(() => _busy = true);
+    try {
+      await PlanService.switchByHand(planId);
+      if (mounted) {
+        showSnack(
+          context,
+          'Plano de testes: ${PlanService.current.value.name}',
+        );
+      }
+    } on PlanSwitchException catch (error) {
+      if (mounted) {
+        showSnack(
+          context,
+          error.notAllowed
+              ? 'O servidor não deixa esta conta trocar de plano. '
+                    'Junta o email a PLAN_SWITCH_EMAILS no backend.'
+              : 'Não foi possível falar com o servidor.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: Listenable.merge([
+        PlanService.current,
+        PlanService.pickedByHand,
+      ]),
+      builder: (context, _) {
+        final current = PlanService.current.value;
+        return Container(
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+          decoration: BoxDecoration(
+            color: AppTheme.warning.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppTheme.warning.withValues(alpha: 0.5)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  const Icon(
+                    Icons.bug_report_outlined,
+                    color: AppTheme.warning,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'Modo de testes (só na build de debug)',
+                      style: TextStyle(
+                        color: AppTheme.text,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  if (_busy)
+                    const SizedBox.square(
+                      dimension: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Troca o plano desta conta no servidor, sem compra, para '
+                'testar os limites de cada um.',
+                style: TextStyle(color: AppTheme.mutedText, fontSize: 13),
+              ),
+              const SizedBox(height: 10),
+              SegmentedButton<String>(
+                showSelectedIcon: false,
+                segments: [
+                  for (final plan in PlanService.catalog.plans)
+                    ButtonSegment(value: plan.id, label: Text(plan.name)),
+                ],
+                selected: {current.id},
+                onSelectionChanged: _busy
+                    ? null
+                    : (selection) => _switch(selection.first),
+              ),
+              if (PlanService.pickedByHand.value)
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: _busy ? null : () => _switch(null),
+                    icon: const Icon(Icons.undo_rounded, size: 18),
+                    label: const Text('Voltar ao plano real'),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

@@ -7,11 +7,23 @@ import 'app_constants.dart';
 import 'backup_flow.dart';
 
 /// The restore points of each connected cloud, newest first, each with a
-/// button that brings the library back to that moment.
+/// button that brings the library back to that moment. With [limit], only
+/// the newest few, and a button to the full history page.
 class BackupHistory extends StatefulWidget {
-  const BackupHistory({super.key, required this.documentsService});
+  const BackupHistory({
+    super.key,
+    required this.documentsService,
+    this.limit,
+    this.initialCloud,
+    this.showTitle = true,
+  });
 
   final DocumentsService documentsService;
+  final int? limit;
+
+  /// The cloud shown first (otherwise the backup destination).
+  final CloudProviderId? initialCloud;
+  final bool showTitle;
 
   @override
   State<BackupHistory> createState() => _BackupHistoryState();
@@ -42,7 +54,9 @@ class _BackupHistoryState extends State<BackupHistory> {
   Future<void> _reload() async {
     final clouds = await widget.documentsService.cloud.connectedProviders();
     if (!mounted) return;
-    final keep = clouds.where((c) => c.id == _selected?.id).firstOrNull;
+    final keep = clouds
+        .where((c) => c.id == (_selected?.id ?? widget.initialCloud))
+        .firstOrNull;
     final destination = clouds
         .where((c) => c.id.name == AppSettings.backupProvider.value)
         .firstOrNull;
@@ -72,15 +86,17 @@ class _BackupHistoryState extends State<BackupHistory> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          AppConstants.backupHistory.tr(),
-          style: const TextStyle(
-            color: AppTheme.text,
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
+        if (widget.showTitle) ...[
+          Text(
+            AppConstants.backupHistory.tr(),
+            style: const TextStyle(
+              color: AppTheme.text,
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+            ),
           ),
-        ),
-        const SizedBox(height: 8),
+          const SizedBox(height: 8),
+        ],
         if (clouds == null)
           const _Loading()
         else if (clouds.isEmpty || selected == null)
@@ -138,15 +154,37 @@ class _BackupHistoryState extends State<BackupHistory> {
                   ),
                 );
               }
+              final limit = widget.limit;
+              final shown = limit == null
+                  ? snapshots
+                  : snapshots.take(limit).toList();
               return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  for (final snapshot in snapshots)
+                  for (final snapshot in shown)
                     _RestorePoint(
                       snapshot: snapshot,
                       onRestore: () => restoreBackupSnapshot(
                         context,
                         widget.documentsService,
                         snapshot,
+                      ),
+                    ),
+                  if (shown.length < snapshots.length)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: TextButton.icon(
+                        onPressed: () => openBackupHistory(
+                          context,
+                          widget.documentsService,
+                          cloud: selected.id,
+                        ),
+                        icon: const Icon(Icons.history_rounded, size: 18),
+                        label: Text(
+                          AppConstants.backupSeeAll.tr(
+                            namedArgs: {'count': '${snapshots.length}'},
+                          ),
+                        ),
                       ),
                     ),
                 ],
@@ -157,6 +195,57 @@ class _BackupHistoryState extends State<BackupHistory> {
       ],
     );
   }
+}
+
+/// Every restore point, on a page of its own, by cloud.
+Future<void> openBackupHistory(
+  BuildContext context,
+  DocumentsService documentsService, {
+  CloudProviderId? cloud,
+}) {
+  return Navigator.of(context).push(
+    MaterialPageRoute<void>(
+      builder: (_) => Scaffold(
+        backgroundColor: AppTheme.background,
+        body: SafeArea(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 8, 12, 4),
+                child: Row(
+                  children: [
+                    const BackButton(),
+                    Expanded(
+                      child: Text(
+                        AppConstants.backupHistoryPage.tr(),
+                        style: const TextStyle(
+                          color: AppTheme.text,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                  children: [
+                    BackupHistory(
+                      documentsService: documentsService,
+                      initialCloud: cloud,
+                      showTitle: false,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
 class _Loading extends StatelessWidget {

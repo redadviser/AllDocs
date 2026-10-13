@@ -80,7 +80,11 @@
     "devices_end_all": "Terminar todas las sesiones",
     "devices_end_all_confirm_title": "¿Terminar todas las sesiones?",
     "devices_end_all_confirm_message": "Todos los dispositivos, incluido este, cerrarán sesión de inmediato.",
-    "devices_end_all_error": "No se pudieron terminar todas las sesiones."
+    "devices_end_all_error": "No se pudieron terminar todas las sesiones.",
+    "forgot_pin": "¿Olvidaste el PIN?",
+    "forgot_title": "Crear un PIN nuevo",
+    "forgot_message": "Para crear un PIN nuevo, confirma que eres tú volviendo a entrar en tu cuenta (contraseña o Google). Todos tus documentos se quedan en este teléfono.",
+    "forgot_action": "Volver a entrar"
   },
   "common": {
     "continue": "Continuar",
@@ -507,7 +511,9 @@
     "history_empty": "Aún no hay copias en {provider}.",
     "history_connect": "Conecta Google Drive o Dropbox para ver aquí el historial de copias y restaurar cualquiera.",
     "history_failed": "No se pudo cargar el historial.",
-    "retry": "Reintentar"
+    "retry": "Reintentar",
+    "see_all": "Ver todas las copias ({count})",
+    "history_page": "Historial de copias"
   },
   "settings": {
     "auto_lock": "Bloquear automáticamente",
@@ -830,5 +836,28 @@
     "camera_denied": "Sin acceso a la cámara. Permítelo en los ajustes del teléfono.",
     "turned_on": "Sincronización activada.",
     "joined_self": "Conectado. Recibiendo la biblioteca…"
+  },
+  "hidden_reset": {
+    "title": "Restablecer el PIN de los álbumes ocultos",
+    "intro": "Como los álbumes ocultos son casi una caja fuerte, restablecer este PIN tiene dos pasos: un código enviado al correo de la cuenta y, por seguridad, una espera de 24 horas. Si no has sido tú, lo cancelas desde el correo.",
+    "send": "Enviar código a {email}",
+    "code_label": "Código de 6 dígitos",
+    "code_hint": "Hemos enviado un código a {email}. Caduca en 15 minutos.",
+    "confirm": "Confirmar",
+    "resend": "Enviar otro código",
+    "wrong": "Código incorrecto. Quedan {count} intentos.",
+    "expired": "El código ha caducado. Pide otro.",
+    "too_many_attempts": "Demasiados intentos incorrectos. Pide otro código.",
+    "too_many_requests": "Has pedido demasiados códigos hoy. Inténtalo mañana.",
+    "waiting_title": "Solicitud confirmada",
+    "waiting_body": "Por seguridad, podrás crear el PIN nuevo a partir del {date}. Hemos enviado un aviso a tu correo: si no has sido tú, cancélalo allí.",
+    "remaining": "Faltan {time}",
+    "cancel": "Cancelar solicitud",
+    "cancelled_note": "La última solicitud se canceló desde el correo.",
+    "ready_title": "Ya puedes crear el PIN nuevo",
+    "ready_body": "Tus álbumes ocultos se quedan como están; solo cambia el PIN.",
+    "create": "Crear PIN nuevo",
+    "done": "PIN de los álbumes ocultos cambiado.",
+    "failed": "No se pudo contactar con el servidor. Inténtalo de nuevo."
   }
 }

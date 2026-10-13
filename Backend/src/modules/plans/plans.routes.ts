@@ -7,6 +7,8 @@ export const plansRouter = Router()
 plansRouter.use(requireAuth)
 plansRouter.get('/', controller.getPlans)
 plansRouter.post('/sync', controller.syncPlan)
+// Testers only (debug builds): pick the plan by hand.
+plansRouter.post('/debug', controller.switchPlan)
 
 // Called by Adapty, authenticated by its Authorization header instead of a
 // session.

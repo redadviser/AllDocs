@@ -58,6 +58,10 @@ class AppConstants {
   static const securityUseBiometrics = 'security.use_biometrics';
   static const securityPinLength = 'security.pin_length';
   static const securityPinMismatch = 'security.pin_mismatch';
+  static const securityForgotPin = 'security.forgot_pin';
+  static const securityForgotTitle = 'security.forgot_title';
+  static const securityForgotMessage = 'security.forgot_message';
+  static const securityForgotAction = 'security.forgot_action';
   static const securityInvalidPin = 'security.invalid_pin';
   static const securityChangePin = 'security.change_pin';
   static const securityChangePinCurrent = 'security.change_pin_current';
@@ -503,6 +507,8 @@ class AppConstants {
   static const backupHistoryConnect = 'backup.history_connect';
   static const backupHistoryFailed = 'backup.history_failed';
   static const backupRetry = 'backup.retry';
+  static const backupSeeAll = 'backup.see_all';
+  static const backupHistoryPage = 'backup.history_page';
   static const backupPickRestoreFolder = 'backup.pick_restore_folder';
   static const settingsAutoLock = 'settings.auto_lock';
   static const settingsAutoLockHint = 'settings.auto_lock_hint';
@@ -813,4 +819,27 @@ class AppConstants {
   static const syncCameraDenied = 'sync.camera_denied';
   static const syncTurnedOn = 'sync.turned_on';
   static const syncJoinedSelf = 'sync.joined_self';
+
+  // Hidden albums PIN reset (email code + 24 h wait).
+  static const hiddenResetTitle = 'hidden_reset.title';
+  static const hiddenResetIntro = 'hidden_reset.intro';
+  static const hiddenResetSend = 'hidden_reset.send';
+  static const hiddenResetCodeLabel = 'hidden_reset.code_label';
+  static const hiddenResetCodeHint = 'hidden_reset.code_hint';
+  static const hiddenResetConfirm = 'hidden_reset.confirm';
+  static const hiddenResetResend = 'hidden_reset.resend';
+  static const hiddenResetWrong = 'hidden_reset.wrong';
+  static const hiddenResetExpired = 'hidden_reset.expired';
+  static const hiddenResetTooManyAttempts = 'hidden_reset.too_many_attempts';
+  static const hiddenResetTooManyRequests = 'hidden_reset.too_many_requests';
+  static const hiddenResetWaitingTitle = 'hidden_reset.waiting_title';
+  static const hiddenResetWaitingBody = 'hidden_reset.waiting_body';
+  static const hiddenResetRemaining = 'hidden_reset.remaining';
+  static const hiddenResetCancel = 'hidden_reset.cancel';
+  static const hiddenResetCancelledNote = 'hidden_reset.cancelled_note';
+  static const hiddenResetReadyTitle = 'hidden_reset.ready_title';
+  static const hiddenResetReadyBody = 'hidden_reset.ready_body';
+  static const hiddenResetCreate = 'hidden_reset.create';
+  static const hiddenResetDone = 'hidden_reset.done';
+  static const hiddenResetFailed = 'hidden_reset.failed';
 }

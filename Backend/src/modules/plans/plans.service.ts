@@ -32,7 +32,7 @@ const FREE_STATE: PlanState = { planId: 'free', billingPeriod: 'monthly', expire
 
 export async function getPlansOverview(userId: string) {
   const rows = await sql`
-    SELECT ${effectivePlanColumn} AS plan, p.plan_billing_period, p.plan_expires_at
+    SELECT ${effectivePlanColumn} AS plan, p.plan_billing_period, p.plan_expires_at, p.plan_source
     FROM profiles p
     WHERE p.id = ${userId}
   `
@@ -40,6 +40,8 @@ export async function getPlansOverview(userId: string) {
   const currentPlanId = ((row?.plan as string | undefined) ?? 'free') as PlanId
   return {
     currentPlanId,
+    // True while the plan was picked by hand in a debug build.
+    pickedByHand: row?.plan_source === 'debug',
     billingPeriod: currentPlanId === 'free' ? null : ((row?.plan_billing_period as string) ?? 'monthly'),
     expiresAt: currentPlanId === 'free' ? null : ((row?.plan_expires_at as Date | null) ?? null),
     plans: PLANS,
@@ -72,16 +74,64 @@ async function applyPlanState(userId: string, state: PlanState) {
     SET plan = ${state.planId},
         plan_billing_period = ${state.billingPeriod},
         plan_expires_at = ${state.expiresAt},
+        plan_source = 'store',
         plan_updated_at = NOW(),
         updated_at = NOW()
     WHERE id = ${userId}
   `
 }
 
+export class PlanSwitchNotAllowedError extends Error {
+  constructor() {
+    super('Switching plans by hand is not enabled for this account')
+  }
+}
+
+/// Testers only: the debug build's plan switch. Allowed on a development
+/// server, or in production for the emails in PLAN_SWITCH_EMAILS.
+export function canSwitchPlanByHand(email: string): boolean {
+  const allowed = (process.env.PLAN_SWITCH_EMAILS ?? '')
+    .split(',')
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean)
+  if (allowed.includes(email.trim().toLowerCase())) return true
+  return process.env.NODE_ENV !== 'production'
+}
+
+/// Sets the plan by hand (until switched back with [planId] = null, which
+/// returns to what the store says). Syncing from the store doesn't
+/// override it meanwhile; a real purchase (webhook) does.
+export async function switchPlanByHand(
+  user: { id: string; email: string },
+  planId: PlanId | null
+) {
+  if (!canSwitchPlanByHand(user.email)) throw new PlanSwitchNotAllowedError()
+  if (planId === null) {
+    await sql`UPDATE profiles SET plan_source = 'store' WHERE id = ${user.id}`
+    if (isAdaptyServerApiConfigured()) return syncPlanFromAdapty(user.id)
+    await applyPlanState(user.id, FREE_STATE)
+    return getPlansOverview(user.id)
+  }
+  await sql`
+    UPDATE profiles
+    SET plan = ${planId},
+        plan_billing_period = 'monthly',
+        plan_expires_at = NULL,
+        plan_source = 'debug',
+        plan_updated_at = NOW(),
+        updated_at = NOW()
+    WHERE id = ${user.id}
+  `
+  return getPlansOverview(user.id)
+}
+
 // Asks Adapty what the account is paying for and stores it. The app calls
 // this after a purchase or restore, so the plan never depends on what the
 // phone claims.
 export async function syncPlanFromAdapty(userId: string) {
+  const source = await sql`SELECT plan_source FROM profiles WHERE id = ${userId}`
+  // A tester's hand-picked plan stays until they switch back.
+  if (source[0]?.plan_source === 'debug') return getPlansOverview(userId)
   if (!isAdaptyServerApiConfigured()) throw new AdaptyNotConfiguredError()
   const levels = await fetchAdaptyAccessLevels(userId)
   await applyPlanState(userId, stateFromAccessLevels(levels))
@@ -119,7 +169,7 @@ async function applyEvent(userId: string, eventType: string, properties: Record<
     await sql`
       UPDATE profiles
       SET plan = 'free', plan_expires_at = NULL, plan_updated_at = NOW(), updated_at = NOW()
-      WHERE id = ${userId} AND plan = ${planId}
+      WHERE id = ${userId} AND plan = ${planId} AND plan_source <> 'debug'
     `
     return
   }
