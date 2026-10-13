@@ -245,6 +245,9 @@ class AlbumDetailScreen extends StatelessWidget {
     DocumentsSnapshot snapshot,
     DocumentAlbum album,
   ) async {
+    // Putting more into the safe needs the plan that includes it.
+    if (album.hidden && !await ensureSafeIncluded(context)) return;
+    if (!context.mounted) return;
     // Straight to the gallery: someone who starts on the shelf may not know
     // what the gallery is yet. When it's empty, the picker offers to find
     // documents on the phone and put them right into this album.

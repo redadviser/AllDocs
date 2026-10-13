@@ -16,12 +16,38 @@ import 'albums_screen.dart';
 String shelfDisplayName(DocumentShelf shelf) =>
     shelf.isDefaultHidden ? AppConstants.hiddenDefaultShelf.tr() : shelf.name;
 
-/// Asks for the hidden albums' PIN (or has one chosen, the first time),
-/// then opens the hidden shelves.
+/// Whether the plan includes the safe ("Cofre": the hidden albums).
+bool get safeIncluded =>
+    PlanService.current.value.has(PlanFeature.hiddenAlbums);
+
+/// True when the plan includes the safe; otherwise offers the plans and
+/// returns false. For everything that puts something into the safe.
+Future<bool> ensureSafeIncluded(BuildContext context) async {
+  if (safeIncluded) return true;
+  await showPlansPrompt(
+    context,
+    title: AppConstants.hiddenTitle.tr(),
+    message: AppConstants.hiddenLocked.tr(),
+  );
+  return false;
+}
+
+/// Asks for the safe's PIN (or has one chosen, the first time), then opens
+/// it. Without the plan: an empty safe stays locked; one with albums in it
+/// (the plan was dropped) still opens, read-only — nothing in it is lost or
+/// shown outside it.
 Future<void> openHiddenAlbums(
   BuildContext context,
   DocumentsService documentsService,
 ) async {
+  if (!safeIncluded) {
+    final snapshot = await documentsService.loadSnapshot();
+    if (!context.mounted) return;
+    if (snapshot.hiddenAlbums.isEmpty) {
+      await ensureSafeIncluded(context);
+      return;
+    }
+  }
   final hasPin = await HiddenAlbumsLock.hasPin();
   if (!context.mounted) return;
   final unlocked = await Navigator.of(context).push<bool>(
@@ -52,14 +78,7 @@ Future<bool> setAlbumHiddenFlow(
   required bool hidden,
 }) async {
   if (hidden) {
-    if (!PlanService.current.value.has(PlanFeature.hiddenAlbums)) {
-      await showPlansPrompt(
-        context,
-        title: AppConstants.hiddenTitle.tr(),
-        message: AppConstants.hiddenLocked.tr(),
-      );
-      return false;
-    }
+    if (!await ensureSafeIncluded(context)) return false;
     if (!await HiddenAlbumsLock.hasPin()) {
       if (!context.mounted) return false;
       final created = await Navigator.of(context).push<bool>(

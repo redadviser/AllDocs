@@ -639,6 +639,8 @@ class AppConstants {
   static const hiddenEnterPin = 'hidden.enter_pin';
   static const hiddenSameAsApp = 'hidden.same_as_app';
   static const hiddenLocked = 'hidden.locked';
+  static const hiddenReadOnly = 'hidden.read_only';
+  static const hiddenSeePlans = 'hidden.see_plans';
   static const hiddenDefaultShelf = 'hidden.default_shelf';
   static const hiddenChooseShelf = 'hidden.choose_shelf';
   static const hiddenChooseShelfHint = 'hidden.choose_shelf_hint';

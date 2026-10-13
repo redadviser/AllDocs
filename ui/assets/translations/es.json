@@ -583,7 +583,7 @@
     "feature_autoBackup": "Copia automática con historial",
     "feature_watermark": "Copias con marca de agua",
     "feature_pdfTools": "Herramientas PDF",
-    "feature_hiddenAlbums": "Álbumes ocultos con PIN propio",
+    "feature_hiddenAlbums": "Caja fuerte con PIN propio",
     "feature_deviceSync": "Sincronización entre hasta {count} dispositivos",
     "feature_secureSharing": "Compartir con enlace seguro",
     "feature_documentRequests": "Pedir documentos a terceros",
@@ -645,23 +645,25 @@
     "locked": "Las herramientas PDF y las copias con marca de agua están incluidas en Folio y Vault."
   },
   "hidden": {
-    "title": "Álbumes ocultos",
-    "hide": "Ocultar álbum",
-    "unhide": "Mostrar en la estantería",
-    "hidden_done": "Álbum ocultado. Encuentra los álbumes ocultos en Ajustes → Seguridad.",
-    "unhidden_done": "El álbum ha vuelto a la estantería.",
-    "create_pin_title": "Crea el PIN de los álbumes ocultos",
-    "create_pin_subtitle": "Distinto del PIN de la app, para que nadie pueda abrirlos solo con tu móvil desbloqueado.",
+    "title": "Caja fuerte",
+    "hide": "Guardar en la caja fuerte",
+    "unhide": "Sacar de la caja fuerte",
+    "hidden_done": "Álbum guardado en la caja fuerte. La encontrarás en Ajustes → Seguridad.",
+    "unhidden_done": "El álbum salió de la caja fuerte y volvió a la estantería.",
+    "create_pin_title": "Crea el PIN de la caja fuerte",
+    "create_pin_subtitle": "Distinto del PIN de la app, para que nadie la abra solo por tener el teléfono desbloqueado.",
     "confirm_pin": "Confirma el PIN",
-    "enter_pin": "PIN de los álbumes ocultos",
+    "enter_pin": "PIN de la caja fuerte",
     "same_as_app": "Elige un PIN distinto al de la app.",
-    "locked": "Los álbumes ocultos están incluidos en Folio y Vault.",
-    "default_shelf": "Ocultos",
+    "locked": "La caja fuerte está incluida en Folio y Vault.",
+    "default_shelf": "Caja fuerte",
     "choose_shelf": "¿A qué estantería?",
-    "choose_shelf_hint": "Este álbum se creó entre los ocultos. Elige la estantería donde aparecerá.",
+    "choose_shelf_hint": "Este álbum se creó en la caja fuerte. Elige la estantería donde aparecerá.",
     "moved_to": "Álbum movido a {shelf}.",
-    "delete_shelf_message": "Los álbumes de esta estantería pasan a \"Ocultos\" y siguen ocultos.",
-    "delete_album_message": "Los documentos de \"{name}\" vuelven a la galería y dejan de estar ocultos."
+    "delete_shelf_message": "Los álbumes de esta estantería pasan a la estantería \"Caja fuerte\" y siguen guardados en ella.",
+    "delete_album_message": "Los documentos de \"{name}\" vuelven a la galería y dejan de estar en la caja fuerte.",
+    "read_only": "Tu plan ya no incluye la caja fuerte. Lo que hay dentro sigue protegido por el PIN: puedes verlo y sacarlo, pero no guardar cosas nuevas.",
+    "see_plans": "Ver planes"
   },
   "assistant": {
     "title": "Asistente",
@@ -838,8 +840,8 @@
     "joined_self": "Conectado. Recibiendo la biblioteca…"
   },
   "hidden_reset": {
-    "title": "Restablecer el PIN de los álbumes ocultos",
-    "intro": "Como los álbumes ocultos son casi una caja fuerte, restablecer este PIN tiene dos pasos: un código enviado al correo de la cuenta y, por seguridad, una espera de 24 horas. Si no has sido tú, lo cancelas desde el correo.",
+    "title": "Restablecer el PIN de la caja fuerte",
+    "intro": "Como la caja fuerte guarda tus documentos más sensibles, restablecer este PIN tiene dos pasos: un código enviado al correo de la cuenta y, por seguridad, una espera de 24 horas. Si no has sido tú, lo cancelas desde el correo.",
     "send": "Enviar código a {email}",
     "code_label": "Código de 6 dígitos",
     "code_hint": "Hemos enviado un código a {email}. Caduca en 15 minutos.",
@@ -855,9 +857,9 @@
     "cancel": "Cancelar solicitud",
     "cancelled_note": "La última solicitud se canceló desde el correo.",
     "ready_title": "Ya puedes crear el PIN nuevo",
-    "ready_body": "Tus álbumes ocultos se quedan como están; solo cambia el PIN.",
+    "ready_body": "Lo que hay en la caja fuerte se queda como está; solo cambia el PIN.",
     "create": "Crear PIN nuevo",
-    "done": "PIN de los álbumes ocultos cambiado.",
+    "done": "PIN de la caja fuerte cambiado.",
     "failed": "No se pudo contactar con el servidor. Inténtalo de nuevo."
   }
 }

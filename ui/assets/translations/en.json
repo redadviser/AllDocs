@@ -583,7 +583,7 @@
     "feature_autoBackup": "Automatic backup with history",
     "feature_watermark": "Watermarked copies",
     "feature_pdfTools": "PDF tools",
-    "feature_hiddenAlbums": "Hidden albums with their own PIN",
+    "feature_hiddenAlbums": "Safe with its own PIN",
     "feature_deviceSync": "Sync across up to {count} devices",
     "feature_secureSharing": "Secure link sharing",
     "feature_documentRequests": "Request documents from others",
@@ -645,23 +645,25 @@
     "locked": "PDF tools and watermarked copies are included in Folio and Vault."
   },
   "hidden": {
-    "title": "Hidden albums",
-    "hide": "Hide album",
-    "unhide": "Show on the shelf",
-    "hidden_done": "Album hidden. Find hidden albums in Settings → Security.",
-    "unhidden_done": "The album is back on the shelf.",
-    "create_pin_title": "Create the hidden albums PIN",
-    "create_pin_subtitle": "Different from the app PIN, so nobody can open them just by holding your unlocked phone.",
+    "title": "Safe",
+    "hide": "Move to the safe",
+    "unhide": "Take out of the safe",
+    "hidden_done": "Album moved to the safe. Find the safe in Settings → Security.",
+    "unhidden_done": "The album left the safe and is back on the shelf.",
+    "create_pin_title": "Create the safe PIN",
+    "create_pin_subtitle": "Different from the app PIN, so nobody can open it just by holding your unlocked phone.",
     "confirm_pin": "Confirm the PIN",
-    "enter_pin": "Hidden albums PIN",
+    "enter_pin": "Safe PIN",
     "same_as_app": "Choose a PIN different from the app's.",
-    "locked": "Hidden albums are included in Folio and Vault.",
-    "default_shelf": "Hidden",
+    "locked": "The safe is included in Folio and Vault.",
+    "default_shelf": "Safe",
     "choose_shelf": "Which shelf?",
-    "choose_shelf_hint": "This album was made among the hidden ones. Choose the shelf it will appear on.",
+    "choose_shelf_hint": "This album was made in the safe. Choose the shelf it will appear on.",
     "moved_to": "Album moved to {shelf}.",
-    "delete_shelf_message": "The albums on this shelf move to \"Hidden\" and stay hidden.",
-    "delete_album_message": "The documents in \"{name}\" go back to the gallery and are no longer hidden."
+    "delete_shelf_message": "The albums on this shelf move to the \"Safe\" shelf and stay in the safe.",
+    "delete_album_message": "The documents in \"{name}\" go back to the gallery and are no longer in the safe.",
+    "read_only": "Your plan no longer includes the safe. What's in it stays protected by the PIN: you can view it and take things out, but not add new ones.",
+    "see_plans": "See plans"
   },
   "assistant": {
     "title": "Assistant",
@@ -838,8 +840,8 @@
     "joined_self": "Connected. Receiving the library…"
   },
   "hidden_reset": {
-    "title": "Reset the hidden albums PIN",
-    "intro": "Since hidden albums are almost a vault, resetting this PIN takes two steps: a code sent to your account's email and, for your security, a 24-hour wait. If it wasn't you, you cancel it from the email.",
+    "title": "Reset the safe PIN",
+    "intro": "Since the safe keeps your most sensitive documents, resetting this PIN takes two steps: a code sent to your account's email and, for your security, a 24-hour wait. If it wasn't you, you cancel it from the email.",
     "send": "Send code to {email}",
     "code_label": "6-digit code",
     "code_hint": "We sent a code to {email}. It expires in 15 minutes.",
@@ -855,9 +857,9 @@
     "cancel": "Cancel request",
     "cancelled_note": "The last request was cancelled from the email.",
     "ready_title": "You can set the new PIN now",
-    "ready_body": "Your hidden albums stay as they are; only the PIN changes.",
+    "ready_body": "What's in the safe stays as it is; only the PIN changes.",
     "create": "Set new PIN",
-    "done": "Hidden albums PIN changed.",
+    "done": "Safe PIN changed.",
     "failed": "Couldn't reach the server. Try again."
   }
 }

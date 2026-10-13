@@ -80,6 +80,8 @@ class _AlbumsScreenState extends State<AlbumsScreen> {
         final shelves = widget.hidden
             ? snapshot.hiddenShelves
             : snapshot.shelves;
+        // The plan was dropped: the safe opens read-only.
+        final readOnlySafe = widget.hidden && !safeIncluded;
         return Column(
           children: [
             Padding(
@@ -119,14 +121,16 @@ class _AlbumsScreenState extends State<AlbumsScreen> {
                     ),
                     onPressed: _toggleMode,
                   ),
-                  IconButton(
-                    tooltip: AppConstants.docshelfNewShelf.tr(),
-                    icon: const Icon(Icons.add_rounded),
-                    onPressed: _createShelf,
-                  ),
+                  if (!readOnlySafe)
+                    IconButton(
+                      tooltip: AppConstants.docshelfNewShelf.tr(),
+                      icon: const Icon(Icons.add_rounded),
+                      onPressed: _createShelf,
+                    ),
                 ],
               ),
             ),
+            if (readOnlySafe) const _ReadOnlySafeBanner(),
             Expanded(
               // Always the same list widget: swapping a plain ListView for
               // the reorderable one when the first shelf appeared replaced
@@ -235,6 +239,8 @@ class _AlbumsScreenState extends State<AlbumsScreen> {
   }
 
   Future<void> _createAlbum(String shelfId) async {
+    if (widget.hidden && !await ensureSafeIncluded(context)) return;
+    if (!mounted) return;
     final draft = await showAlbumDialog(context);
     if (draft == null) return;
     await _service.createAlbum(
@@ -246,6 +252,8 @@ class _AlbumsScreenState extends State<AlbumsScreen> {
   }
 
   Future<void> _createShelf() async {
+    if (widget.hidden && !await ensureSafeIncluded(context)) return;
+    if (!mounted) return;
     final name = await showNameDialog(
       context,
       title: AppConstants.docshelfNewShelf.tr(),
@@ -279,6 +287,64 @@ class _AlbumsScreenState extends State<AlbumsScreen> {
       actionLabel: AppConstants.commonDelete.tr(),
     );
     if (confirmed) await _service.deleteShelf(shelf.id);
+  }
+}
+
+/// On top of a safe the plan no longer includes.
+class _ReadOnlySafeBanner extends StatelessWidget {
+  const _ReadOnlySafeBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+      child: Material(
+        color: AppTheme.premium.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: () => ensureSafeIncluded(context),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(
+                      Icons.lock_clock_outlined,
+                      color: AppTheme.premium,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        AppConstants.hiddenReadOnly.tr(),
+                        style: const TextStyle(
+                          color: AppTheme.text,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    AppConstants.hiddenSeePlans.tr(),
+                    style: const TextStyle(
+                      color: AppTheme.premium,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

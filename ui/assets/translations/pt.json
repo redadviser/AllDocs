@@ -583,7 +583,7 @@
     "feature_autoBackup": "Backup automático com histórico",
     "feature_watermark": "Cópias com marca de água",
     "feature_pdfTools": "Ferramentas PDF",
-    "feature_hiddenAlbums": "Álbuns ocultos com PIN próprio",
+    "feature_hiddenAlbums": "Cofre com PIN próprio",
     "feature_deviceSync": "Sincronização entre até {count} aparelhos",
     "feature_secureSharing": "Partilha segura por link",
     "feature_documentRequests": "Pedir documentos a terceiros",
@@ -645,23 +645,25 @@
     "locked": "As ferramentas PDF e as cópias com marca de água estão incluídas no Folio e no Vault."
   },
   "hidden": {
-    "title": "Álbuns ocultos",
-    "hide": "Ocultar álbum",
-    "unhide": "Mostrar na estante",
-    "hidden_done": "Álbum ocultado. Encontras os álbuns ocultos em Definições → Segurança.",
-    "unhidden_done": "O álbum voltou à estante.",
-    "create_pin_title": "Cria o PIN dos álbuns ocultos",
-    "create_pin_subtitle": "Diferente do PIN da app, para que ninguém os abra só por ter o telemóvel desbloqueado.",
+    "title": "Cofre",
+    "hide": "Guardar no cofre",
+    "unhide": "Tirar do cofre",
+    "hidden_done": "Álbum guardado no cofre. Encontras o cofre em Definições → Segurança.",
+    "unhidden_done": "O álbum saiu do cofre e voltou à estante.",
+    "create_pin_title": "Cria o PIN do cofre",
+    "create_pin_subtitle": "Diferente do PIN da app, para que ninguém o abra só por ter o telemóvel desbloqueado.",
     "confirm_pin": "Confirma o PIN",
-    "enter_pin": "PIN dos álbuns ocultos",
+    "enter_pin": "PIN do cofre",
     "same_as_app": "Escolhe um PIN diferente do PIN da app.",
-    "locked": "Os álbuns ocultos estão incluídos no Folio e no Vault.",
-    "default_shelf": "Ocultos",
+    "locked": "O cofre está incluído no Folio e no Vault.",
+    "default_shelf": "Cofre",
     "choose_shelf": "Para que estante?",
-    "choose_shelf_hint": "Este álbum foi criado nos ocultos. Escolhe a estante onde vai aparecer.",
+    "choose_shelf_hint": "Este álbum foi criado no cofre. Escolhe a estante onde vai aparecer.",
     "moved_to": "Álbum movido para {shelf}.",
-    "delete_shelf_message": "Os álbuns desta estante passam para \"Ocultos\" e continuam escondidos.",
-    "delete_album_message": "Os documentos de \"{name}\" passam para a galeria e deixam de estar ocultos."
+    "delete_shelf_message": "Os álbuns desta estante passam para a estante \"Cofre\" e continuam guardados no cofre.",
+    "delete_album_message": "Os documentos de \"{name}\" passam para a galeria e deixam de estar no cofre.",
+    "read_only": "O teu plano já não inclui o cofre. O que lá está continua protegido pelo PIN: podes ver e tirar do cofre, mas não guardar coisas novas.",
+    "see_plans": "Ver planos"
   },
   "assistant": {
     "title": "Assistente",
@@ -838,8 +840,8 @@
     "joined_self": "Ligado. A receber a biblioteca…"
   },
   "hidden_reset": {
-    "title": "Repor o PIN dos álbuns ocultos",
-    "intro": "Como os álbuns ocultos são quase um cofre, repor este PIN tem dois passos: um código enviado para o email da conta e, por segurança, uma espera de 24 horas. Se não foste tu a pedir, cancelas pelo email.",
+    "title": "Repor o PIN do cofre",
+    "intro": "Como o cofre guarda os teus documentos mais sensíveis, repor este PIN tem dois passos: um código enviado para o email da conta e, por segurança, uma espera de 24 horas. Se não foste tu a pedir, cancelas pelo email.",
     "send": "Enviar código para {email}",
     "code_label": "Código de 6 dígitos",
     "code_hint": "Enviámos um código para {email}. Expira em 15 minutos.",
@@ -855,9 +857,9 @@
     "cancel": "Cancelar pedido",
     "cancelled_note": "O último pedido foi cancelado a partir do email.",
     "ready_title": "Já podes criar o PIN novo",
-    "ready_body": "Os teus álbuns ocultos ficam como estão; só muda o PIN.",
+    "ready_body": "O que está no cofre fica como está; só muda o PIN.",
     "create": "Criar PIN novo",
-    "done": "PIN dos álbuns ocultos alterado.",
+    "done": "PIN do cofre alterado.",
     "failed": "Não foi possível falar com o servidor. Tenta novamente."
   }
 }

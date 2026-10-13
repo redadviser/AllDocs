@@ -583,7 +583,7 @@
     "feature_autoBackup": "Sauvegarde automatique avec historique",
     "feature_watermark": "Copies avec filigrane",
     "feature_pdfTools": "Outils PDF",
-    "feature_hiddenAlbums": "Albums masqués avec leur propre code",
+    "feature_hiddenAlbums": "Coffre-fort avec son propre code",
     "feature_deviceSync": "Synchronisation sur {count} appareils maximum",
     "feature_secureSharing": "Partage sécurisé par lien",
     "feature_documentRequests": "Demander des documents à des tiers",
@@ -645,23 +645,25 @@
     "locked": "Les outils PDF et les copies filigranées sont inclus dans Folio et Vault."
   },
   "hidden": {
-    "title": "Albums masqués",
-    "hide": "Masquer l'album",
-    "unhide": "Afficher sur l'étagère",
-    "hidden_done": "Album masqué. Retrouvez les albums masqués dans Réglages → Sécurité.",
-    "unhidden_done": "L'album est de retour sur l'étagère.",
-    "create_pin_title": "Créez le code des albums masqués",
-    "create_pin_subtitle": "Différent du code de l'app, pour que personne ne les ouvre simplement avec votre téléphone déverrouillé.",
+    "title": "Coffre-fort",
+    "hide": "Mettre au coffre-fort",
+    "unhide": "Sortir du coffre-fort",
+    "hidden_done": "Album mis au coffre-fort. Retrouvez-le dans Réglages → Sécurité.",
+    "unhidden_done": "L'album est sorti du coffre-fort et revenu sur l'étagère.",
+    "create_pin_title": "Créez le code du coffre-fort",
+    "create_pin_subtitle": "Différent du code de l'app, pour que personne ne l'ouvre simplement en ayant votre téléphone déverrouillé.",
     "confirm_pin": "Confirmez le code",
-    "enter_pin": "Code des albums masqués",
+    "enter_pin": "Code du coffre-fort",
     "same_as_app": "Choisissez un code différent de celui de l'app.",
-    "locked": "Les albums masqués sont inclus dans Folio et Vault.",
-    "default_shelf": "Masqués",
+    "locked": "Le coffre-fort est inclus dans Folio et Vault.",
+    "default_shelf": "Coffre-fort",
     "choose_shelf": "Sur quelle étagère ?",
-    "choose_shelf_hint": "Cet album a été créé parmi les masqués. Choisissez l'étagère où il apparaîtra.",
+    "choose_shelf_hint": "Cet album a été créé dans le coffre-fort. Choisissez l'étagère où il apparaîtra.",
     "moved_to": "Album déplacé vers {shelf}.",
-    "delete_shelf_message": "Les albums de cette étagère passent dans « Masqués » et restent masqués.",
-    "delete_album_message": "Les documents de « {name} » reviennent dans la galerie et ne sont plus masqués."
+    "delete_shelf_message": "Les albums de cette étagère passent dans l'étagère « Coffre-fort » et y restent protégés.",
+    "delete_album_message": "Les documents de « {name} » reviennent dans la galerie et ne sont plus au coffre-fort.",
+    "read_only": "Votre offre n'inclut plus le coffre-fort. Son contenu reste protégé par le code : vous pouvez le consulter et en sortir des éléments, mais pas en ajouter.",
+    "see_plans": "Voir les offres"
   },
   "assistant": {
     "title": "Assistant",
@@ -838,8 +840,8 @@
     "joined_self": "Connecté. Réception de la bibliothèque…"
   },
   "hidden_reset": {
-    "title": "Réinitialiser le code PIN des albums masqués",
-    "intro": "Comme les albums masqués sont presque un coffre-fort, réinitialiser ce code se fait en deux étapes : un code envoyé à l’e-mail du compte puis, par sécurité, une attente de 24 heures. Si ce n’était pas vous, vous annulez depuis l’e-mail.",
+    "title": "Réinitialiser le code du coffre-fort",
+    "intro": "Comme le coffre-fort garde vos documents les plus sensibles, réinitialiser ce code se fait en deux étapes : un code envoyé à l’e-mail du compte puis, par sécurité, une attente de 24 heures. Si ce n’était pas vous, vous annulez depuis l’e-mail.",
     "send": "Envoyer le code à {email}",
     "code_label": "Code à 6 chiffres",
     "code_hint": "Nous avons envoyé un code à {email}. Il expire dans 15 minutes.",
@@ -855,9 +857,9 @@
     "cancel": "Annuler la demande",
     "cancelled_note": "La dernière demande a été annulée depuis l’e-mail.",
     "ready_title": "Vous pouvez créer le nouveau code",
-    "ready_body": "Vos albums masqués restent tels quels ; seul le code change.",
+    "ready_body": "Le contenu du coffre-fort reste tel quel ; seul le code change.",
     "create": "Créer le nouveau code",
-    "done": "Code des albums masqués modifié.",
+    "done": "Code du coffre-fort modifié.",
     "failed": "Impossible de joindre le serveur. Réessayez."
   }
 }
