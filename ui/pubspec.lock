@@ -5,10 +5,10 @@ packages:
     dependency: "direct main"
     description:
       name: adapty_flutter
-      sha256: "01c93c8bfc77ac21e92572f9d8b9c2de19a3a7aef18edf3d9e41c42eff42e29e"
+      sha256: a21fdcc59dc40f7690f6c4d0f371ae12970ac13ff015efcf06f2149c3bc0707e
       url: "https://pub.dev"
     source: hosted
-    version: "3.17.2"
+    version: "4.1.1"
   android_id:
     dependency: "direct main"
     description:

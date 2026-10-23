@@ -1198,6 +1198,39 @@ export const openApiSpec = {
         responses: { 200: { description: 'OK' } },
       },
     },
+    '/api/account/deletion': {
+      post: {
+        tags: ['Auth'],
+        summary: 'Email the signed-in account a link to delete it (confirmed on the web page)',
+        security: [{ sessionCookie: [] }],
+        requestBody: {
+          content: {
+            'application/json': {
+              schema: { type: 'object', properties: { language: { type: 'string', enum: ['pt', 'en', 'es', 'fr'] } } },
+            },
+          },
+        },
+        responses: { 200: { description: '{sent, email (masked)}' } },
+      },
+    },
+    '/delete-account': {
+      get: {
+        tags: ['Auth'],
+        summary: 'Account deletion web page (the URL for Google Play)',
+        description: [
+          'Without a token: a form that emails the account its deletion link (same answer',
+          'whether or not the email has an account). With ?token= from that email (valid one',
+          'hour, single use): what is deleted and what stays, a reminder to cancel the store',
+          'subscription, and a required checkbox. Confirming (POST /delete-account/confirm)',
+          'deletes the account, its sessions, its server data and stored files.',
+        ].join('\n'),
+        parameters: [
+          { name: 'token', in: 'query', schema: { type: 'string' } },
+          { name: 'lang', in: 'query', schema: { type: 'string', enum: ['pt', 'en', 'es', 'fr'] } },
+        ],
+        responses: { 200: { description: 'HTML page' }, 410: { description: 'Link expired or used (HTML page)' } },
+      },
+    },
     '/api/config/cloud': {
       get: {
         tags: ['Config'],

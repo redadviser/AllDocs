@@ -268,4 +268,14 @@ CREATE TABLE IF NOT EXISTS hidden_pin_resets (
 
 CREATE INDEX IF NOT EXISTS idx_hidden_pin_resets_user ON hidden_pin_resets (user_id, created_at DESC);
 
+-- Account deletion: the link emailed to confirm it (only its hash), valid
+-- for an hour, single use.
+CREATE TABLE IF NOT EXISTS account_deletions (
+  token_hash TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  expires_at TIMESTAMPTZ NOT NULL,
+  used_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 COMMIT;

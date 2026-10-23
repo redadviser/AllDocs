@@ -38,7 +38,8 @@
     "login_error": "We couldn't sign you in. Check your details and try again.",
     "offline": "Local mode active",
     "language": "Language",
-    "session_ended": "Your session was ended from another device. Sign in again to continue."
+    "session_ended": "Your session was ended from another device. Sign in again to continue.",
+    "account_deleted": "Your account was deleted. Your documents are still on this phone."
   },
   "security": {
     "greeting_morning": "Good morning, {name}",
@@ -246,7 +247,28 @@
     "tags": "tags",
     "devices": "Sessions and devices",
     "help_title": "Help and legal",
-    "account_title": "Account"
+    "account_title": "Account",
+    "contact_support_priority": "Priority support",
+    "contact_support_priority_subject": "AllDocs — Priority support (Vault)",
+    "contact_support_details": "Account: {email}\nPlan: {plan}\nSystem: {platform}",
+    "delete_account": "Delete account",
+    "delete_intro": "Your account and everything you have on our server are deleted for good. To confirm it's you, we email you a link.",
+    "delete_goes": "Deleted",
+    "delete_goes_account": "Your account, profile and the sessions on every device",
+    "delete_goes_server": "Secure links, document requests and device sync",
+    "delete_stays": "Stays",
+    "delete_stays_phone": "The documents on this phone (until you uninstall the app)",
+    "delete_stays_backups": "Your backups on Google Drive or Dropbox",
+    "delete_subscription": "Have a subscription? Deleting the account doesn't cancel it: cancel it in the store first.",
+    "delete_manage_subscription": "Manage subscription",
+    "delete_step_export": "1. Keep your documents",
+    "delete_step_export_hint": "Copy them to a folder on the phone before deleting the account.",
+    "delete_step_email": "2. Confirm by email",
+    "delete_step_email_hint": "The link takes you to a page where you confirm the deletion.",
+    "delete_send": "Send confirmation email",
+    "delete_sent": "We sent a link to {email}. Open it to review and confirm the deletion. It's valid for one hour.",
+    "delete_resend": "Resend email",
+    "delete_failed": "Couldn't send the email. Try again."
   },
   "permission": {
     "storage_title": "Allow file access",

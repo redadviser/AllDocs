@@ -186,7 +186,8 @@ export async function releaseSessionDevices(userId: string, sessionDeviceIds: st
   }
 }
 
-async function endSync(userId: string) {
+/// Deletes all of the account's sync data (rows and stored files).
+export async function endSync(userId: string) {
   const blobs = await sql`DELETE FROM sync_blobs WHERE user_id = ${userId} RETURNING stored_name`
   for (const b of blobs) await removeBlob(b.stored_name as string)
   const snapshots = await sql`DELETE FROM sync_snapshots WHERE user_id = ${userId} RETURNING stored_name`

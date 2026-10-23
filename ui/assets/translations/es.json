@@ -38,7 +38,8 @@
     "login_error": "No se pudo iniciar sesión. Comprueba tus datos e inténtalo de nuevo.",
     "offline": "Modo local activo",
     "language": "Idioma",
-    "session_ended": "Tu sesión se cerró desde otro dispositivo. Vuelve a entrar para continuar."
+    "session_ended": "Tu sesión se cerró desde otro dispositivo. Vuelve a entrar para continuar.",
+    "account_deleted": "Tu cuenta se ha eliminado. Los documentos siguen en este teléfono."
   },
   "security": {
     "greeting_morning": "Buenos días, {name}",
@@ -246,7 +247,28 @@
     "tags": "etiquetas",
     "devices": "Sesiones y dispositivos",
     "help_title": "Ayuda e información",
-    "account_title": "Cuenta"
+    "account_title": "Cuenta",
+    "contact_support_priority": "Soporte prioritario",
+    "contact_support_priority_subject": "AllDocs — Soporte prioritario (Vault)",
+    "contact_support_details": "Cuenta: {email}\nPlan: {plan}\nSistema: {platform}",
+    "delete_account": "Eliminar cuenta",
+    "delete_intro": "Tu cuenta y todo lo que tienes en nuestro servidor se borran definitivamente. Para confirmar que eres tú, te enviamos un enlace por correo.",
+    "delete_goes": "Se borra",
+    "delete_goes_account": "La cuenta, el perfil y las sesiones en todos los dispositivos",
+    "delete_goes_server": "Enlaces seguros, solicitudes de documentos y la sincronización",
+    "delete_stays": "Se queda",
+    "delete_stays_phone": "Los documentos en este teléfono (hasta que desinstales la app)",
+    "delete_stays_backups": "Tus copias en Google Drive o Dropbox",
+    "delete_subscription": "¿Tienes una suscripción? Eliminar la cuenta no la cancela: cancélala primero en la tienda.",
+    "delete_manage_subscription": "Gestionar suscripción",
+    "delete_step_export": "1. Guarda tus documentos",
+    "delete_step_export_hint": "Cópialos a una carpeta del teléfono antes de eliminar la cuenta.",
+    "delete_step_email": "2. Confirma por correo",
+    "delete_step_email_hint": "El enlace te lleva a una página donde confirmas la eliminación.",
+    "delete_send": "Enviar correo de confirmación",
+    "delete_sent": "Hemos enviado un enlace a {email}. Ábrelo para revisar y confirmar la eliminación. Es válido durante una hora.",
+    "delete_resend": "Reenviar correo",
+    "delete_failed": "No se pudo enviar el correo. Inténtalo de nuevo."
   },
   "permission": {
     "storage_title": "Permitir acceso a archivos",

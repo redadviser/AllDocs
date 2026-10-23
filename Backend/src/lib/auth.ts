@@ -194,9 +194,29 @@ export async function getCurrentUserFromToken(
   }
 }
 
+/// Why a token no longer works: its account was deleted, or just the
+/// session ended (signed out elsewhere, expired, never valid).
+export async function sessionEndReason(
+  token: string | undefined
+): Promise<'accountDeleted' | 'sessionEnded'> {
+  try {
+    if (!token) return 'sessionEnded'
+    const { payload } = await jwtVerify(token, JWT_SECRET)
+    const userId = payload.sub as string
+    if (!userId) return 'sessionEnded'
+    const rows = await sql`SELECT 1 FROM users WHERE id = ${userId}`
+    return rows.length === 0 ? 'accountDeleted' : 'sessionEnded'
+  } catch {
+    return 'sessionEnded'
+  }
+}
+
+export function sessionToken(req: Request): string | undefined {
+  return req.cookies?.[COOKIE_NAME]
+}
+
 export async function getCurrentUser(req: Request): Promise<AccountUser | null> {
-  const token = req.cookies?.[COOKIE_NAME]
-  return getCurrentUserFromToken(token)
+  return getCurrentUserFromToken(sessionToken(req))
 }
 
 export function sessionCookieConfig(token: string) {

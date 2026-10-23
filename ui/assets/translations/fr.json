@@ -38,7 +38,8 @@
     "login_error": "Connexion impossible. Vérifie tes informations et réessaie.",
     "offline": "Mode local actif",
     "language": "Langue",
-    "session_ended": "Votre session a été fermée depuis un autre appareil. Reconnectez-vous pour continuer."
+    "session_ended": "Votre session a été fermée depuis un autre appareil. Reconnectez-vous pour continuer.",
+    "account_deleted": "Votre compte a été supprimé. Vos documents restent sur ce téléphone."
   },
   "security": {
     "greeting_morning": "Bonjour, {name}",
@@ -246,7 +247,28 @@
     "tags": "tags",
     "devices": "Sessions et appareils",
     "help_title": "Aide et mentions légales",
-    "account_title": "Compte"
+    "account_title": "Compte",
+    "contact_support_priority": "Support prioritaire",
+    "contact_support_priority_subject": "AllDocs — Support prioritaire (Vault)",
+    "contact_support_details": "Compte : {email}\nOffre : {plan}\nSystème : {platform}",
+    "delete_account": "Supprimer le compte",
+    "delete_intro": "Votre compte et tout ce que vous avez sur notre serveur sont supprimés définitivement. Pour confirmer que c'est vous, nous vous envoyons un lien par e-mail.",
+    "delete_goes": "Supprimé",
+    "delete_goes_account": "Le compte, le profil et les sessions sur tous les appareils",
+    "delete_goes_server": "Liens sécurisés, demandes de documents et la synchronisation",
+    "delete_stays": "Reste",
+    "delete_stays_phone": "Les documents sur ce téléphone (jusqu'à la désinstallation de l'app)",
+    "delete_stays_backups": "Vos sauvegardes sur Google Drive ou Dropbox",
+    "delete_subscription": "Vous avez un abonnement ? Supprimer le compte ne l'annule pas : annulez-le d'abord dans la boutique.",
+    "delete_manage_subscription": "Gérer l'abonnement",
+    "delete_step_export": "1. Gardez vos documents",
+    "delete_step_export_hint": "Copiez-les dans un dossier du téléphone avant de supprimer le compte.",
+    "delete_step_email": "2. Confirmez par e-mail",
+    "delete_step_email_hint": "Le lien vous mène à une page où vous confirmez la suppression.",
+    "delete_send": "Envoyer l'e-mail de confirmation",
+    "delete_sent": "Nous avons envoyé un lien à {email}. Ouvrez-le pour vérifier et confirmer la suppression. Il est valable une heure.",
+    "delete_resend": "Renvoyer l'e-mail",
+    "delete_failed": "Impossible d'envoyer l'e-mail. Réessayez."
   },
   "permission": {
     "storage_title": "Autoriser l’accès aux fichiers",

@@ -25,7 +25,12 @@ class _DevicesScreenState extends State<DevicesScreen> {
   }
 
   void _reload() {
-    setState(() => _future = AuthService.listDevices());
+    // A block, not `=> _future = ...`: that arrow returns the Future, which
+    // setState rejects (it threw right after a session was ended, so the
+    // screen said ending it had failed when it hadn't).
+    setState(() {
+      _future = AuthService.listDevices();
+    });
   }
 
   Future<void> _endSession(DeviceSession device) async {

@@ -3,6 +3,8 @@ import {
   clearSessionCookieConfig,
   getCurrentUser,
   sessionCookieConfig,
+  sessionEndReason,
+  sessionToken,
 } from '../../lib/auth'
 import { sql } from '../../lib/db'
 import { releaseSessionDevices } from '../sync/sync.service'
@@ -85,7 +87,8 @@ export async function logout(req: Request, res: Response) {
 export async function me(req: Request, res: Response) {
   const user = await getCurrentUser(req)
   if (!user) {
-    res.status(401).json({ user: null })
+    // The app tells "your account was deleted" from "signed out elsewhere".
+    res.status(401).json({ user: null, code: await sessionEndReason(sessionToken(req)) })
     return
   }
   res.json({ user })

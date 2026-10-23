@@ -33,6 +33,20 @@ class _GoogleIdToken {
 /// Storage seam for the session token, so tests can swap in an in-memory
 /// fake instead of exercising flutter_secure_storage's platform channel
 /// (see test/auth_service_test.dart).
+/// What the server says about this phone's session.
+enum SessionState {
+  valid,
+
+  /// Ended: signed out from another device, or expired.
+  ended,
+
+  /// The account itself was deleted.
+  accountDeleted,
+
+  /// Couldn't be told (offline, server unreachable).
+  unknown,
+}
+
 abstract class AuthTokenStore {
   Future<String?> read();
   Future<void> write(String token);
@@ -140,24 +154,45 @@ class AuthService {
     }
   }
 
-  /// Whether the server still accepts this phone's session: true, false
-  /// (ended — from another device, or expired), or null when it can't be
-  /// told (offline: the library works without the server, so nothing
-  /// changes).
-  static Future<bool?> checkSession() async {
-    if (LocalModeConfig.isLocalOnly) return null;
+  /// Whether the server still accepts this phone's session. [unknown] when
+  /// it can't be told (offline: the library works without the server, so
+  /// nothing changes).
+  static Future<SessionState> checkSession() async {
+    if (LocalModeConfig.isLocalOnly) return SessionState.unknown;
     final token = await tokenStore.read();
-    if (token == null) return null;
+    if (token == null) return SessionState.unknown;
     try {
       final res = await ApiHelpers.get(
         '/api/auth/me',
         headers: ApiHelpers.headersWithToken(token),
       );
-      if (res.statusCode == 401) return false;
-      return res.statusCode == 200 ? true : null;
+      if (res.statusCode == 200) return SessionState.valid;
+      if (res.statusCode != 401) return SessionState.unknown;
+      try {
+        final code = (jsonDecode(res.body) as Map)['code'];
+        if (code == 'accountDeleted') return SessionState.accountDeleted;
+      } catch (_) {}
+      return SessionState.ended;
     } catch (_) {
-      return null;
+      return SessionState.unknown;
     }
+  }
+
+  /// Emails the signed-in account the link to delete it (the deletion
+  /// itself is confirmed on that web page). Returns the address, masked.
+  static Future<String> requestAccountDeletion({
+    required String language,
+  }) async {
+    final token = await tokenStore.read();
+    final res = await ApiHelpers.post(
+      '/api/account/deletion',
+      headers: ApiHelpers.headersWithToken(token),
+      body: jsonEncode({'language': language}),
+    );
+    if (res.statusCode != 200) {
+      throw Exception(ApiHelpers.errorMessage(res, 'Could not send the email'));
+    }
+    return (jsonDecode(res.body) as Map)['email']?.toString() ?? '';
   }
 
   /// The signed-in user's photo — the Google account picture for Google

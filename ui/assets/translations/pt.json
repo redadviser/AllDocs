@@ -38,7 +38,8 @@
     "login_error": "Não foi possível iniciar sessão. Verifica os dados e tenta novamente.",
     "offline": "Modo local ativo",
     "language": "Idioma",
-    "session_ended": "A tua sessão foi terminada noutro dispositivo. Entra de novo para continuar."
+    "session_ended": "A tua sessão foi terminada noutro dispositivo. Entra de novo para continuar.",
+    "account_deleted": "A tua conta foi eliminada. Os documentos continuam neste telemóvel."
   },
   "security": {
     "greeting_morning": "Bom dia, {name}",
@@ -246,7 +247,28 @@
     "tags": "tags",
     "devices": "Sessões e dispositivos",
     "help_title": "Ajuda e informações",
-    "account_title": "Conta"
+    "account_title": "Conta",
+    "contact_support_priority": "Suporte prioritário",
+    "contact_support_priority_subject": "AllDocs — Suporte prioritário (Vault)",
+    "contact_support_details": "Conta: {email}\nPlano: {plan}\nSistema: {platform}",
+    "delete_account": "Eliminar conta",
+    "delete_intro": "A tua conta e tudo o que tens no nosso servidor são apagados de vez. Para confirmar que és tu, enviamos-te um email com um link.",
+    "delete_goes": "É apagado",
+    "delete_goes_account": "A conta, o perfil e as sessões em todos os aparelhos",
+    "delete_goes_server": "Links seguros, pedidos de documentos e a sincronização",
+    "delete_stays": "Fica",
+    "delete_stays_phone": "Os documentos neste telemóvel (até desinstalares a app)",
+    "delete_stays_backups": "Os teus backups na Google Drive ou Dropbox",
+    "delete_subscription": "Tens uma subscrição? Eliminar a conta não a cancela: cancela-a primeiro na loja.",
+    "delete_manage_subscription": "Gerir subscrição",
+    "delete_step_export": "1. Guarda os teus documentos",
+    "delete_step_export_hint": "Copia-os para uma pasta do telemóvel antes de eliminares a conta.",
+    "delete_step_email": "2. Confirma por email",
+    "delete_step_email_hint": "O link leva-te a uma página onde confirmas a eliminação.",
+    "delete_send": "Enviar email de confirmação",
+    "delete_sent": "Enviámos um link para {email}. Abre-o para rever e confirmar a eliminação. É válido durante uma hora.",
+    "delete_resend": "Reenviar email",
+    "delete_failed": "Não foi possível enviar o email. Tenta novamente."
   },
   "permission": {
     "storage_title": "Permitir acesso aos ficheiros",

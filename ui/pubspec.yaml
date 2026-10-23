@@ -63,7 +63,7 @@ dependencies:
   image: ^4.10.1
   webview_flutter: ^4.14.1
   # Subscriptions (App Store / Google Play billing), same SDK as AllPhotos.
-  adapty_flutter: ^3.17.0
+  adapty_flutter: ^4.1.1
   pdf_manipulator: ^5.0.1
   cryptography: ^2.9.0
   cryptography_flutter: ^2.3.4

@@ -20,6 +20,7 @@ class AppConstants {
   static const authSubtitle = 'auth.subtitle';
   static const authSubtitleSignup = 'auth.subtitle_signup';
   static const authTagline = 'auth.tagline';
+  static const authAccountDeleted = 'auth.account_deleted';
   static const authSessionEnded = 'auth.session_ended';
   static const authFeatureSearch = 'auth.feature_search';
   static const authFeatureReminders = 'auth.feature_reminders';
@@ -246,6 +247,30 @@ class AppConstants {
   static const profileSupportTitle = 'profile.support_title';
   static const profileFaq = 'profile.faq';
   static const profileContactSupport = 'profile.contact_support';
+  static const profileDeleteAccount = 'profile.delete_account';
+  static const profileDeleteIntro = 'profile.delete_intro';
+  static const profileDeleteGoes = 'profile.delete_goes';
+  static const profileDeleteGoesAccount = 'profile.delete_goes_account';
+  static const profileDeleteGoesServer = 'profile.delete_goes_server';
+  static const profileDeleteStays = 'profile.delete_stays';
+  static const profileDeleteStaysPhone = 'profile.delete_stays_phone';
+  static const profileDeleteStaysBackups = 'profile.delete_stays_backups';
+  static const profileDeleteSubscription = 'profile.delete_subscription';
+  static const profileDeleteManageSubscription =
+      'profile.delete_manage_subscription';
+  static const profileDeleteStepExport = 'profile.delete_step_export';
+  static const profileDeleteStepExportHint = 'profile.delete_step_export_hint';
+  static const profileDeleteStepEmail = 'profile.delete_step_email';
+  static const profileDeleteStepEmailHint = 'profile.delete_step_email_hint';
+  static const profileDeleteSend = 'profile.delete_send';
+  static const profileDeleteSent = 'profile.delete_sent';
+  static const profileDeleteResend = 'profile.delete_resend';
+  static const profileDeleteFailed = 'profile.delete_failed';
+  static const profileContactSupportPriority =
+      'profile.contact_support_priority';
+  static const profileContactSupportPrioritySubject =
+      'profile.contact_support_priority_subject';
+  static const profileContactSupportDetails = 'profile.contact_support_details';
   static const profileContactSupportSubject = 'profile.contact_support_subject';
   static const profileRateApp = 'profile.rate_app';
   static const profilePrivacyPolicy = 'profile.privacy_policy';

@@ -134,13 +134,14 @@ class AdaptyService {
   static Future<List<PlanProduct>> loadProducts() async {
     if (!isAvailable) return const [];
     await initialize();
-    final paywall = await _adapty.getPaywall(
+    // Adapty 4 calls a placement's paywall a "flow".
+    final flow = await _adapty.getFlow(
       placementId: _placementId,
-      fetchPolicy: AdaptyPaywallFetchPolicy.reloadRevalidatingCacheData,
+      fetchPolicy: AdaptyFlowFetchPolicy.reloadRevalidatingCacheData,
       loadTimeout: const Duration(seconds: 10),
     );
-    unawaited(_adapty.logShowPaywall(paywall: paywall).catchError((_) {}));
-    final products = await _adapty.getPaywallProducts(paywall: paywall);
+    unawaited(_adapty.logShowFlow(flow: flow).catchError((_) {}));
+    final products = await _adapty.getPaywallProducts(flow: flow);
     return [
       for (final product in products)
         if (_planIdOf(product) case final planId?)

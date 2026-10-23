@@ -13,6 +13,7 @@ import '../../common/backup_history.dart';
 import '../../common/language_picker.dart';
 import '../../common/settings_grid.dart';
 import '../../common/zip_preview_sheet.dart' show formatBytes;
+import 'delete_account_screen.dart';
 import 'plans_screen.dart';
 import '../../common/snapshot_builder.dart';
 import '../../common/user_initials.dart';
@@ -817,35 +818,26 @@ class _AccountSection extends StatelessWidget {
       child: SettingsGrid(
         children: [
           SettingsGridAction(
-            icon: Icons.ios_share_rounded,
-            title: AppConstants.profileExportDocuments.tr(),
-            onTap: () => _exportDocuments(context),
-          ),
-          SettingsGridAction(
             icon: Icons.logout_rounded,
             title: AppConstants.profileLogout.tr(),
-            destructive: true,
             onTap: () => _confirmAndLogout(context),
           ),
+          // An account lives on the server: nothing to delete in local mode.
+          if (!LocalModeConfig.isLocalOnly)
+            SettingsGridAction(
+              icon: Icons.person_remove_outlined,
+              title: AppConstants.profileDeleteAccount.tr(),
+              destructive: true,
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) =>
+                      DeleteAccountScreen(documentsService: documentsService),
+                ),
+              ),
+            ),
         ],
       ),
     );
-  }
-
-  Future<void> _exportDocuments(BuildContext context) async {
-    final result = await documentsService.exportDocuments(
-      dialogTitle: AppConstants.profileExportPickerTitle.tr(),
-    );
-    if (!context.mounted) return;
-
-    final message = result.count == 0 || result.path == null
-        ? AppConstants.profileExportEmpty.tr()
-        : AppConstants.profileExportDone.tr(
-            namedArgs: {'count': '${result.count}', 'path': result.path!},
-          );
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _confirmAndLogout(BuildContext context) async {
@@ -888,6 +880,7 @@ class _HelpSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final priority = PlanService.current.value.has(PlanFeature.prioritySupport);
     return SettingsSection(
       icon: Icons.help_outline_rounded,
       title: AppConstants.profileHelpTitle.tr(),
@@ -902,8 +895,13 @@ class _HelpSection extends StatelessWidget {
           ),
           SettingsGridAction(
             icon: Icons.support_agent_outlined,
-            title: AppConstants.profileContactSupport.tr(),
-            onTap: () => _contactSupport(context),
+            iconColor: priority ? AppTheme.premium : null,
+            title:
+                (priority
+                        ? AppConstants.profileContactSupportPriority
+                        : AppConstants.profileContactSupport)
+                    .tr(),
+            onTap: () => _contactSupport(context, priority: priority),
           ),
           SettingsGridAction(
             icon: Icons.star_rate_outlined,
@@ -920,13 +918,31 @@ class _HelpSection extends StatelessWidget {
     );
   }
 
-  Future<void> _contactSupport(BuildContext context) async {
+  /// An email to support with the account, plan and system filled in. On
+  /// Vault, its subject marks it as priority support, which is what the
+  /// support inbox sorts and answers first by.
+  Future<void> _contactSupport(
+    BuildContext context, {
+    required bool priority,
+  }) async {
+    final details = AppConstants.profileContactSupportDetails.tr(
+      namedArgs: {
+        'email': await AuthService.email() ?? '-',
+        'plan': PlanService.current.value.name,
+        'platform':
+            '${Platform.operatingSystem} ${Platform.operatingSystemVersion}',
+      },
+    );
+    if (!context.mounted) return;
     final uri = Uri(
       scheme: 'mailto',
       path: _supportEmail,
-      queryParameters: {
-        'subject': AppConstants.profileContactSupportSubject.tr(),
-      },
+      // Uri's queryParameters would turn spaces into "+", which mail apps
+      // show as is.
+      query: [
+        'subject=${Uri.encodeComponent((priority ? AppConstants.profileContactSupportPrioritySubject : AppConstants.profileContactSupportSubject).tr())}',
+        'body=${Uri.encodeComponent('\n\n\n—\n$details')}',
+      ].join('&'),
     );
     await _launch(context, uri);
   }
@@ -948,7 +964,7 @@ class _HelpSection extends StatelessWidget {
 
     // No published App Store id yet on iOS — collect feedback by email
     // instead of a broken review deep link.
-    await _contactSupport(context);
+    await _contactSupport(context, priority: false);
   }
 
   Future<void> _launch(BuildContext context, Uri uri) async {

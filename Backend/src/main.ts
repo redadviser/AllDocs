@@ -16,6 +16,7 @@ import { purgeOld as purgeOldRequests } from './modules/requests/requests.servic
 import { sharePageRouter, sharesRouter } from './modules/shares/shares.routes'
 import { purgeOld as purgeOldShares } from './modules/shares/shares.service'
 import { syncRouter } from './modules/sync/sync.routes'
+import { accountRouter, deletionPageRouter } from './modules/account/account.routes'
 import { hiddenPinPageRouter, hiddenPinRouter } from './modules/hidden-pin/hidden-pin.routes'
 import { purgeOld as purgeOldSync } from './modules/sync/sync.service'
 
@@ -61,6 +62,7 @@ if (process.env.DOCS_ENABLED !== 'false') {
 app.use('/api/auth/password', passwordRouter)
 app.use('/api/auth', authRouter)
 app.use(resetPageRouter)
+app.use(deletionPageRouter)
 app.use('/api/config', configRouter)
 app.use('/api/devices', devicesRouter)
 app.use('/api/plans', plansRouter)
@@ -69,6 +71,7 @@ app.use('/api/assistant', assistantRouter)
 app.use('/api/requests', requestsRouter)
 app.use('/api/shares', sharesRouter)
 app.use('/api/sync', syncRouter)
+app.use('/api/account', accountRouter)
 app.use('/api/security/hidden-pin-reset', hiddenPinRouter)
 app.use(hiddenPinPageRouter)
 

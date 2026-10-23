@@ -64,15 +64,22 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
 
   Future<bool> _runSessionCheck() async {
     if (!_signedIn || _endingSession) return !_endingSession;
-    if (await AuthService.checkSession() != false || !mounted) return true;
+    final state = await AuthService.checkSession();
+    if (!mounted) return true;
+    if (state != SessionState.ended && state != SessionState.accountDeleted) {
+      return true;
+    }
     _endingSession = true;
     _sessionTimer?.cancel();
+    final notice =
+        (state == SessionState.accountDeleted
+                ? AppConstants.authAccountDeleted
+                : AppConstants.authSessionEnded)
+            .tr();
     await AuthService.logout();
     if (mounted) {
       Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
-        MaterialPageRoute(
-          builder: (_) => AuthGate(notice: AppConstants.authSessionEnded.tr()),
-        ),
+        MaterialPageRoute(builder: (_) => AuthGate(notice: notice)),
         (route) => false,
       );
     }
