@@ -59,7 +59,7 @@ function stateFromAccessLevels(levels: AdaptyAccessLevel[]): PlanState {
     const expiresAt = level.expires_at ? new Date(level.expires_at) : null
     best = {
       planId,
-      billingPeriod: billingPeriodFromProductId(level.store_product_id),
+      billingPeriod: billingPeriodFromProductId(`${level.store_product_id ?? ''} ${level.store_base_plan_id ?? ''}`),
       // In a billing grace period the store still grants access past
       // expires_at; leave the expiry open until Adapty reports the outcome.
       expiresAt: expiresAt && expiresAt.getTime() > Date.now() ? expiresAt : null,
@@ -127,11 +127,11 @@ export async function switchPlanByHand(
 
 // Asks Adapty what the account is paying for and stores it. The app calls
 // this after a purchase or restore, so the plan never depends on what the
-// phone claims.
-export async function syncPlanFromAdapty(userId: string) {
+// phone claims. A tester's hand-picked plan stays until they switch back,
+// unless [afterPurchase]: a real purchase (or a store event) always wins.
+export async function syncPlanFromAdapty(userId: string, { afterPurchase = false } = {}) {
   const source = await sql`SELECT plan_source FROM profiles WHERE id = ${userId}`
-  // A tester's hand-picked plan stays until they switch back.
-  if (source[0]?.plan_source === 'debug') return getPlansOverview(userId)
+  if (source[0]?.plan_source === 'debug' && !afterPurchase) return getPlansOverview(userId)
   if (!isAdaptyServerApiConfigured()) throw new AdaptyNotConfiguredError()
   const levels = await fetchAdaptyAccessLevels(userId)
   await applyPlanState(userId, stateFromAccessLevels(levels))
@@ -168,15 +168,17 @@ async function applyEvent(userId: string, eventType: string, properties: Record<
   if (revoked) {
     await sql`
       UPDATE profiles
-      SET plan = 'free', plan_expires_at = NULL, plan_updated_at = NOW(), updated_at = NOW()
-      WHERE id = ${userId} AND plan = ${planId} AND plan_source <> 'debug'
+      SET plan = 'free', plan_expires_at = NULL, plan_source = 'store', plan_updated_at = NOW(), updated_at = NOW()
+      WHERE id = ${userId} AND plan = ${planId}
     `
     return
   }
 
   await applyPlanState(userId, {
     planId,
-    billingPeriod: billingPeriodFromProductId(properties.vendor_product_id),
+    billingPeriod: billingPeriodFromProductId(
+      `${asString(properties.vendor_product_id) ?? ''} ${asString(properties.base_plan_id) ?? ''}`
+    ),
     expiresAt,
   })
 }
@@ -208,7 +210,7 @@ export async function processAdaptyWebhook(body: unknown) {
   // Adapty's own view of the profile is the source of truth when we can ask
   // for it: it settles out-of-order events and upgrades/downgrades in one go.
   if (isAdaptyServerApiConfigured()) {
-    await syncPlanFromAdapty(userId)
+    await syncPlanFromAdapty(userId, { afterPurchase: true })
   } else {
     await applyEvent(userId, eventType, properties)
   }

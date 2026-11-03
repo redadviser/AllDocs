@@ -7,6 +7,14 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// ── App version (Google Play) ──────────────────────────────────────────
+// Before each new upload to Google Play:
+//   • appVersionCode: +1 every time (Play refuses a code it has already seen)
+//   • appVersionName: the version people see in the store (e.g. 1.0.1)
+// These override the version in pubspec.yaml for Android.
+val appVersionCode = 5
+val appVersionName = "5.0.0"
+
 // Release signing with the upload key: android/key.properties (git-ignored)
 // points at android/upload-keystore.jks. Without it (another machine, CI)
 // release builds fall back to the debug key — fine for `flutter run
@@ -41,8 +49,8 @@ android {
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
-        versionCode = flutter.versionCode
-        versionName = flutter.versionName
+        versionCode = appVersionCode
+        versionName = appVersionName
         // OAuth redirect scheme for Dropbox sign-in (flutter_appauth).
         // Must match CloudConfig.redirectUri on the Dart side.
         manifestPlaceholders["appAuthRedirectScheme"] = "com.alldocs.app"

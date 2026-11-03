@@ -28,9 +28,9 @@ enum PurchaseOutcome { purchased, pending, cancelled }
 ///
 /// Adapty setup this expects:
 /// - access levels `premium` (Folio) and `pro` (Vault);
-/// - one placement ([_placementId], default `alldocs_plans`) whose paywall
-///   holds the four products: Folio and Vault, monthly and yearly. On iOS
-///   all four go in one subscription group, so changing plan replaces the
+/// - one placement per product ([_placementIds]: Folio and Vault, monthly
+///   and yearly), each with a paywall holding that product. On iOS all
+///   four go in one subscription group, so changing plan replaces the
 ///   current subscription instead of adding a second one.
 ///
 /// The buyer is identified with the AllDocs user id, which is what the
@@ -41,10 +41,19 @@ class AdaptyService {
   static const String _publicSdkKey = String.fromEnvironment(
     'ADAPTY_PUBLIC_SDK_KEY',
   );
-  static const String _placementId = String.fromEnvironment(
-    'ADAPTY_PLACEMENT_PLANS',
-    defaultValue: 'alldocs_plans',
+  // Comma-separated; a build can override them with
+  // --dart-define=ADAPTY_PLACEMENTS=...
+  static const String _placements = String.fromEnvironment(
+    'ADAPTY_PLACEMENTS',
+    defaultValue:
+        'folio_monthly_access,folio_yearly_access,'
+        'vault_monthly_access,vault_yearly_access',
   );
+
+  static List<String> get _placementIds => [
+    for (final id in _placements.split(','))
+      if (id.trim().isNotEmpty) id.trim(),
+  ];
 
   static final Adapty _adapty = Adapty();
   static Future<void>? _activation;
@@ -134,14 +143,18 @@ class AdaptyService {
   static Future<List<PlanProduct>> loadProducts() async {
     if (!isAvailable) return const [];
     await initialize();
-    // Adapty 4 calls a placement's paywall a "flow".
-    final flow = await _adapty.getFlow(
-      placementId: _placementId,
-      fetchPolicy: AdaptyFlowFetchPolicy.reloadRevalidatingCacheData,
-      loadTimeout: const Duration(seconds: 10),
-    );
-    unawaited(_adapty.logShowFlow(flow: flow).catchError((_) {}));
-    final products = await _adapty.getPaywallProducts(flow: flow);
+    // Each placement's paywall ("flow" in Adapty 4) holds one product;
+    // together they're the four. A placement that fails (offline, not set
+    // up) only leaves its product out.
+    final perPlacement = await Future.wait([
+      for (final placementId in _placementIds) _productsOf(placementId),
+    ]);
+    final seen = <String>{};
+    final products = [
+      for (final list in perPlacement)
+        for (final product in list)
+          if (seen.add(_storeIdOf(product))) product,
+    ];
     return [
       for (final product in products)
         if (_planIdOf(product) case final planId?)
@@ -151,6 +164,23 @@ class AdaptyService {
             product: product,
           ),
     ];
+  }
+
+  static Future<List<AdaptyPaywallProduct>> _productsOf(
+    String placementId,
+  ) async {
+    try {
+      final flow = await _adapty.getFlow(
+        placementId: placementId,
+        fetchPolicy: AdaptyFlowFetchPolicy.reloadRevalidatingCacheData,
+        loadTimeout: const Duration(seconds: 10),
+      );
+      unawaited(_adapty.logShowFlow(flow: flow).catchError((_) {}));
+      return await _adapty.getPaywallProducts(flow: flow);
+    } catch (error) {
+      debugPrint('[Adapty] placement $placementId failed: $error');
+      return const [];
+    }
   }
 
   /// Buys [product]. On Android, a current subscription to another plan is
@@ -187,7 +217,8 @@ class AdaptyService {
       final profile = await _adapty.getProfile();
       for (final level in profile.accessLevels.values) {
         if (level.isActive && !level.isRefund && level.store == 'play_store') {
-          current = level.vendorProductId;
+          // Google wants the subscription id, without ":<base plan>".
+          current = level.vendorProductId.split(':').first;
           break;
         }
       }
@@ -218,10 +249,20 @@ class AdaptyService {
     final unit = product.subscription?.period.unit;
     if (unit == AdaptyPeriodUnit.year) return BillingPeriod.yearly;
     if (unit == AdaptyPeriodUnit.month) return BillingPeriod.monthly;
-    final id = product.vendorProductId.toLowerCase();
-    return RegExp('year|annual|anual').hasMatch(id)
+    final id = _storeIdOf(product).toLowerCase();
+    return RegExp('year|annual|anual|ano').hasMatch(id)
         ? BillingPeriod.yearly
         : BillingPeriod.monthly;
+  }
+
+  /// What tells two store products apart. On Google Play the monthly and
+  /// yearly plans can be base plans of one subscription, sharing its
+  /// [AdaptyPaywallProduct.vendorProductId]; the base plan separates them.
+  static String _storeIdOf(AdaptyPaywallProduct product) {
+    final basePlan = product.subscription?.basePlanId;
+    return basePlan == null || basePlan.isEmpty
+        ? product.vendorProductId
+        : '${product.vendorProductId}:$basePlan';
   }
 
   static bool _looksLikeUuid(String value) => RegExp(

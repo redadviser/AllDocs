@@ -97,20 +97,35 @@ class PlanService {
     for (var attempt = 0; attempt < 6; attempt++) {
       // Without the server-side key the backend can't ask Adapty, but its
       // webhook still updates the plan: read what it has.
-      if (!await _fetch('/api/plans/sync', post: true)) await refresh();
+      final synced = await _fetch(
+        '/api/plans/sync',
+        post: true,
+        // Right after a purchase the store's answer replaces a plan
+        // picked by hand in a debug build.
+        body: expectPlanId == null ? null : {'afterPurchase': true},
+      );
+      if (!synced) await refresh();
       if (expectPlanId == null || current.value.id == expectPlanId) return;
       await Future<void>.delayed(const Duration(seconds: 2));
     }
   }
 
-  static Future<bool> _fetch(String path, {required bool post}) async {
+  static Future<bool> _fetch(
+    String path, {
+    required bool post,
+    Map<String, Object?>? body,
+  }) async {
     if (LocalModeConfig.isLocalOnly) return false;
     try {
       final token = await AuthService.tokenStore.read();
       if (token == null) return false;
       final headers = ApiHelpers.headersWithToken(token);
       final res = post
-          ? await ApiHelpers.post(path, headers: headers)
+          ? await ApiHelpers.post(
+              path,
+              headers: headers,
+              body: body == null ? null : jsonEncode(body),
+            )
           : await ApiHelpers.get(path, headers: headers);
       if (res.statusCode != 200) {
         debugPrint('[Plans] $path answered ${res.statusCode}');
@@ -155,13 +170,22 @@ class PlanService {
   }
 
   /// Buys [product] and, once the store confirms, has the backend apply it.
+  /// Reports [PurchaseOutcome.pending] when the store took the payment but
+  /// the account doesn't show the plan yet (it follows via the webhook).
   static Future<PurchaseOutcome> buy(PlanProduct product) async {
+    // The purchase must reach Adapty under the AllDocs account, or the
+    // backend never finds it; the sign-in step may have failed offline.
+    final userId = await AuthService.userId();
+    if (userId != null) {
+      await AdaptyService.identify(userId, email: await AuthService.email());
+    }
     final outcome = await AdaptyService.purchase(
       product,
       isUpgrade: catalog.isUpgrade(current.value.id, product.planId),
     );
     if (outcome == PurchaseOutcome.purchased) {
       await syncFromStore(expectPlanId: product.planId);
+      if (current.value.id != product.planId) return PurchaseOutcome.pending;
     }
     return outcome;
   }

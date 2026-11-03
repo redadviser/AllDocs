@@ -10,6 +10,8 @@ export interface AdaptyAccessLevel {
   access_level_id: string
   store?: string | null
   store_product_id?: string | null
+  // Google Play: the base plan (monthly / yearly) inside the subscription.
+  store_base_plan_id?: string | null
   starts_at?: string | null
   expires_at?: string | null
   renewal_cancelled_at?: string | null

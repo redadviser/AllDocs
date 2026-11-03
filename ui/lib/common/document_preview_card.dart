@@ -297,6 +297,26 @@ class _TextPagePreview extends StatelessWidget {
     // Only the first lines are visible; laying out 20k chars per card was
     // a big part of the gallery's scroll jank.
     final text = raw == null || raw.length <= 320 ? raw : raw.substring(0, 320);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final page = _page(color, text);
+        // Too small for the page's own layout (a list's 44 px thumbnail):
+        // draw it at a card's size and shrink it, like a real miniature.
+        if (constraints.maxWidth >= 110 && constraints.maxHeight >= 110) {
+          return page;
+        }
+        return ClipRect(
+          child: FittedBox(
+            fit: BoxFit.cover,
+            alignment: Alignment.topCenter,
+            child: SizedBox(width: 150, height: 200, child: page),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _page(Color color, String? text) {
     return Container(
       color: const Color(0xFFF4F5F7),
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),

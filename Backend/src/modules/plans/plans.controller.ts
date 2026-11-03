@@ -9,7 +9,11 @@ export async function getPlans(req: Request, res: Response) {
 
 export async function syncPlan(req: Request, res: Response) {
   try {
-    res.json(await service.syncPlanFromAdapty(req.user!.id))
+    res.json(
+      await service.syncPlanFromAdapty(req.user!.id, {
+        afterPurchase: req.body?.afterPurchase === true,
+      })
+    )
   } catch (error) {
     if (error instanceof service.AdaptyNotConfiguredError) {
       res.status(503).json({ error: error.message })

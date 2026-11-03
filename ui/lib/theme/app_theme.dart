@@ -117,8 +117,16 @@ class AppTheme {
         backgroundColor: surface,
         selectedColor: accent.withValues(alpha: 0.16),
         side: const BorderSide(color: border),
-        labelStyle: const TextStyle(color: text, fontSize: 13),
-        secondaryLabelStyle: const TextStyle(color: text, fontSize: 13),
+        labelStyle: const TextStyle(
+          fontFamily: fontFamily,
+          color: text,
+          fontSize: 13,
+        ),
+        secondaryLabelStyle: const TextStyle(
+          fontFamily: fontFamily,
+          color: text,
+          fontSize: 13,
+        ),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         showCheckmark: false,
       ),
@@ -128,7 +136,11 @@ class AppTheme {
           foregroundColor: onAccent,
           minimumSize: const Size(0, 46),
           shape: shape,
-          textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          textStyle: const TextStyle(
+            fontFamily: fontFamily,
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
@@ -137,20 +149,28 @@ class AppTheme {
           minimumSize: const Size(0, 46),
           side: const BorderSide(color: border),
           shape: shape,
-          textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          textStyle: const TextStyle(
+            fontFamily: fontFamily,
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: accent,
-          textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+          textStyle: const TextStyle(
+            fontFamily: fontFamily,
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: surfaceStrong,
-        hintStyle: const TextStyle(color: dimText),
-        labelStyle: const TextStyle(color: mutedText),
+        hintStyle: const TextStyle(fontFamily: fontFamily, color: dimText),
+        labelStyle: const TextStyle(fontFamily: fontFamily, color: mutedText),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 14,
           vertical: 14,
@@ -180,6 +200,7 @@ class AppTheme {
         backgroundColor: surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         titleTextStyle: const TextStyle(
+          fontFamily: fontFamily,
           color: text,
           fontSize: 18,
           fontWeight: FontWeight.w700,
@@ -188,7 +209,7 @@ class AppTheme {
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         backgroundColor: surfaceSoft,
-        contentTextStyle: const TextStyle(color: text),
+        contentTextStyle: const TextStyle(fontFamily: fontFamily, color: text),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
       listTileTheme: const ListTileThemeData(
