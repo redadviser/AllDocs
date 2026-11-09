@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -23,8 +25,9 @@ const double _modernLaneHeight = 176;
 enum _AlbumDisplayMode { classic, modern }
 
 /// Bookshelf: shelves stacked like AllPhotos', each holding its albums as
-/// book spines (classic) or cover cards (modern). Long-press a shelf to drag
-/// it, long-press an album and slide sideways to move it along the shelf.
+/// book spines (classic) or cover cards (modern). Long-press a shelf's name
+/// bar to drag the shelf; long-press an album to drag it anywhere on its
+/// shelf or onto another one.
 class AlbumsScreen extends StatefulWidget {
   const AlbumsScreen({
     super.key,
@@ -45,8 +48,78 @@ class AlbumsScreen extends StatefulWidget {
 class _AlbumsScreenState extends State<AlbumsScreen> {
   static const _displayModeKey = 'albums.display_mode';
   _AlbumDisplayMode _mode = _AlbumDisplayMode.classic;
+  final _scroll = ScrollController();
+  final _listKey = GlobalKey();
+
+  /// Scrolls the shelves while an album is dragged near the top or bottom,
+  /// so it can reach a shelf that's off screen.
+  Timer? _autoScroll;
+  double _autoScrollSpeed = 0;
 
   DocumentsService get _service => widget.documentsService;
+
+  @override
+  void dispose() {
+    _autoScroll?.cancel();
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  void _onAlbumDragUpdate(Offset globalPosition) {
+    final box = _listKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize) return;
+    const edge = 80.0;
+    const maxSpeed = 14.0;
+    final y = box.globalToLocal(globalPosition).dy;
+    final height = box.size.height;
+    _autoScrollSpeed = y < edge
+        ? -maxSpeed * (edge - y).clamp(0, edge) / edge
+        : y > height - edge
+        ? maxSpeed * (y - height + edge).clamp(0, edge) / edge
+        : 0;
+    if (_autoScrollSpeed == 0) {
+      _stopAutoScroll();
+    } else {
+      _autoScroll ??= Timer.periodic(const Duration(milliseconds: 16), (_) {
+        if (!_scroll.hasClients) return;
+        final position = _scroll.position;
+        final to = (position.pixels + _autoScrollSpeed).clamp(
+          position.minScrollExtent,
+          position.maxScrollExtent,
+        );
+        if (to != position.pixels) _scroll.jumpTo(to);
+      });
+    }
+  }
+
+  void _stopAutoScroll() {
+    _autoScroll?.cancel();
+    _autoScroll = null;
+  }
+
+  /// Puts [album] at [index] among [shelf]'s albums: a new place on its own
+  /// shelf, or a move from another one.
+  Future<void> _dropAlbum(
+    DocumentShelf shelf,
+    DocumentAlbum album,
+    int index,
+  ) async {
+    _stopAutoScroll();
+    if (album.shelfId != shelf.id) {
+      await _service.moveAlbumToShelf(album.id, shelf.id, index: index);
+      return;
+    }
+    final ids = shelf.albums.map((a) => a.id).toList();
+    final from = ids.indexOf(album.id);
+    if (from < 0) return;
+    // Taking it out first shifts the places after it by one.
+    final to = (from < index ? index - 1 : index).clamp(0, ids.length - 1);
+    if (to == from) return;
+    ids
+      ..removeAt(from)
+      ..insert(to, album.id);
+    await _service.reorderAlbums(shelf.id, ids);
+  }
 
   @override
   void initState() {
@@ -136,6 +209,8 @@ class _AlbumsScreenState extends State<AlbumsScreen> {
               // the reorderable one when the first shelf appeared replaced
               // the whole subtree mid-frame.
               child: ReorderableListView.builder(
+                key: _listKey,
+                scrollController: _scroll,
                 padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
                 buildDefaultDragHandles: false,
                 header: widget.hidden
@@ -182,28 +257,28 @@ class _AlbumsScreenState extends State<AlbumsScreen> {
                 },
                 itemBuilder: (context, index) {
                   final shelf = shelves[index];
-                  return ReorderableDelayedDragStartListener(
+                  return _ShelfWidget(
                     key: ValueKey('shelf-${shelf.id}'),
                     index: index,
-                    child: _ShelfWidget(
-                      shelf: shelf,
-                      snapshot: snapshot,
-                      mode: _mode,
-                      isFirst: index == 0,
-                      isLast: index == shelves.length - 1,
-                      onAddAlbum: () => _createAlbum(shelf.id),
-                      // "Hidden" keeps its translated name and stays.
-                      onRename: shelf.isDefaultHidden
-                          ? null
-                          : () => _renameShelf(shelf),
-                      onSort: () => _service.sortAlbumsByName(shelf.id),
-                      onDelete: shelf.isDefaultHidden
-                          ? null
-                          : () => _deleteShelf(shelf),
-                      onOpenAlbum: _openAlbum,
-                      onAlbumsReordered: (albumIds) =>
-                          _service.reorderAlbums(shelf.id, albumIds),
-                    ),
+                    shelf: shelf,
+                    snapshot: snapshot,
+                    mode: _mode,
+                    editable: !readOnlySafe,
+                    isFirst: index == 0,
+                    isLast: index == shelves.length - 1,
+                    onAddAlbum: () => _createAlbum(shelf.id, shelves),
+                    // "Hidden" keeps its translated name and stays.
+                    onRename: shelf.isDefaultHidden
+                        ? null
+                        : () => _renameShelf(shelf),
+                    onSort: () => _service.sortAlbumsByName(shelf.id),
+                    onDelete: shelf.isDefaultHidden
+                        ? null
+                        : () => _deleteShelf(shelf),
+                    onOpenAlbum: _openAlbum,
+                    onAlbumDropped: (album, to) => _dropAlbum(shelf, album, to),
+                    onAlbumDragUpdate: _onAlbumDragUpdate,
+                    onAlbumDragEnd: _stopAutoScroll,
                   );
                 },
               ),
@@ -238,17 +313,16 @@ class _AlbumsScreenState extends State<AlbumsScreen> {
     );
   }
 
-  Future<void> _createAlbum(String shelfId) async {
+  Future<void> _createAlbum(String shelfId, List<DocumentShelf> shelves) async {
     if (widget.hidden && !await ensureSafeIncluded(context)) return;
     if (!mounted) return;
-    final draft = await showAlbumDialog(context);
-    if (draft == null) return;
-    await _service.createAlbum(
-      shelfId,
-      draft.name,
-      colorValue: draft.colorValue,
-      iconName: draft.iconName,
+    final draft = await showAlbumDialog(
+      context,
+      shelves: shelves,
+      shelfId: shelfId,
     );
+    if (draft == null) return;
+    await createAlbumFromDraft(_service, draft, hidden: widget.hidden);
   }
 
   Future<void> _createShelf() async {
@@ -350,9 +424,12 @@ class _ReadOnlySafeBanner extends StatelessWidget {
 
 class _ShelfWidget extends StatefulWidget {
   const _ShelfWidget({
+    super.key,
+    required this.index,
     required this.shelf,
     required this.snapshot,
     required this.mode,
+    required this.editable,
     required this.isFirst,
     required this.isLast,
     required this.onAddAlbum,
@@ -360,12 +437,19 @@ class _ShelfWidget extends StatefulWidget {
     required this.onSort,
     required this.onDelete,
     required this.onOpenAlbum,
-    required this.onAlbumsReordered,
+    required this.onAlbumDropped,
+    required this.onAlbumDragUpdate,
+    required this.onAlbumDragEnd,
   });
 
+  /// Its place in the list of shelves (for dragging the shelf).
+  final int index;
   final DocumentShelf shelf;
   final DocumentsSnapshot snapshot;
   final _AlbumDisplayMode mode;
+
+  /// False on a read-only safe: albums can't be dragged.
+  final bool editable;
   final bool isFirst;
   final bool isLast;
   final VoidCallback onAddAlbum;
@@ -373,53 +457,101 @@ class _ShelfWidget extends StatefulWidget {
   final VoidCallback onSort;
   final VoidCallback? onDelete;
   final ValueChanged<DocumentAlbum> onOpenAlbum;
-  final ValueChanged<List<String>> onAlbumsReordered;
+
+  /// An album (from this shelf or another) dropped at [index] among this
+  /// shelf's albums.
+  final void Function(DocumentAlbum album, int index) onAlbumDropped;
+  final ValueChanged<Offset> onAlbumDragUpdate;
+  final VoidCallback onAlbumDragEnd;
 
   @override
   State<_ShelfWidget> createState() => _ShelfWidgetState();
 }
 
 class _ShelfWidgetState extends State<_ShelfWidget> {
-  late List<DocumentAlbum> _albums = List.of(widget.shelf.albums);
-  int? _draggingIndex;
-  double _dragOffset = 0;
+  /// Where an album dragged over this shelf would land, as an index among
+  /// its albums; null when nothing is over it.
+  int? _dropIndex;
 
-  @override
-  void didUpdateWidget(covariant _ShelfWidget oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.shelf.albums != widget.shelf.albums) {
-      _albums = List.of(widget.shelf.albums);
-      _draggingIndex = null;
-      _dragOffset = 0;
-    }
+  void _hover(int? index) {
+    if (_dropIndex != index) setState(() => _dropIndex = index);
   }
 
-  void _endDragging() {
-    final from = _draggingIndex;
-    if (from == null) return;
-    const minDrag = 28.0;
-    final step = widget.mode == _AlbumDisplayMode.modern ? 132.0 : 42.0;
-    final distance = _dragOffset.abs();
-    if (distance >= minDrag) {
-      final direction = _dragOffset.isNegative ? -1 : 1;
-      final change = direction * (1 + ((distance - minDrag) / step).floor());
-      final to = (from + change).clamp(0, _albums.length - 1);
-      if (to != from) {
-        final album = _albums.removeAt(from);
-        _albums.insert(to, album);
-        widget.onAlbumsReordered(_albums.map((a) => a.id).toList());
-      }
-    }
-    setState(() {
-      _draggingIndex = null;
-      _dragOffset = 0;
-    });
+  void _drop(DocumentAlbum album, int index) {
+    _hover(null);
+    widget.onAlbumDropped(album, index);
+  }
+
+  Widget _albumView(DocumentAlbum album, List<DocumentFile> documents) {
+    return widget.mode == _AlbumDisplayMode.modern
+        ? _ModernAlbumCard(album: album, documents: documents)
+        : AlbumSpine(album: album, count: documents.length);
+  }
+
+  Widget _album(BuildContext context, int index, double itemHeight) {
+    final albums = widget.shelf.albums;
+    final album = albums[index];
+    final documents = widget.snapshot.documentsForAlbum(album.id);
+    final view = _albumView(album, documents);
+    final tappable = GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => widget.onOpenAlbum(album),
+      child: view,
+    );
+    if (!widget.editable) return tappable;
+
+    final modern = widget.mode == _AlbumDisplayMode.modern;
+    final size = Size(
+      modern ? _modernAlbumCardWidth : albumSpineWidth + 8,
+      itemHeight,
+    );
+    return Builder(
+      builder: (itemContext) => DragTarget<DocumentAlbum>(
+        // Over its left half it goes before this album, over the right
+        // half after it.
+        onMove: (details) {
+          final box = itemContext.findRenderObject() as RenderBox?;
+          if (box == null || !box.hasSize) return;
+          final x = box.globalToLocal(details.offset).dx;
+          _hover(x < box.size.width / 2 ? index : index + 1);
+        },
+        onLeave: (_) => _hover(null),
+        onAcceptWithDetails: (details) =>
+            _drop(details.data, _dropIndex ?? index),
+        builder: (context, candidates, rejected) {
+          final before = _dropIndex == index;
+          final after = _dropIndex == index + 1 && index == albums.length - 1;
+          return LongPressDraggable<DocumentAlbum>(
+            data: album,
+            dragAnchorStrategy: pointerDragAnchorStrategy,
+            onDragUpdate: (details) =>
+                widget.onAlbumDragUpdate(details.globalPosition),
+            onDragEnd: (_) => widget.onAlbumDragEnd(),
+            feedback: _DraggedAlbum(size: size, child: view),
+            childWhenDragging: Opacity(opacity: 0.3, child: view),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                tappable,
+                if (before) const _DropMarker(left: true),
+                if (after) const _DropMarker(left: false),
+              ],
+            ),
+          );
+        },
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final albums = widget.shelf.albums;
     final modern = widget.mode == _AlbumDisplayMode.modern;
     final laneHeight = modern ? _modernLaneHeight : _classicLaneHeight;
+    final lanePadding = modern
+        ? const EdgeInsets.fromLTRB(10, 12, 10, 4)
+        : const EdgeInsets.fromLTRB(8, 14, 8, 0);
+    final itemHeight = laneHeight - lanePadding.vertical;
     final radius = BorderRadius.vertical(
       top: Radius.circular(widget.isFirst ? 12 : 0),
       bottom: Radius.circular(widget.isLast ? 12 : 0),
@@ -461,153 +593,133 @@ class _ShelfWidgetState extends State<_ShelfWidget> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    height: 50,
-                    padding: const EdgeInsets.fromLTRB(16, 0, 4, 0),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          AppTheme.shelfSurface,
-                          Color.lerp(
-                            AppTheme.shelfSurface,
-                            AppTheme.shelfBack,
-                            0.78,
-                          )!,
-                        ],
-                      ),
-                      border: Border(
-                        bottom: BorderSide(
-                          color: AppTheme.shelfEdge.withValues(alpha: 0.6),
-                        ),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            shelfDisplayName(widget.shelf).toUpperCase(),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: AppTheme.mutedText,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 14,
-                              height: 1.16,
-                              letterSpacing: 1.05,
-                            ),
-                          ),
-                        ),
-                        if (widget.onRename case final onRename?)
-                          _ShelfIcon(
-                            icon: Icons.edit_outlined,
-                            tooltip: AppConstants.albumsRenameShelf.tr(),
-                            onTap: onRename,
-                          ),
-                        _ShelfIcon(
-                          icon: Icons.sort_by_alpha,
-                          tooltip: AppConstants.albumsSortByName.tr(),
-                          onTap: widget.onSort,
-                        ),
-                        if (widget.onDelete case final onDelete?)
-                          _ShelfIcon(
-                            icon: Icons.delete_outline,
-                            tooltip: AppConstants.docshelfDeleteShelf.tr(),
-                            color: AppTheme.destructive,
-                            onTap: onDelete,
-                          ),
-                      ],
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(10, 0, 10, 0),
+                  // Long-press the shelf's name bar to move the shelf.
+                  ReorderableDelayedDragStartListener(
+                    index: widget.index,
                     child: Container(
-                      height: laneHeight,
+                      height: 50,
+                      padding: const EdgeInsets.fromLTRB(16, 0, 4, 0),
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
                           colors: [
+                            AppTheme.shelfSurface,
                             Color.lerp(
                               AppTheme.shelfSurface,
                               AppTheme.shelfBack,
-                              0.62,
-                            )!,
-                            Color.lerp(
-                              AppTheme.shelfBack,
-                              AppTheme.shelfEdge,
-                              0.65,
+                              0.78,
                             )!,
                           ],
                         ),
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(
-                          color: AppTheme.shelfEdge.withValues(alpha: 0.5),
+                        border: Border(
+                          bottom: BorderSide(
+                            color: AppTheme.shelfEdge.withValues(alpha: 0.6),
+                          ),
                         ),
                       ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: ListView.builder(
-                          scrollDirection: Axis.horizontal,
-                          padding: modern
-                              ? const EdgeInsets.fromLTRB(10, 12, 10, 4)
-                              : const EdgeInsets.fromLTRB(8, 14, 8, 0),
-                          itemCount: _albums.length + 1,
-                          itemBuilder: (context, index) {
-                            if (index == _albums.length) {
-                              return modern
-                                  ? _AddModernAlbumButton(
-                                      onTap: widget.onAddAlbum,
-                                    )
-                                  : _AddAlbumSpine(onTap: widget.onAddAlbum);
-                            }
-                            final album = _albums[index];
-                            final documents = widget.snapshot.documentsForAlbum(
-                              album.id,
-                            );
-                            final dragging = _draggingIndex == index;
-                            return GestureDetector(
-                              behavior: HitTestBehavior.opaque,
-                              onTap: dragging
-                                  ? null
-                                  : () => widget.onOpenAlbum(album),
-                              onLongPressStart: (_) => setState(() {
-                                _draggingIndex = index;
-                                _dragOffset = 0;
-                              }),
-                              onLongPressMoveUpdate: (details) {
-                                if (_draggingIndex == index) {
-                                  setState(
-                                    () => _dragOffset =
-                                        details.offsetFromOrigin.dx,
-                                  );
-                                }
-                              },
-                              onLongPressEnd: (_) => _endDragging(),
-                              onLongPressCancel: _endDragging,
-                              child: AnimatedOpacity(
-                                opacity: dragging ? 0.7 : 1,
-                                duration: const Duration(milliseconds: 140),
-                                child: Transform.translate(
-                                  offset: dragging
-                                      ? Offset(_dragOffset, -6)
-                                      : Offset.zero,
-                                  child: modern
-                                      ? _ModernAlbumCard(
-                                          album: album,
-                                          documents: documents,
-                                        )
-                                      : AlbumSpine(
-                                          album: album,
-                                          count: documents.length,
-                                        ),
-                                ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              shelfDisplayName(widget.shelf).toUpperCase(),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: AppTheme.mutedText,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                                height: 1.16,
+                                letterSpacing: 1.05,
                               ),
-                            );
-                          },
-                        ),
+                            ),
+                          ),
+                          if (widget.onRename case final onRename?)
+                            _ShelfIcon(
+                              icon: Icons.edit_outlined,
+                              tooltip: AppConstants.albumsRenameShelf.tr(),
+                              onTap: onRename,
+                            ),
+                          _ShelfIcon(
+                            icon: Icons.sort_by_alpha,
+                            tooltip: AppConstants.albumsSortByName.tr(),
+                            onTap: widget.onSort,
+                          ),
+                          if (widget.onDelete case final onDelete?)
+                            _ShelfIcon(
+                              icon: Icons.delete_outline,
+                              tooltip: AppConstants.docshelfDeleteShelf.tr(),
+                              color: AppTheme.destructive,
+                              onTap: onDelete,
+                            ),
+                        ],
                       ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(10, 0, 10, 0),
+                    // Dropped on the lane's empty space, an album goes at
+                    // the end of the shelf.
+                    child: DragTarget<DocumentAlbum>(
+                      onMove: (_) => _hover(albums.length),
+                      onLeave: (_) => _hover(null),
+                      onAcceptWithDetails: (details) =>
+                          _drop(details.data, albums.length),
+                      builder: (context, candidates, rejected) {
+                        final over = _dropIndex != null;
+                        return AnimatedContainer(
+                          duration: const Duration(milliseconds: 120),
+                          height: laneHeight,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Color.lerp(
+                                  AppTheme.shelfSurface,
+                                  AppTheme.shelfBack,
+                                  0.62,
+                                )!,
+                                Color.lerp(
+                                  AppTheme.shelfBack,
+                                  AppTheme.shelfEdge,
+                                  0.65,
+                                )!,
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(
+                              color: over
+                                  ? AppTheme.accent
+                                  : AppTheme.shelfEdge.withValues(alpha: 0.5),
+                              width: over ? 2 : 1,
+                            ),
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: ListView.builder(
+                              scrollDirection: Axis.horizontal,
+                              padding: lanePadding,
+                              itemCount: albums.length + 1,
+                              itemBuilder: (context, index) {
+                                if (index == albums.length) {
+                                  return modern
+                                      ? _AddModernAlbumButton(
+                                          onTap: widget.onAddAlbum,
+                                        )
+                                      : _AddAlbumSpine(
+                                          onTap: widget.onAddAlbum,
+                                        );
+                                }
+                                return KeyedSubtree(
+                                  key: ValueKey(albums[index].id),
+                                  child: _album(context, index, itemHeight),
+                                );
+                              },
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   ),
                 ],
@@ -654,6 +766,53 @@ class _ShelfWidgetState extends State<_ShelfWidget> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The album under the finger while it's dragged: lifted a little and
+/// centred on the finger.
+class _DraggedAlbum extends StatelessWidget {
+  const _DraggedAlbum({required this.size, required this.child});
+
+  final Size size;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Transform.translate(
+      offset: Offset(-size.width / 2, -size.height / 2),
+      child: Transform.scale(
+        scale: 1.08,
+        child: Material(
+          type: MaterialType.transparency,
+          child: SizedBox.fromSize(size: size, child: child),
+        ),
+      ),
+    );
+  }
+}
+
+/// The line showing where a dragged album will land.
+class _DropMarker extends StatelessWidget {
+  const _DropMarker({required this.left});
+
+  final bool left;
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      top: 0,
+      bottom: 0,
+      left: left ? -3 : null,
+      right: left ? null : -3,
+      child: Container(
+        width: 4,
+        decoration: BoxDecoration(
+          color: AppTheme.accent,
+          borderRadius: BorderRadius.circular(2),
         ),
       ),
     );

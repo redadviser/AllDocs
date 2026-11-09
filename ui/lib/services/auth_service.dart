@@ -232,6 +232,7 @@ class AuthService {
         'device': await _deviceInfo(),
       }),
     );
+    ApiHelpers.throwIfRateLimited(res);
     if (res.statusCode != 200) {
       throw Exception(ApiHelpers.errorMessage(res, 'Login failed'));
     }
@@ -277,6 +278,7 @@ class AuthService {
         'device': await _deviceInfo(),
       }),
     );
+    ApiHelpers.throwIfRateLimited(res);
     if (res.statusCode != 200 && res.statusCode != 201) {
       throw Exception(ApiHelpers.errorMessage(res, 'Sign up failed'));
     }
@@ -309,6 +311,7 @@ class AuthService {
         'device': await _deviceInfo(),
       }),
     );
+    ApiHelpers.throwIfRateLimited(res);
     if (res.statusCode != 200) {
       throw Exception(ApiHelpers.errorMessage(res, 'Google sign-in failed'));
     }

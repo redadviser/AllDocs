@@ -36,6 +36,7 @@
     "continue_with_google": "Continuar con Google",
     "or_divider": "o",
     "login_error": "No se pudo iniciar sesión. Comprueba tus datos e inténtalo de nuevo.",
+    "too_many_attempts": "Demasiados intentos. Espera 15 minutos e inténtalo de nuevo.",
     "offline": "Modo local activo",
     "language": "Idioma",
     "session_ended": "Tu sesión se cerró desde otro dispositivo. Vuelve a entrar para continuar.",
@@ -127,7 +128,8 @@
     "album_empty_message": "Importa documentos directamente a este álbum.",
     "document_count": "{count} documentos",
     "color": "Color",
-    "icon": "Icono"
+    "icon": "Icono",
+    "shelf": "Estante"
   },
   "archive": {
     "title": "Archivo",
@@ -442,6 +444,8 @@
     "modern_view": "Ver portadas",
     "classic_view": "Ver lomos",
     "sort_by_name": "Ordenar álbumes por nombre",
+    "move_to_shelf": "Mover a otro estante",
+    "moved_to_shelf": "Movido a \"{shelf}\"",
     "collections": "Colecciones",
     "search_gallery": "Buscar en la galería"
   },

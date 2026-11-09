@@ -1,5 +1,6 @@
 import express, { type NextFunction, type Request, type Response, Router } from 'express'
 import { requireAuth } from '../../lib/middleware'
+import { codeLimiter } from '../../lib/rate-limit'
 import * as controller from './shares.controller'
 import { MAX_SHARE_BYTES } from './shares.service'
 
@@ -34,6 +35,7 @@ export const sharePageRouter = Router()
 sharePageRouter.get('/s/:token', controller.page)
 sharePageRouter.post(
   '/s/:token/file',
+  codeLimiter,
   express.urlencoded({ extended: false, limit: '4kb' }),
   controller.file
 )

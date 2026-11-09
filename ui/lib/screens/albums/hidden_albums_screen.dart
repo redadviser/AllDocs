@@ -142,16 +142,9 @@ class _ShelfChooserScreen extends StatelessWidget {
       actionLabel: AppConstants.commonCreate.tr(),
     );
     if (name == null) return;
-    final before = {
-      for (final shelf in (await documentsService.loadSnapshot()).shelves)
-        shelf.id,
-    };
-    await documentsService.createShelf(name);
-    final created = (await documentsService.loadSnapshot()).shelves
-        .where((shelf) => !before.contains(shelf.id))
-        .firstOrNull;
+    final created = await documentsService.createShelf(name);
     if (created != null && context.mounted) {
-      Navigator.of(context).pop(created.id);
+      Navigator.of(context).pop(created);
     }
   }
 

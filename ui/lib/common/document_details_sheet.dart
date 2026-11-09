@@ -281,14 +281,9 @@ class _DocumentDetailsSheetState extends State<_DocumentDetailsSheet> {
   }
 
   Future<void> _createAlbum() async {
-    final draft = await showAlbumDialog(context);
+    final draft = await showAlbumDialog(context, shelves: _snapshot.shelves);
     if (draft == null) return;
-    final id = await widget.documentsService.createAlbum(
-      null,
-      draft.name,
-      colorValue: draft.colorValue,
-      iconName: draft.iconName,
-    );
+    final id = await createAlbumFromDraft(widget.documentsService, draft);
     final snapshot = await widget.documentsService.loadSnapshot();
     if (!mounted) return;
     setState(() {

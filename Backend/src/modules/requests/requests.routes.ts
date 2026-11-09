@@ -1,5 +1,6 @@
 import express, { type NextFunction, type Request, type Response, Router } from 'express'
 import { requireAuth } from '../../lib/middleware'
+import { publicUploadLimiter } from '../../lib/rate-limit'
 import * as controller from './requests.controller'
 import { MAX_FILE_BYTES } from './requests.service'
 
@@ -21,6 +22,7 @@ export const requestPageRouter = Router()
 requestPageRouter.get('/r/:token', controller.page)
 requestPageRouter.post(
   '/r/:token/files',
+  publicUploadLimiter,
   express.raw({ type: () => true, limit: MAX_FILE_BYTES }),
   controller.upload
 )

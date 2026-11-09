@@ -4,6 +4,7 @@ import cors from 'cors'
 import express from 'express'
 import swaggerUi from 'swagger-ui-express'
 import { openApiSpec } from './docs/openapi'
+import { apiLimiter, publicPageLimiter } from './lib/rate-limit'
 import { ensureSchema } from './lib/schema'
 import { authRouter } from './modules/auth/auth.routes'
 import { configRouter } from './modules/config/config.routes'
@@ -22,16 +23,33 @@ import { purgeOld as purgeOldSync } from './modules/sync/sync.service'
 
 const app = express()
 
+// One proxy in front (CapRover's nginx): req.ip is the address it saw.
 app.set('trust proxy', 1)
+app.disable('x-powered-by')
 
-app.use(
-  cors({
-    origin: process.env.CORS_ORIGIN?.split(',').map((v) => v.trim()) || true,
-    credentials: true,
+// Defaults for every answer; the HTML pages add their own CSP.
+app.use((_req, res, next) => {
+  res.set({
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'DENY',
+    'Referrer-Policy': 'no-referrer',
+    'Strict-Transport-Security': 'max-age=31536000',
+    'Cross-Origin-Opener-Policy': 'same-origin',
   })
-)
+  next()
+})
+
+// The app isn't a browser and the pages call their own origin, so no
+// other site may call the API with someone's cookie unless listed here.
+const corsOrigins = (process.env.CORS_ORIGIN ?? '')
+  .split(',')
+  .map((v) => v.trim())
+  .filter(Boolean)
+app.use(cors({ origin: corsOrigins.length > 0 ? corsOrigins : false, credentials: true }))
 
 app.use(cookieParser())
+app.use('/api', apiLimiter)
+app.use(['/r/:token', '/s/:token'], publicPageLimiter)
 // Before the JSON/form parsers: an upload's body is the raw file, whatever
 // content type the browser gives it.
 app.use(requestPageRouter)
@@ -43,9 +61,9 @@ app.get('/health', (_req, res) => {
   res.json({ ok: true })
 })
 
-// API docs (Swagger UI). On by default; set DOCS_ENABLED=false to hide
-// them on a deployment.
-if (process.env.DOCS_ENABLED !== 'false') {
+// API docs (Swagger UI). Off unless DOCS_ENABLED=true (local development):
+// a public map of the API only helps someone probing it.
+if (process.env.DOCS_ENABLED === 'true') {
   app.get('/api/docs/openapi.json', (_req, res) => {
     res.json(openApiSpec)
   })

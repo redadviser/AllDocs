@@ -375,13 +375,17 @@ Future<void> showAlbumMembershipSheet(
                       ),
                       TextButton.icon(
                         onPressed: () async {
-                          final draft = await showAlbumDialog(context);
+                          final shelves =
+                              (await documentsService.loadSnapshot()).shelves;
+                          if (!context.mounted) return;
+                          final draft = await showAlbumDialog(
+                            context,
+                            shelves: shelves,
+                          );
                           if (draft == null) return;
-                          final albumId = await documentsService.createAlbum(
-                            null,
-                            draft.name,
-                            colorValue: draft.colorValue,
-                            iconName: draft.iconName,
+                          final albumId = await createAlbumFromDraft(
+                            documentsService,
+                            draft,
                           );
                           if (albumId != null) {
                             await documentsService.addDocumentsToAlbum(

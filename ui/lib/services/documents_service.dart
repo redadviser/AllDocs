@@ -254,8 +254,11 @@ class DocumentsService {
 
   // Organization ----------------------------------------------------------
 
-  Future<void> createShelf(String name, {bool hidden = false}) {
-    return _mutate(_store.createShelf(name, hidden: hidden));
+  /// Returns the new shelf's id (null for a blank name).
+  Future<String?> createShelf(String name, {bool hidden = false}) async {
+    final id = await _store.createShelf(name, hidden: hidden);
+    _notifyChanged();
+    return id;
   }
 
   Future<void> ensureStarterShelf(
@@ -307,8 +310,8 @@ class DocumentsService {
     return _store.unhideDestination(albumId);
   }
 
-  Future<void> moveAlbumToShelf(String albumId, String shelfId) {
-    return _mutate(_store.moveAlbumToShelf(albumId, shelfId));
+  Future<void> moveAlbumToShelf(String albumId, String shelfId, {int? index}) {
+    return _mutate(_store.moveAlbumToShelf(albumId, shelfId, index: index));
   }
 
   Future<void> reorderShelves(List<String> shelfIds) {

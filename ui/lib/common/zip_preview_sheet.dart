@@ -211,19 +211,21 @@ class _ZipPreviewSheetState extends State<_ZipPreviewSheet> {
                   setState(() => _albumId = value);
                   return;
                 }
+                final shelves =
+                    (await widget.documentsService.loadSnapshot()).shelves;
+                if (!context.mounted) return;
                 final draft = await showAlbumDialog(
                   context,
                   suggestedName: _suggestedAlbumName(),
+                  shelves: shelves,
                 );
                 if (draft == null || !mounted) {
                   setState(() {});
                   return;
                 }
-                final id = await widget.documentsService.createAlbum(
-                  null,
-                  draft.name,
-                  colorValue: draft.colorValue,
-                  iconName: draft.iconName,
+                final id = await createAlbumFromDraft(
+                  widget.documentsService,
+                  draft,
                 );
                 final snapshot = await widget.documentsService.loadSnapshot();
                 if (!mounted) return;

@@ -5,10 +5,18 @@ import type { Request } from 'express'
 import { sql } from './db'
 import { effectivePlanColumn } from './plans'
 
-// Session tokens are signed with this server's own secret.
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || 'default-dev-secret-change-in-production'
-)
+// Session tokens are signed with this server's own secret. Whoever knows it
+// can sign in as anyone, so it must be long, random, and never in git; the
+// server won't start without one (outside local development).
+function jwtSecret(): string {
+  const configured = process.env.JWT_SECRET?.trim() ?? ''
+  if (configured.length >= 32) return configured
+  if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') {
+    return configured || 'default-dev-secret-change-in-production'
+  }
+  throw new Error('JWT_SECRET must be set to a random value of at least 32 characters')
+}
+const JWT_SECRET = new TextEncoder().encode(jwtSecret())
 export const COOKIE_NAME = 'session_token'
 const SESSION_DURATION = 60 * 60 * 24 * 30
 

@@ -1042,17 +1042,15 @@ class _SuggestionCard extends StatelessWidget {
   Future<void> _accept(BuildContext context) async {
     var albumId = suggestion.album?.id;
     if (albumId == null) {
+      final shelves = (await documentsService.loadSnapshot()).shelves;
+      if (!context.mounted) return;
       final draft = await showAlbumDialog(
         context,
         suggestedName: semanticTypeAlbumName(suggestion.semanticType),
+        shelves: shelves,
       );
       if (draft == null) return;
-      albumId = await documentsService.createAlbum(
-        null,
-        draft.name,
-        colorValue: draft.colorValue,
-        iconName: draft.iconName,
-      );
+      albumId = await createAlbumFromDraft(documentsService, draft);
     }
     if (albumId == null) return;
     await documentsService.addDocumentsToAlbum([

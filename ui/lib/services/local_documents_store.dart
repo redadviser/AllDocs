@@ -766,15 +766,17 @@ class LocalDocumentsStore {
     );
   }
 
-  Future<void> createShelf(String name, {bool hidden = false}) async {
+  /// Returns the new shelf's id (null for a blank name).
+  Future<String?> createShelf(String name, {bool hidden = false}) async {
     final normalized = name.trim();
-    if (normalized.isEmpty) return;
+    if (normalized.isEmpty) return null;
 
     final state = await _readState();
     final shelves = _shelvesRaw(state);
+    final id = _newId('shelf');
     shelves.add(
       DocumentShelf(
-        id: _newId('shelf'),
+        id: id,
         name: normalized,
         position: shelves.length,
         albums: const [],
@@ -782,6 +784,7 @@ class LocalDocumentsStore {
       ).toJson(),
     );
     await _writeState(state);
+    return id;
   }
 
   Future<void> renameShelf(String shelfId, String name) async {
@@ -884,24 +887,31 @@ class LocalDocumentsStore {
 
   /// Moves an album to [target]. Crossing between the visible and hidden
   /// side, it remembers the shelf it left, to go back there next time.
+  /// Moves the album onto [target], at [index] among its albums (default:
+  /// the end).
   void _moveAlbum(
     Map<String, dynamic> state,
     String albumId,
-    Map<String, dynamic> target,
-  ) {
+    Map<String, dynamic> target, {
+    int? index,
+  }) {
     for (final source in _shelvesList(state)) {
       final albums = _albumsRaw(source);
-      final index = albums.indexWhere(
+      final from = albums.indexWhere(
         (album) => album is Map && album['id']?.toString() == albumId,
       );
-      if (index < 0) continue;
+      if (from < 0) continue;
       if (identical(source, target)) return;
-      final album = Map<String, dynamic>.from(albums.removeAt(index) as Map);
+      final album = Map<String, dynamic>.from(albums.removeAt(from) as Map);
       if ((source['hidden'] == true) != (target['hidden'] == true)) {
         album['return_shelf_id'] = source['id'];
       }
       album['shelf_id'] = target['id'];
-      _albumsRaw(target).add(album);
+      final targetAlbums = _albumsRaw(target);
+      targetAlbums.insert(
+        (index ?? targetAlbums.length).clamp(0, targetAlbums.length),
+        album,
+      );
       _reindexAlbums(source);
       _reindexAlbums(target);
       return;
@@ -934,13 +944,19 @@ class LocalDocumentsStore {
     return back;
   }
 
-  Future<void> moveAlbumToShelf(String albumId, String shelfId) async {
+  /// Puts the album on another shelf, at [index] among its albums (default:
+  /// the end).
+  Future<void> moveAlbumToShelf(
+    String albumId,
+    String shelfId, {
+    int? index,
+  }) async {
     final state = await _readState();
     final target = shelfId == defaultHiddenShelfId
         ? _defaultHiddenShelf(state)
         : _findShelf(state, shelfId);
     if (target == null) return;
-    _moveAlbum(state, albumId, target);
+    _moveAlbum(state, albumId, target, index: index);
     await _writeState(state);
   }
 

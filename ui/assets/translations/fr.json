@@ -36,6 +36,7 @@
     "continue_with_google": "Continuer avec Google",
     "or_divider": "ou",
     "login_error": "Connexion impossible. Vérifie tes informations et réessaie.",
+    "too_many_attempts": "Trop de tentatives. Attends 15 minutes et réessaie.",
     "offline": "Mode local actif",
     "language": "Langue",
     "session_ended": "Votre session a été fermée depuis un autre appareil. Reconnectez-vous pour continuer.",
@@ -127,7 +128,8 @@
     "album_empty_message": "Importe des documents directement dans cet album.",
     "document_count": "{count} documents",
     "color": "Couleur",
-    "icon": "Icône"
+    "icon": "Icône",
+    "shelf": "Étagère"
   },
   "archive": {
     "title": "Archive",
@@ -442,6 +444,8 @@
     "modern_view": "Voir les couvertures",
     "classic_view": "Voir les tranches",
     "sort_by_name": "Trier les albums par nom",
+    "move_to_shelf": "Déplacer vers une autre étagère",
+    "moved_to_shelf": "Déplacé vers « {shelf} »",
     "collections": "Collections",
     "search_gallery": "Rechercher dans la galerie"
   },

@@ -36,6 +36,7 @@
     "continue_with_google": "Continue with Google",
     "or_divider": "or",
     "login_error": "We couldn't sign you in. Check your details and try again.",
+    "too_many_attempts": "Too many attempts. Wait 15 minutes and try again.",
     "offline": "Local mode active",
     "language": "Language",
     "session_ended": "Your session was ended from another device. Sign in again to continue.",
@@ -127,7 +128,8 @@
     "album_empty_message": "Import documents directly into this album.",
     "document_count": "{count} documents",
     "color": "Color",
-    "icon": "Icon"
+    "icon": "Icon",
+    "shelf": "Shelf"
   },
   "archive": {
     "title": "Archive",
@@ -442,6 +444,8 @@
     "modern_view": "Show covers",
     "classic_view": "Show spines",
     "sort_by_name": "Sort albums by name",
+    "move_to_shelf": "Move to another shelf",
+    "moved_to_shelf": "Moved to \"{shelf}\"",
     "collections": "Collections",
     "search_gallery": "Search the gallery"
   },

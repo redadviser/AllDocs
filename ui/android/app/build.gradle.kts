@@ -12,8 +12,8 @@ plugins {
 //   • appVersionCode: +1 every time (Play refuses a code it has already seen)
 //   • appVersionName: the version people see in the store (e.g. 1.0.1)
 // These override the version in pubspec.yaml for Android.
-val appVersionCode = 5
-val appVersionName = "5.0.0"
+val appVersionCode = 7
+val appVersionName = "7.0.0"
 
 // Release signing with the upload key: android/key.properties (git-ignored)
 // points at android/upload-keystore.jks. Without it (another machine, CI)

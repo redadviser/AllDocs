@@ -102,7 +102,12 @@ class AlbumDetailScreen extends StatelessWidget {
                           ),
                           PopupMenuButton<String>(
                             onSelected: (value) {
-                              if (value == 'edit') _edit(context, album);
+                              if (value == 'edit') {
+                                _edit(context, snapshot, album);
+                              }
+                              if (value == 'move') {
+                                _moveToShelf(context, snapshot, album);
+                              }
                               if (value == 'hide') _setHidden(context, album);
                               if (value == 'delete') _delete(context, album);
                             },
@@ -110,6 +115,12 @@ class AlbumDetailScreen extends StatelessWidget {
                               PopupMenuItem(
                                 value: 'edit',
                                 child: Text(AppConstants.albumsEditAlbum.tr()),
+                              ),
+                              PopupMenuItem(
+                                value: 'move',
+                                child: Text(
+                                  AppConstants.albumsMoveToShelf.tr(),
+                                ),
                               ),
                               PopupMenuItem(
                                 value: 'hide',
@@ -275,14 +286,66 @@ class AlbumDetailScreen extends StatelessWidget {
     await documentsService.addDocumentsToAlbum(picked, album.id);
   }
 
-  Future<void> _edit(BuildContext context, DocumentAlbum album) async {
-    final draft = await showAlbumDialog(context, initial: album);
+  /// The shelves on the album's own side (visible or hidden); moving
+  /// across sides is hiding / showing it.
+  List<DocumentShelf> _shelvesFor(
+    DocumentsSnapshot snapshot,
+    DocumentAlbum album,
+  ) => album.hidden ? snapshot.hiddenShelves : snapshot.shelves;
+
+  Future<void> _edit(
+    BuildContext context,
+    DocumentsSnapshot snapshot,
+    DocumentAlbum album,
+  ) async {
+    final draft = await showAlbumDialog(
+      context,
+      initial: album,
+      shelves: _shelvesFor(snapshot, album),
+    );
     if (draft == null) return;
     await documentsService.updateAlbum(
       album.id,
       name: draft.name,
       colorValue: draft.colorValue,
       iconName: draft.iconName,
+    );
+    final shelfId = await draft.shelf?.resolve(
+      documentsService,
+      hidden: album.hidden,
+    );
+    if (shelfId != null && shelfId != album.shelfId) {
+      await documentsService.moveAlbumToShelf(album.id, shelfId);
+    }
+  }
+
+  Future<void> _moveToShelf(
+    BuildContext context,
+    DocumentsSnapshot snapshot,
+    DocumentAlbum album,
+  ) async {
+    final choice = await showMoveToShelfDialog(
+      context,
+      shelves: _shelvesFor(snapshot, album),
+      currentShelfId: album.shelfId,
+    );
+    if (choice == null) return;
+    final shelfId = await choice.resolve(
+      documentsService,
+      hidden: album.hidden,
+    );
+    if (shelfId == null || shelfId == album.shelfId) return;
+    await documentsService.moveAlbumToShelf(album.id, shelfId);
+    final shelf = (await documentsService.loadSnapshot()).shelfById(shelfId);
+    if (shelf == null || !context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          AppConstants.albumsMovedToShelf.tr(
+            namedArgs: {'shelf': shelfDisplayName(shelf)},
+          ),
+        ),
+      ),
     );
   }
 

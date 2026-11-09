@@ -6,8 +6,19 @@ import 'package:http/http.dart' as http;
 
 import 'api_base_url.dart';
 
+/// The server refused because too many attempts came in a short time
+/// (HTTP 429); trying again later works.
+class RateLimitedException implements Exception {
+  const RateLimitedException();
+}
+
 class ApiHelpers {
   const ApiHelpers._();
+
+  /// Throws [RateLimitedException] when [res] says to slow down.
+  static void throwIfRateLimited(http.Response res) {
+    if (res.statusCode == 429) throw const RateLimitedException();
+  }
 
   static Map<String, String> headersWithToken([String? token]) {
     return {

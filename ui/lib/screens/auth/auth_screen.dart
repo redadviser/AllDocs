@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 
 import '../../common/app_constants.dart';
 import '../../common/language_picker.dart';
+import '../../services/api_helpers.dart' show RateLimitedException;
 import '../../services/auth_service.dart';
 import '../../services/local_mode_config.dart';
 import '../../theme/app_theme.dart';
@@ -65,11 +66,18 @@ class _AuthScreenState extends State<AuthScreen> {
     });
     try {
       await action();
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(AppConstants.authLoginError.tr())));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            (error is RateLimitedException
+                    ? AppConstants.authTooManyAttempts
+                    : AppConstants.authLoginError)
+                .tr(),
+          ),
+        ),
+      );
     } finally {
       if (mounted) {
         setState(() {

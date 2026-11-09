@@ -45,6 +45,7 @@ class AppConstants {
   static const authOffline = 'auth.offline';
   static const authLanguage = 'auth.language';
   static const authLoginError = 'auth.login_error';
+  static const authTooManyAttempts = 'auth.too_many_attempts';
 
   static const securityGreetingMorning = 'security.greeting_morning';
   static const securityGreetingAfternoon = 'security.greeting_afternoon';
@@ -137,6 +138,7 @@ class AppConstants {
   static const docshelfDocumentCount = 'docshelf.document_count';
   static const docshelfColor = 'docshelf.color';
   static const docshelfIcon = 'docshelf.icon';
+  static const docshelfShelf = 'docshelf.shelf';
 
   static const archiveTitle = 'archive.title';
   static const archiveUnorganized = 'archive.unorganized';
@@ -550,6 +552,8 @@ class AppConstants {
   static const albumsModernView = 'albums.modern_view';
   static const albumsClassicView = 'albums.classic_view';
   static const albumsSortByName = 'albums.sort_by_name';
+  static const albumsMoveToShelf = 'albums.move_to_shelf';
+  static const albumsMovedToShelf = 'albums.moved_to_shelf';
   static const albumsCollections = 'albums.collections';
 
   // Gallery, albums, cloud, archive and settings (v3 redesign).
