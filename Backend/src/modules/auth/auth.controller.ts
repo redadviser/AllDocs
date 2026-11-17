@@ -67,6 +67,30 @@ export async function googleSignIn(req: Request, res: Response) {
   }
 }
 
+export async function appleSignIn(req: Request, res: Response) {
+  try {
+    const { identityToken, nonce, authorizationCode, displayName, device } = req.body
+    if (!identityToken || !nonce) {
+      res.status(400).json({ error: 'identityToken and nonce are required' })
+      return
+    }
+
+    const { user, token } = await authService.loginWithApple(
+      identityToken,
+      nonce,
+      authorizationCode,
+      displayName,
+      device
+    )
+    const cookie = sessionCookieConfig(token)
+    res.cookie(cookie.name, cookie.value, cookie.options)
+    res.json({ user })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Apple sign-in failed'
+    res.status(401).json({ error: message })
+  }
+}
+
 export async function logout(req: Request, res: Response) {
   // Signing out ends this phone's session for good: off the devices list,
   // and out of sync (its place is free for another phone).

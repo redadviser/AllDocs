@@ -1,4 +1,5 @@
 import crypto from 'crypto'
+import { revokeAppleToken } from '../../lib/apple-auth'
 import { sql } from '../../lib/db'
 import { removeStored } from '../../lib/file-vault'
 import { sendMail } from '../../lib/mailer'
@@ -87,6 +88,12 @@ export async function deleteWithToken(token: string): Promise<boolean> {
 /// only point at them), then the account, whose rows cascade.
 export async function deleteAccount(userId: string) {
   await endSync(userId)
+  const [apple] = await sql`SELECT apple_refresh_token FROM users WHERE id = ${userId}`
+  if (apple?.apple_refresh_token) {
+    await revokeAppleToken(apple.apple_refresh_token as string).catch((error) =>
+      console.error('Revoking Sign in with Apple failed:', error)
+    )
+  }
   const shareFiles = await sql`
     SELECT stored_name FROM document_shares WHERE user_id = ${userId} AND stored_name IS NOT NULL
   `

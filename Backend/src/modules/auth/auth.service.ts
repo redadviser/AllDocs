@@ -1,4 +1,5 @@
 import { findOrCreateUserByEmail, signIn, signUp } from '../../lib/auth'
+import { exchangeAppleCode, verifyAppleIdentityToken } from '../../lib/apple-auth'
 import { sql } from '../../lib/db'
 import { verifyGoogleIdToken } from '../../lib/google-auth'
 
@@ -58,6 +59,41 @@ export async function signup(
 export async function loginWithGoogle(idToken: string, device?: DeviceInfo) {
   const { email, name, picture } = await verifyGoogleIdToken(idToken)
   const result = await findOrCreateUserByEmail(email, name, picture, device?.id)
+  await registerDevice(result.user.id, device)
+  return result
+}
+
+// Apple identifies the person by `sub`, stable for this app. The email can
+// be a private relay address, and Apple may only send it the first time,
+// so the account is found by `sub` first and by email only to link it.
+export async function loginWithApple(
+  identityToken: string,
+  rawNonce: string,
+  authorizationCode?: string,
+  displayName?: string,
+  device?: DeviceInfo
+) {
+  const { sub, email } = await verifyAppleIdentityToken(identityToken, rawNonce)
+
+  const linked = await sql`SELECT email FROM users WHERE apple_sub = ${sub}`
+  const accountEmail = (linked[0]?.email as string | undefined) ?? email
+  if (!accountEmail) throw new Error('Apple did not share an email address')
+
+  const result = await findOrCreateUserByEmail(accountEmail, displayName, undefined, device?.id)
+  if (linked.length === 0) {
+    await sql`UPDATE users SET apple_sub = ${sub} WHERE id = ${result.user.id} AND apple_sub IS NULL`
+  }
+  if (authorizationCode) {
+    // Only needed to revoke on account deletion; never blocks sign-in.
+    try {
+      const refreshToken = await exchangeAppleCode(authorizationCode)
+      if (refreshToken) {
+        await sql`UPDATE users SET apple_refresh_token = ${refreshToken} WHERE id = ${result.user.id}`
+      }
+    } catch (error) {
+      console.error('Apple code exchange failed (non-fatal):', error)
+    }
+  }
   await registerDevice(result.user.id, device)
   return result
 }

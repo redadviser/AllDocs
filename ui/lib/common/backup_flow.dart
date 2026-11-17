@@ -293,4 +293,5 @@ Future<bool> _withProgress(
 IconData cloudProviderIcon(CloudProviderId id) => switch (id) {
   CloudProviderId.googleDrive => Icons.add_to_drive_outlined,
   CloudProviderId.dropbox => Icons.cloud_queue_outlined,
+  CloudProviderId.icloud => Icons.cloud_outlined,
 };

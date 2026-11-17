@@ -3,11 +3,13 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:android_id/android_id.dart';
+import 'package:crypto/crypto.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import '../models/device_session.dart';
 import 'adapty_service.dart';
@@ -47,6 +49,11 @@ enum SessionState {
   unknown,
 }
 
+/// The person closed the sign-in sheet: not an error to show.
+class AuthCanceledException implements Exception {
+  const AuthCanceledException();
+}
+
 abstract class AuthTokenStore {
   Future<String?> read();
   Future<void> write(String token);
@@ -84,6 +91,7 @@ class AuthService {
   static const _userIdKey = 'auth.user_id.v1';
   static const _avatarUrlKey = 'auth.avatar_url.v1';
   static const _deviceIdKey = 'auth.device_id.v1';
+  static const signInMethodKey = 'auth.sign_in_method.v1';
 
   static Future<bool> isSignedIn() async {
     if (LocalModeConfig.isLocalOnly) {
@@ -358,6 +366,67 @@ class AuthService {
     );
   }
 
+  /// Sign in with Apple (iOS only). Apple shares the name and email only
+  /// the first time; afterwards the server finds the account by Apple's id.
+  static Future<String> loginWithApple() async {
+    final rawNonce = _randomId();
+    final AuthorizationCredentialAppleID credential;
+    try {
+      credential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+        nonce: sha256.convert(utf8.encode(rawNonce)).toString(),
+      );
+    } on SignInWithAppleAuthorizationException catch (error) {
+      if (error.code == AuthorizationErrorCode.canceled) {
+        throw const AuthCanceledException();
+      }
+      rethrow;
+    }
+    final name = [
+      credential.givenName,
+      credential.familyName,
+    ].whereType<String>().join(' ').trim();
+    final email = credential.email ?? '';
+
+    if (LocalModeConfig.isLocalOnly) {
+      return _persistLocalSession(
+        email: email.isNotEmpty ? email : '${credential.userIdentifier}@apple',
+        displayName: name.isEmpty ? null : name,
+      );
+    }
+
+    final identityToken = credential.identityToken;
+    if (identityToken == null) {
+      throw Exception('Apple did not return an identity token');
+    }
+    final res = await ApiHelpers.post(
+      '/api/auth/apple/signin',
+      headers: ApiHelpers.headersWithToken(),
+      body: jsonEncode({
+        'identityToken': identityToken,
+        'nonce': rawNonce,
+        'authorizationCode': credential.authorizationCode,
+        if (name.isNotEmpty) 'displayName': name,
+        'device': await _deviceInfo(),
+      }),
+    );
+    ApiHelpers.throwIfRateLimited(res);
+    if (res.statusCode != 200) {
+      throw Exception(ApiHelpers.errorMessage(res, 'Apple sign-in failed'));
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(signInMethodKey, 'apple');
+    return _persistSession(
+      res,
+      fallbackEmail: email,
+      fallbackName: name.isEmpty ? null : name,
+    );
+  }
+
   static Future<void> logout() async {
     if (_googleSignInInitialized) {
       try {
@@ -397,6 +466,7 @@ class AuthService {
     await prefs.remove(_planKey);
     await prefs.remove(_userIdKey);
     await prefs.remove(_avatarUrlKey);
+    await prefs.remove(signInMethodKey);
   }
 
   /// The signed-in devices for this account (Security screen), newest-seen

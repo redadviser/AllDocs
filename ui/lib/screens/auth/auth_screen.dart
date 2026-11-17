@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import '../../common/app_constants.dart';
 import '../../common/language_picker.dart';
@@ -21,6 +22,7 @@ class AuthScreen extends StatefulWidget {
     required this.onLogin,
     required this.onSignup,
     required this.onGoogleSignIn,
+    this.onAppleSignIn,
     this.notice,
   });
 
@@ -32,6 +34,9 @@ class AuthScreen extends StatefulWidget {
   final Future<void> Function(String email, String password, String displayName)
   onSignup;
   final Future<void> Function() onGoogleSignIn;
+
+  /// Null where Sign in with Apple isn't offered (everywhere but iOS).
+  final Future<void> Function()? onAppleSignIn;
 
   @override
   State<AuthScreen> createState() => _AuthScreenState();
@@ -66,6 +71,8 @@ class _AuthScreenState extends State<AuthScreen> {
     });
     try {
       await action();
+    } on AuthCanceledException {
+      // Closed the Apple sheet: nothing to report.
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -261,6 +268,22 @@ class _AuthScreenState extends State<AuthScreen> {
           ],
         ),
         const SizedBox(height: 12),
+        if (widget.onAppleSignIn case final onApple?) ...[
+          IgnorePointer(
+            ignoring: _submitting,
+            child: Opacity(
+              opacity: _submitting ? 0.6 : 1,
+              child: SignInWithAppleButton(
+                onPressed: () => _run(onApple),
+                text: AppConstants.authContinueWithApple.tr(),
+                style: SignInWithAppleButtonStyle.white,
+                height: 48,
+                borderRadius: const BorderRadius.all(Radius.circular(16)),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+        ],
         _GoogleButton(
           busy: _googleInFlight,
           onPressed: _submitting ? null : _submitGoogle,

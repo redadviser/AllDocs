@@ -34,6 +34,7 @@
     "toggle_to_signup": "¿Aún no tienes cuenta? Crea una",
     "toggle_to_login": "¿Ya tienes cuenta? Entrar",
     "continue_with_google": "Continuar con Google",
+    "continue_with_apple": "Continuar con Apple",
     "or_divider": "o",
     "login_error": "No se pudo iniciar sesión. Comprueba tus datos e inténtalo de nuevo.",
     "too_many_attempts": "Demasiados intentos. Espera 15 minutos e inténtalo de nuevo.",

@@ -97,4 +97,5 @@ Future<void> showCloudQuickSheet(
 String _shortName(CloudProviderId id) => switch (id) {
   CloudProviderId.googleDrive => 'Google Drive',
   CloudProviderId.dropbox => 'Dropbox',
+  CloudProviderId.icloud => 'iCloud',
 };

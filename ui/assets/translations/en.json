@@ -34,6 +34,7 @@
     "toggle_to_signup": "New here? Create an account",
     "toggle_to_login": "Already have an account? Sign in",
     "continue_with_google": "Continue with Google",
+    "continue_with_apple": "Continue with Apple",
     "or_divider": "or",
     "login_error": "We couldn't sign you in. Check your details and try again.",
     "too_many_attempts": "Too many attempts. Wait 15 minutes and try again.",

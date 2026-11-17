@@ -18,6 +18,12 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_users_email_lower ON users ((LOWER(email)));
 
+-- Sign in with Apple: the stable Apple user id, and the refresh token
+-- revoked when the account is deleted (App Store guideline 5.1.1(v)).
+ALTER TABLE users ADD COLUMN IF NOT EXISTS apple_sub TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS apple_refresh_token TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_users_apple_sub ON users (apple_sub) WHERE apple_sub IS NOT NULL;
+
 CREATE TABLE IF NOT EXISTS profiles (
   id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
   display_name TEXT,

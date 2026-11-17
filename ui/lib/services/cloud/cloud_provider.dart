@@ -7,12 +7,14 @@ import '../../models/models.dart';
 import '../backup_storage.dart';
 import '../current_user.dart';
 
-enum CloudProviderId { googleDrive, dropbox }
+enum CloudProviderId { googleDrive, dropbox, icloud }
 
 extension CloudProviderIdSource on CloudProviderId {
   DocumentSource get documentSource => switch (this) {
     CloudProviderId.googleDrive => DocumentSource.googleDrive,
     CloudProviderId.dropbox => DocumentSource.dropbox,
+    // Backup-only: nothing is ever imported from it.
+    CloudProviderId.icloud => DocumentSource.device,
   };
 }
 

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../common/app_constants.dart';
@@ -170,6 +171,9 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
         () => AuthService.signup(email, password, displayName: displayName),
       ),
       onGoogleSignIn: () => _completeAuth(AuthService.loginWithGoogle),
+      onAppleSignIn: defaultTargetPlatform == TargetPlatform.iOS
+          ? () => _completeAuth(AuthService.loginWithApple)
+          : null,
     );
   }
 }

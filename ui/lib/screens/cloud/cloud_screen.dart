@@ -603,6 +603,7 @@ class CloudScreenState extends State<CloudScreen> {
 Color _providerColor(CloudProviderId id) => switch (id) {
   CloudProviderId.googleDrive => const Color(0xFF5DB37E),
   CloudProviderId.dropbox => const Color(0xFF5B7FE0),
+  CloudProviderId.icloud => const Color(0xFF4A9FE8),
 };
 
 class _ProviderAvatar extends StatelessWidget {

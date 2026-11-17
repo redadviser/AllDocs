@@ -88,6 +88,20 @@
 			</array>
 		</dict>
 	</array>
+	<!-- iCloud backups: the container shows in the Files app as
+	     iCloud Drive > AllDocs. -->
+	<key>NSUbiquitousContainers</key>
+	<dict>
+		<key>iCloud.com.alldocs.app</key>
+		<dict>
+			<key>NSUbiquitousContainerIsDocumentScopePublic</key>
+			<true/>
+			<key>NSUbiquitousContainerName</key>
+			<string>AllDocs</string>
+			<key>NSUbiquitousContainerSupportedFolderLevels</key>
+			<string>Any</string>
+		</dict>
+	</dict>
 	<key>UIStatusBarHidden</key>
 	<false/>
 </dict>

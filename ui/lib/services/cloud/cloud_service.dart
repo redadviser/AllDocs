@@ -1,8 +1,11 @@
+import 'dart:io';
+
 import '../../models/models.dart';
 import '../local_documents_store.dart';
 import 'cloud_provider.dart';
 import 'dropbox_provider.dart';
 import 'google_drive_provider.dart';
+import 'icloud_provider.dart';
 
 /// A cloud document whose remote copy changed since it was imported.
 class CloudUpdate {
@@ -22,7 +25,13 @@ class CloudUpdate {
 /// documents stay available offline and don't depend on the cloud account.
 class CloudService {
   CloudService({List<CloudProvider>? providers, LocalDocumentsStore? store})
-    : providers = providers ?? [GoogleDriveProvider(), DropboxProvider()],
+    : providers =
+          providers ??
+          [
+            if (Platform.isIOS) ICloudProvider(),
+            GoogleDriveProvider(),
+            DropboxProvider(),
+          ],
       _store = store ?? const LocalDocumentsStore();
 
   final List<CloudProvider> providers;

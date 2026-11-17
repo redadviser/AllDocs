@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'auth_service.dart';
+import 'cloud/cloud_provider.dart';
 import 'current_user.dart';
 
 /// Device-local preferences for security and backup. Kept in
@@ -63,6 +65,16 @@ class AppSettings {
       }
     }
     backupProvider.value = prefs.getString(_backupProviderKey);
+    // Apple accounts on iPhone back up to iCloud until they pick something
+    // else (once: choosing "this phone" later must stick).
+    final iCloudDefaultKey = CurrentUser.scoped('backup.icloud_default.v1');
+    if (backupProvider.value == null &&
+        defaultTargetPlatform == TargetPlatform.iOS &&
+        prefs.getString(AuthService.signInMethodKey) == 'apple' &&
+        !prefs.containsKey(iCloudDefaultKey)) {
+      await prefs.setBool(iCloudDefaultKey, true);
+      await setBackupProvider(CloudProviderId.icloud.name);
+    }
     autoBackup.value = prefs.getBool(_autoBackupKey) ?? false;
     lastBackupAt.value = DateTime.tryParse(
       prefs.getString(_lastBackupKey) ?? '',

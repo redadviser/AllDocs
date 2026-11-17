@@ -41,6 +41,7 @@ class AppConstants {
   static const authToggleToSignup = 'auth.toggle_to_signup';
   static const authToggleToLogin = 'auth.toggle_to_login';
   static const authContinueWithGoogle = 'auth.continue_with_google';
+  static const authContinueWithApple = 'auth.continue_with_apple';
   static const authOrDivider = 'auth.or_divider';
   static const authOffline = 'auth.offline';
   static const authLanguage = 'auth.language';

@@ -117,6 +117,43 @@ starter shelf, never re-adding one the user deleted).
 Known gap: no automated test covers the real network branches (password or
 Google) — `LocalModeConfig.isLocalOnly` is a hardcoded `const`.
 
+## Sign in with Apple (iOS)
+
+Offered on iOS only, above "Continue with Google" (App Store guideline 4.8
+requires it once Google sign-in exists). The app sends Apple's identity
+token plus the raw nonce to `POST /api/auth/apple/signin`; the server
+checks it against Apple's keys (`src/lib/apple-auth.ts`, audience
+`APPLE_BUNDLE_ID`) and that `sha256(nonce)` matches the token.
+
+Accounts are found by `users.apple_sub` (Apple's stable id) first. On the
+first Apple sign-in a verified email links to an existing account with that
+email; a "Hide My Email" relay address creates a new account.
+
+Deleting an account revokes the Apple tokens (guideline 5.1.1(v)). That
+needs a Sign in with Apple key: Apple Developer > Keys, then
+`APPLE_TEAM_ID`, `APPLE_KEY_ID` and `APPLE_PRIVATE_KEY` in the backend's
+`.env`. Without it sign-in works and the revoke is skipped.
+
+## iCloud backups (iOS)
+
+`ICloudProvider` is a backup-only cloud provider, listed on iOS only. It
+writes the usual backup tree into the app's iCloud container
+(`iCloud.com.alldocs.app`), which the Files app shows as
+iCloud Drive > AllDocs > AllDocs Backups. There's no sign-in: it uses the
+phone's Apple ID and counts as connected whenever iCloud Drive is on,
+unless the person disconnects it in AllDocs. Accounts that signed in with
+Apple get iCloud as their default backup destination, once.
+
+iOS can evict synced files, leaving `.name.icloud` placeholders.
+`ICloudBackupStorage` lists them under the real name and downloads them
+(native `alldocs/icloud` channel in `AppDelegate.swift`) before reading,
+copying or moving.
+
+Xcode/Apple Developer setup: the App ID `com.alldocs.app` needs the
+"Sign in with Apple" and "iCloud" (iCloud Documents, container
+`iCloud.com.alldocs.app`) capabilities; `Runner.entitlements` already
+lists them.
+
 ## iOS scanning parity (known gap, accepted for now)
 
 `DocumentScannerService` uses `google_mlkit_document_scanner` on Android (real
