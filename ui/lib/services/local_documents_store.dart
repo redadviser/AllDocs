@@ -2133,13 +2133,17 @@ class LocalDocumentsStore {
     var withoutAlbum = const StorageBucket();
     var archivedOrDeleted = const StorageBucket();
     var trashBytes = 0;
+    var trashCount = 0;
     for (var i = 0; i < documents.length; i++) {
       final document = documents[i];
       final size = sizes[i];
       if (size == null) continue;
       if (!document.isActive) {
         archivedOrDeleted = archivedOrDeleted.add(size);
-        if (document.isDeleted) trashBytes += size;
+        if (document.isDeleted) {
+          trashBytes += size;
+          trashCount++;
+        }
       } else if (document.albumIds.isNotEmpty) {
         inAlbums = inAlbums.add(size);
       } else {
@@ -2148,11 +2152,12 @@ class LocalDocumentsStore {
     }
     return StorageSummary(
       // The plan's limit is applied by DocumentsService.
-      limitBytes: PlanCatalog.builtIn.byId(AppPlan.free).storageBytes,
+      limitDocuments: PlanCatalog.builtIn.byId(AppPlan.free).maxDocuments,
       inAlbums: inAlbums,
       withoutAlbum: withoutAlbum,
       archivedOrDeleted: archivedOrDeleted,
       trashBytes: trashBytes,
+      trashCount: trashCount,
     );
   }
 

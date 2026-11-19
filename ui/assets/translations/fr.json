@@ -589,7 +589,7 @@
   "plans": {
     "title": "Forfaits",
     "subtitle": "Vos documents restent toujours sur votre téléphone. Choisissez l'espace et les fonctions qu'il vous faut.",
-    "usage": "{used} sur {limit} utilisés",
+    "usage": "{used} sur {limit} documents",
     "monthly": "Mensuel",
     "yearly": "Annuel",
     "save": "-{percent} %",
@@ -602,7 +602,6 @@
     "current": "Forfait actuel",
     "recommended": "Recommandé",
     "choose": "Choisir {plan}",
-    "storage": "{size} d'espace",
     "any_size": "Documents de toute taille",
     "reminders_limited": "Jusqu'à {count} alertes d'expiration",
     "reminders_unlimited": "Alertes d'expiration illimitées",
@@ -626,12 +625,14 @@
     "pending": "L'achat est en attente. Le forfait s'active dès sa confirmation.",
     "failed": "L'opération n'a pas abouti. Vérifiez la connexion et réessayez.",
     "unavailable": "Les achats ne sont pas encore disponibles dans cette version de l'app.",
-    "storage_full_title": "Plus d'espace dans {plan}",
-    "storage_full_message": "Il faut {needed}, mais il ne vous reste que {free} sur les {limit} de votre forfait. Changez de forfait ou libérez de l'espace en supprimant des documents.",
-    "storage_full_message_unknown": "Vous avez utilisé les {limit} de votre forfait. Changez de forfait ou libérez de l'espace en supprimant des documents.",
+    "storage_full_title": "Limite de {plan} atteinte",
+    "storage_full_message": "Cela ajoute {needed} documents, mais il ne vous en reste que {free} sur les {limit} de votre forfait. Ce que vous avez enregistré reste ici. Changez de forfait ou supprimez des documents pour faire de la place.",
+    "storage_full_message_unknown": "Vous avez déjà les {limit} documents de votre forfait. Ce que vous avez enregistré reste ici. Changez de forfait ou supprimez des documents pour faire de la place.",
     "see_plans": "Voir les forfaits",
     "not_now": "Plus tard",
-    "auto_backup_locked": "La sauvegarde automatique est incluse dans Folio et Vault."
+    "auto_backup_locked": "La sauvegarde automatique est incluse dans Folio et Vault.",
+    "documents_limited": "Jusqu'à {count} documents",
+    "documents_unlimited": "Documents illimités"
   },
   "pdf": {
     "tools": "Outils PDF",

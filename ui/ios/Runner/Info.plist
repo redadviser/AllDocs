@@ -22,10 +22,45 @@
 	<string>$(FLUTTER_BUILD_NAME)</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.alldocs.app</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>$(GOOGLE_REVERSED_CLIENT_ID)</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>A AllDocs usa a câmara para digitalizar documentos localmente e para ler o código QR de ligação de outro aparelho.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>A AllDocs usa Face ID para desbloquear documentos protegidos no dispositivo.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>A AllDocs não usa a localização do telemóvel.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>A AllDocs acede às fotografias para importar imagens de documentos que escolheres.</string>
+	<key>NSUbiquitousContainers</key>
+	<dict>
+		<key>iCloud.com.alldocs.app</key>
+		<dict>
+			<key>NSUbiquitousContainerIsDocumentScopePublic</key>
+			<true/>
+			<key>NSUbiquitousContainerName</key>
+			<string>AllDocs</string>
+			<key>NSUbiquitousContainerSupportedFolderLevels</key>
+			<string>Any</string>
+		</dict>
+	</dict>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
@@ -49,14 +84,12 @@
 	</dict>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
-	<key>NSCameraUsageDescription</key>
-	<string>A AllDocs usa a câmara para digitalizar documentos localmente e para ler o código QR de ligação de outro aparelho.</string>
-	<key>NSFaceIDUsageDescription</key>
-	<string>A AllDocs usa Face ID para desbloquear documentos protegidos no dispositivo.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
 	<string>Main</string>
+	<key>UIStatusBarHidden</key>
+	<false/>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
@@ -70,39 +103,5 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-	<!-- OAuth redirects: Dropbox sign-in (flutter_appauth, must
-	     match CloudConfig.redirectUri) and Google Sign-In / Drive (the
-	     reversed iOS client id, set in Flutter/CloudKeys.xcconfig). -->
-	<key>CFBundleURLTypes</key>
-	<array>
-		<dict>
-			<key>CFBundleURLSchemes</key>
-			<array>
-				<string>com.alldocs.app</string>
-			</array>
-		</dict>
-		<dict>
-			<key>CFBundleURLSchemes</key>
-			<array>
-				<string>$(GOOGLE_REVERSED_CLIENT_ID)</string>
-			</array>
-		</dict>
-	</array>
-	<!-- iCloud backups: the container shows in the Files app as
-	     iCloud Drive > AllDocs. -->
-	<key>NSUbiquitousContainers</key>
-	<dict>
-		<key>iCloud.com.alldocs.app</key>
-		<dict>
-			<key>NSUbiquitousContainerIsDocumentScopePublic</key>
-			<true/>
-			<key>NSUbiquitousContainerName</key>
-			<string>AllDocs</string>
-			<key>NSUbiquitousContainerSupportedFolderLevels</key>
-			<string>Any</string>
-		</dict>
-	</dict>
-	<key>UIStatusBarHidden</key>
-	<false/>
 </dict>
 </plist>

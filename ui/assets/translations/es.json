@@ -589,7 +589,7 @@
   "plans": {
     "title": "Planes",
     "subtitle": "Tus documentos siempre se quedan en tu móvil. Elige cuánto espacio y qué funciones quieres.",
-    "usage": "{used} de {limit} usados",
+    "usage": "{used} de {limit} documentos",
     "monthly": "Mensual",
     "yearly": "Anual",
     "save": "Ahorra {percent}%",
@@ -602,7 +602,6 @@
     "current": "Plan actual",
     "recommended": "Recomendado",
     "choose": "Elegir {plan}",
-    "storage": "{size} de espacio",
     "any_size": "Documentos de cualquier tamaño",
     "reminders_limited": "Hasta {count} alertas de caducidad",
     "reminders_unlimited": "Alertas de caducidad ilimitadas",
@@ -626,12 +625,14 @@
     "pending": "La compra está pendiente. El plan se activará en cuanto se confirme.",
     "failed": "No se pudo completar. Comprueba la conexión e inténtalo de nuevo.",
     "unavailable": "Las compras aún no están disponibles en esta versión de la app.",
-    "storage_full_title": "Sin espacio en {plan}",
-    "storage_full_message": "Esto necesita {needed}, pero solo te quedan {free} libres de los {limit} de tu plan. Cambia de plan o libera espacio borrando documentos.",
-    "storage_full_message_unknown": "Ya has usado los {limit} de tu plan. Cambia de plan o libera espacio borrando documentos.",
+    "storage_full_title": "Límite de {plan} alcanzado",
+    "storage_full_message": "Esto añade {needed} documentos, pero solo te quedan {free} de los {limit} de tu plan. Lo que ya guardaste sigue aquí. Cambia de plan o elimina documentos para hacer sitio.",
+    "storage_full_message_unknown": "Ya tienes los {limit} documentos de tu plan. Lo que guardaste sigue aquí. Cambia de plan o elimina documentos para hacer sitio.",
     "see_plans": "Ver planes",
     "not_now": "Ahora no",
-    "auto_backup_locked": "La copia automática está incluida en Folio y Vault."
+    "auto_backup_locked": "La copia automática está incluida en Folio y Vault.",
+    "documents_limited": "Hasta {count} documentos",
+    "documents_unlimited": "Documentos ilimitados"
   },
   "pdf": {
     "tools": "Herramientas PDF",

@@ -8,17 +8,17 @@ void main() {
     expect(catalog.plans.map((p) => p.name), ['Pocket', 'Folio', 'Vault']);
 
     final pocket = catalog.byId(AppPlan.free);
-    expect(pocket.storageBytes, 500 * 1024 * 1024);
+    expect(pocket.maxDocuments, 10);
     expect(pocket.maxActiveReminders, 3);
     expect(pocket.has(PlanFeature.autoBackup), isFalse);
 
     final folio = catalog.byId(AppPlan.premium);
-    expect(folio.storageBytes, 5 * 1024 * 1024 * 1024);
+    expect(folio.maxDocuments, isNull);
     expect(folio.maxActiveReminders, isNull);
     expect(folio.has(PlanFeature.autoBackup), isTrue);
 
     final vault = catalog.byId(AppPlan.pro);
-    expect(vault.storageBytes, 50 * 1024 * 1024 * 1024);
+    expect(vault.maxDocuments, isNull);
     expect(vault.features.containsAll(folio.features), isTrue);
   });
 
@@ -44,7 +44,7 @@ void main() {
           'priceMonthlyCents': 0,
           'priceYearlyCents': 0,
           'currency': 'EUR',
-          'storageBytes': 100,
+          'maxDocuments': 10,
           'maxActiveReminders': 3,
           'maxDevices': 1,
           'features': <String>[],
@@ -55,7 +55,7 @@ void main() {
           'priceMonthlyCents': 199,
           'priceYearlyCents': 1599,
           'currency': 'EUR',
-          'storageBytes': 1000,
+          'maxDocuments': null,
           'maxActiveReminders': null,
           'maxDevices': 2,
           'features': ['autoBackup', 'teleportation'],
@@ -68,7 +68,27 @@ void main() {
     expect(catalog.comingSoon, {PlanFeature.watermark});
 
     final roundTrip = PlanCatalog.fromJson(catalog.toJson());
-    expect(roundTrip.byId('premium').storageBytes, 1000);
+    expect(roundTrip.byId('free').maxDocuments, 10);
+    expect(roundTrip.byId('premium').maxDocuments, isNull);
     expect(roundTrip.byId('free').maxActiveReminders, 3);
   });
+
+  test(
+    'a catalog from before the document limit falls back to the built-in one',
+    () {
+      final catalog = PlanCatalog.fromJson({
+        'plans': [
+          {
+            'id': 'free',
+            'name': 'Pocket',
+            'priceMonthlyCents': 0,
+            'priceYearlyCents': 0,
+            'storageBytes': 500,
+            'maxActiveReminders': 3,
+          },
+        ],
+      });
+      expect(catalog.byId(AppPlan.free).maxDocuments, 10);
+    },
+  );
 }

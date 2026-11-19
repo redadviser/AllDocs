@@ -589,7 +589,7 @@
   "plans": {
     "title": "Planos",
     "subtitle": "Os teus documentos ficam sempre no telemóvel. Escolhe quanto espaço e que funcionalidades queres.",
-    "usage": "{used} de {limit} usados",
+    "usage": "{used} de {limit} documentos",
     "monthly": "Mensal",
     "yearly": "Anual",
     "save": "Poupa {percent}%",
@@ -602,7 +602,6 @@
     "current": "Plano atual",
     "recommended": "Recomendado",
     "choose": "Escolher {plan}",
-    "storage": "{size} de espaço",
     "any_size": "Documentos de qualquer tamanho",
     "reminders_limited": "Até {count} alertas de validade",
     "reminders_unlimited": "Alertas de validade ilimitados",
@@ -626,12 +625,14 @@
     "pending": "A compra está pendente. O plano fica ativo assim que for confirmada.",
     "failed": "Não foi possível concluir a operação. Verifica a ligação e tenta novamente.",
     "unavailable": "As compras ainda não estão disponíveis nesta versão da app.",
-    "storage_full_title": "Sem espaço no {plan}",
-    "storage_full_message": "Isto precisa de {needed}, mas só tens {free} livres dos {limit} do teu plano. Muda de plano ou liberta espaço apagando documentos.",
-    "storage_full_message_unknown": "Já usaste os {limit} do teu plano. Muda de plano ou liberta espaço apagando documentos.",
+    "storage_full_title": "Limite do {plan} atingido",
+    "storage_full_message": "Isto junta {needed} documentos, mas só tens {free} livres dos {limit} do teu plano. Os que já guardaste continuam aqui. Muda de plano ou apaga documentos para abrir espaço.",
+    "storage_full_message_unknown": "Já tens os {limit} documentos do teu plano. Os que guardaste continuam aqui. Muda de plano ou apaga documentos para abrir espaço.",
     "see_plans": "Ver planos",
     "not_now": "Agora não",
-    "auto_backup_locked": "O backup automático está incluído no Folio e no Vault."
+    "auto_backup_locked": "O backup automático está incluído no Folio e no Vault.",
+    "documents_limited": "Até {count} documentos",
+    "documents_unlimited": "Documentos ilimitados"
   },
   "pdf": {
     "tools": "Ferramentas PDF",

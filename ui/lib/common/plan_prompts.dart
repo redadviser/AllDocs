@@ -6,7 +6,6 @@ import '../screens/profile/plans_screen.dart';
 import '../services/services.dart';
 import '../theme/app_theme.dart';
 import 'app_constants.dart';
-import 'zip_preview_sheet.dart' show formatBytes;
 
 /// Runs an import; one that doesn't fit in the plan's space explains why
 /// and offers the plans instead of failing silently.
@@ -28,16 +27,17 @@ Future<void> showStorageFullDialog(
 ) {
   final summary = error.summary;
   final plan = PlanService.current.value;
-  final message = error.neededBytes > 0
+  final free = summary.freeDocuments ?? 0;
+  final message = free > 0
       ? AppConstants.plansStorageFullMessage.tr(
           namedArgs: {
-            'needed': formatBytes(error.neededBytes),
-            'free': formatBytes(summary.freeBytes),
-            'limit': formatBytes(summary.limitBytes),
+            'needed': '${error.neededDocuments}',
+            'free': '$free',
+            'limit': '${summary.limitDocuments}',
           },
         )
       : AppConstants.plansStorageFullMessageUnknown.tr(
-          namedArgs: {'limit': formatBytes(summary.limitBytes)},
+          namedArgs: {'limit': '${summary.limitDocuments}'},
         );
   return showPlansPrompt(
     context,

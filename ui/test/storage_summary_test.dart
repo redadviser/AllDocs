@@ -49,25 +49,28 @@ void main() {
     expect(summary.usedBytes, 1000);
     // The recycle bin is shown but doesn't count towards the plan's limit.
     expect(summary.trashBytes, 400);
-    expect(summary.countedBytes, 600);
+    expect(summary.trashCount, 1);
+    expect(summary.countedDocuments, 3);
     expect(
-      summary.limitBytes,
-      PlanCatalog.builtIn.byId(AppPlan.free).storageBytes,
+      summary.limitDocuments,
+      PlanCatalog.builtIn.byId(AppPlan.free).maxDocuments,
     );
   });
 
   test('a library is full once what counts reaches the limit', () {
     const summary = StorageSummary(
-      limitBytes: 1000,
-      withoutAlbum: StorageBucket(count: 1, bytes: 900),
+      limitDocuments: 3,
+      withoutAlbum: StorageBucket(count: 2, bytes: 900),
       archivedOrDeleted: StorageBucket(count: 1, bytes: 500),
       trashBytes: 500,
+      trashCount: 1,
     );
-    expect(summary.countedBytes, 900);
-    expect(summary.freeBytes, 100);
-    expect(summary.hasRoomFor(100), isTrue);
-    expect(summary.hasRoomFor(101), isFalse);
+    expect(summary.countedDocuments, 2);
+    expect(summary.freeDocuments, 1);
+    expect(summary.hasRoomFor(1), isTrue);
+    expect(summary.hasRoomFor(2), isFalse);
     expect(summary.isFull, isFalse);
-    expect(summary.withLimit(900).isFull, isTrue);
+    expect(summary.withLimit(2).isFull, isTrue);
+    expect(summary.withLimit(null).hasRoomFor(1000), isTrue);
   });
 }

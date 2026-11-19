@@ -104,7 +104,7 @@ export const openApiSpec = {
           priceMonthlyCents: { type: 'integer', example: 199 },
           priceYearlyCents: { type: 'integer', example: 1599 },
           currency: { type: 'string', example: 'EUR' },
-          storageBytes: { type: 'integer', description: 'How much the library may hold on the phone', example: 5368709120 },
+          maxDocuments: { type: 'integer', nullable: true, description: 'Documents the library may hold; null = unlimited', example: 10 },
           maxActiveReminders: { type: 'integer', nullable: true, description: 'null = unlimited', example: null },
           maxDevices: { type: 'integer', example: 2 },
           features: {

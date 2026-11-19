@@ -73,8 +73,8 @@ void main() {
     );
     expect(snapshot.favoriteDocuments, isEmpty);
     expect(snapshot.tags, isEmpty);
-    // Still takes space.
-    expect(snapshot.profile.storageSummary.countedBytes, 600);
+    // Still counts towards the plan's limit.
+    expect(snapshot.profile.storageSummary.countedDocuments, 3);
 
     // Shown again, it goes back to the shelf it came from.
     expect(await store.unhideDestination(privateAlbum), home);

@@ -476,7 +476,9 @@ class _StorageUsageTile extends StatelessWidget {
                         CircularProgressIndicator(
                           // A sliver even when nearly empty, so it reads as
                           // a gauge rather than an empty ring.
-                          value: summary.usedBytes == 0
+                          value: summary.limitDocuments == null
+                              ? 1
+                              : summary.countedDocuments == 0
                               ? 0
                               : summary.usedRatio.clamp(0.01, 1.0),
                           strokeWidth: compact ? 8 : 10,
@@ -485,7 +487,9 @@ class _StorageUsageTile extends StatelessWidget {
                         ),
                         Center(
                           child: Text(
-                            '${summary.usedPercent}%',
+                            summary.limitDocuments == null
+                                ? '${summary.countedDocuments}'
+                                : '${summary.usedPercent}%',
                             style: TextStyle(
                               color: AppTheme.text,
                               fontSize: compact ? 15 : 19,
@@ -500,8 +504,14 @@ class _StorageUsageTile extends StatelessWidget {
               ),
               SizedBox(height: compact ? 6 : 8),
               Text(
-                '${formatBytes(summary.usedBytes)} / '
-                '${formatBytes(summary.limitBytes)}',
+                summary.limitDocuments == null
+                    ? AppConstants.plansDocumentsUnlimited.tr()
+                    : AppConstants.plansUsage.tr(
+                        namedArgs: {
+                          'used': '${summary.countedDocuments}',
+                          'limit': '${summary.limitDocuments}',
+                        },
+                      ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
@@ -709,13 +719,6 @@ class _SecuritySectionState extends State<_SecuritySection> {
 class _LanguageSection extends StatelessWidget {
   const _LanguageSection();
 
-  static const _flags = {
-    'pt': '🇵🇹',
-    'en': '🇬🇧',
-    'es': '🇪🇸',
-    'fr': '🇫🇷',
-  };
-
   @override
   Widget build(BuildContext context) {
     final options = [
@@ -732,7 +735,7 @@ class _LanguageSection extends StatelessWidget {
         children: [
           for (final option in options)
             _LanguageOption(
-              flag: _flags[option.locale.languageCode]!,
+              code: option.locale.languageCode,
               label: option.label,
               selected:
                   context.locale.languageCode == option.locale.languageCode,
@@ -746,13 +749,13 @@ class _LanguageSection extends StatelessWidget {
 
 class _LanguageOption extends StatelessWidget {
   const _LanguageOption({
-    required this.flag,
+    required this.code,
     required this.label,
     required this.selected,
     required this.onTap,
   });
 
-  final String flag;
+  final String code;
   final String label;
   final bool selected;
   final VoidCallback onTap;
@@ -779,7 +782,7 @@ class _LanguageOption extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(flag, style: const TextStyle(fontSize: 18)),
+              LanguageFlag(code, width: 24),
               const SizedBox(width: 8),
               Flexible(
                 child: Text(

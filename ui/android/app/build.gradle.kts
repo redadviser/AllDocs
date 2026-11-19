@@ -89,4 +89,6 @@ flutter {
 dependencies {
     // Required by flutter_local_notifications (isCoreLibraryDesugaringEnabled above).
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+    // OCR (alldocs/ocr channel in MainActivity). iOS uses Apple Vision.
+    implementation("com.google.mlkit:text-recognition:16.0.1")
 }

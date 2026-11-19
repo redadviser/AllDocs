@@ -587,7 +587,8 @@ class AppConstants {
   static const plansCurrent = 'plans.current';
   static const plansRecommended = 'plans.recommended';
   static const plansChoose = 'plans.choose';
-  static const plansStorage = 'plans.storage';
+  static const plansDocumentsLimited = 'plans.documents_limited';
+  static const plansDocumentsUnlimited = 'plans.documents_unlimited';
   static const plansAnySize = 'plans.any_size';
   static const plansRemindersLimited = 'plans.reminders_limited';
   static const plansRemindersUnlimited = 'plans.reminders_unlimited';

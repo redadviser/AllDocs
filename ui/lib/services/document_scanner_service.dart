@@ -1,15 +1,13 @@
 import 'dart:io';
 import 'dart:isolate';
 
-import 'package:flutter/services.dart';
-import 'package:google_mlkit_document_scanner/google_mlkit_document_scanner.dart';
-import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
-import 'package:image_picker/image_picker.dart';
+import 'package:cunning_document_scanner/cunning_document_scanner.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'document_classifier.dart';
 import 'scan_image_filter.dart';
 import 'searchable_pdf_builder.dart';
+import 'text_recognition.dart';
 
 class ScannedDocumentResult {
   const ScannedDocumentResult({
@@ -53,71 +51,27 @@ typedef ScanFilterChooser = Future<ScanFilter?> Function(List<String> pages);
 class DocumentScannerService {
   const DocumentScannerService();
 
+  /// Native scanner with edge detection, auto-crop and several pages:
+  /// Google's ML Kit scanner on Android, Apple's VisionKit on iOS.
   Future<ScannedDocumentResult?> scanDocument({
     ScanFilterChooser? chooseFilter,
   }) async {
-    if (Platform.isAndroid) {
-      return _scanWithMlKitDocumentScanner(chooseFilter);
-    }
-
-    return _scanWithFallbackCamera(chooseFilter);
-  }
-
-  Future<ScannedDocumentResult?> _scanWithMlKitDocumentScanner(
-    ScanFilterChooser? chooseFilter,
-  ) async {
-    final scanner = DocumentScanner(
-      options: DocumentScannerOptions(
-        documentFormats: const {DocumentFormat.jpeg, DocumentFormat.pdf},
-        mode: ScannerMode.full,
-        pageLimit: 20,
-        isGalleryImport: true,
-      ),
+    // Cancelling returns null; other failures throw.
+    final result = await CunningDocumentScanner.scanDocuments(
+      noOfPages: 20,
+      scannerSource: Platform.isAndroid
+          ? ScannerSource.cameraAndGallery
+          : ScannerSource.camera,
+      // The scanner's own PDF is the fallback if the searchable one fails.
+      output: ScanOutput.imagesAndPdf,
     );
-
-    try {
-      final result = await scanner.scanDocument();
-      final imagePaths = _existingPaths(result.images ?? const []);
-      final pdfPath = _existingPath(result.pdf?.uri);
-
-      if (imagePaths.isNotEmpty) {
-        return await _filterAndBuild(
-          imagePaths,
-          chooseFilter,
-          fallbackPdfPath: pdfPath,
-        );
-      }
-
-      if (pdfPath == null) return null;
-      return ScannedDocumentResult(
-        filePath: pdfPath,
-        fileName: _scanFileName(),
-        pageCount: result.pdf?.pageCount ?? 1,
-        searchable: false,
-        ocrText: null,
-        cleanupPaths: [pdfPath],
-      );
-    } on PlatformException catch (error) {
-      if (_isCancellation(error)) return null;
-      rethrow;
-    } finally {
-      await scanner.close();
-    }
-  }
-
-  // Known gap: unlike the Android path above, this has no edge detection,
-  // auto-crop, or multi-page capture. Accepted for now; see "iOS scanning
-  // parity" in docs/architecture.md for the plan to close it.
-  Future<ScannedDocumentResult?> _scanWithFallbackCamera(
-    ScanFilterChooser? chooseFilter,
-  ) async {
-    final picked = await ImagePicker().pickImage(
-      source: ImageSource.camera,
-      imageQuality: 96,
+    final imagePaths = _existingPaths(result?.images ?? const []);
+    if (imagePaths.isEmpty) return null;
+    return _filterAndBuild(
+      imagePaths,
+      chooseFilter,
+      fallbackPdfPath: _existingPath(result?.pdf),
     );
-    if (picked == null) return null;
-
-    return _filterAndBuild([picked.path], chooseFilter);
   }
 
   Future<ScannedDocumentResult?> _filterAndBuild(
@@ -139,7 +93,7 @@ class DocumentScannerService {
     final filtered = await applyScanFilter(imagePaths, filter);
     final result = await _buildSearchableScanResult(
       imagePaths: filtered,
-      // The ML Kit PDF is unfiltered; only fall back to it for "original".
+      // The scanner's PDF is unfiltered; only fall back to it for "original".
       fallbackPdfPath: filter == ScanFilter.original ? fallbackPdfPath : null,
     );
     return ScannedDocumentResult(
@@ -209,43 +163,19 @@ class DocumentScannerService {
   }
 
   Future<List<ScannedPage>> _recognizePages(List<String> imagePaths) async {
-    final recognizer = TextRecognizer(script: TextRecognitionScript.latin);
-    try {
-      final pages = <ScannedPage>[];
-      for (final imagePath in imagePaths) {
-        final recognized = await recognizer.processImage(
-          InputImage.fromFilePath(imagePath),
-        );
-        final lines = <OcrTextLine>[];
-        for (final block in recognized.blocks) {
-          for (final line in block.lines) {
-            final text = line.text.trim().replaceAll(RegExp(r'\s+'), ' ');
-            final box = line.boundingBox;
-            if (text.isEmpty || box.width <= 1 || box.height <= 1) continue;
-            lines.add(
-              OcrTextLine(
-                text: text,
-                left: box.left,
-                top: box.top,
-                width: box.width,
-                height: box.height,
+    const recognition = TextRecognition();
+    return [
+      for (final imagePath in imagePaths)
+        await recognition
+            .recognize(imagePath)
+            .then(
+              (recognized) => ScannedPage(
+                imagePath: imagePath,
+                text: recognized.text,
+                lines: recognized.lines,
               ),
-            );
-          }
-        }
-
-        pages.add(
-          ScannedPage(
-            imagePath: imagePath,
-            text: recognized.text.trim(),
-            lines: lines,
-          ),
-        );
-      }
-      return pages;
-    } finally {
-      await recognizer.close();
-    }
+            ),
+    ];
   }
 
   Future<File> _temporaryPdfFile() async {
@@ -274,10 +204,5 @@ class DocumentScannerService {
       for (final path in paths)
         if (_existingPath(path) != null) _existingPath(path)!,
     ];
-  }
-
-  bool _isCancellation(PlatformException error) {
-    final message = '${error.code} ${error.message ?? ''}'.toLowerCase();
-    return message.contains('cancel');
   }
 }

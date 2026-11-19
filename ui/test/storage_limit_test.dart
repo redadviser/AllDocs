@@ -23,7 +23,7 @@ void main() {
       name: 'Pocket',
       priceMonthlyCents: 0,
       priceYearlyCents: 0,
-      storageBytes: 1000,
+      maxDocuments: 1,
       maxActiveReminders: 3,
       maxDevices: 1,
       features: {},
@@ -50,16 +50,16 @@ void main() {
       service.importExtractedZipEntries(file('b.txt', 600)),
       throwsA(
         isA<StorageFullException>()
-            .having((e) => e.neededBytes, 'neededBytes', 600)
-            .having((e) => e.summary.freeBytes, 'freeBytes', 400),
+            .having((e) => e.neededDocuments, 'neededDocuments', 1)
+            .having((e) => e.summary.freeDocuments, 'freeDocuments', 0),
       ),
     );
     final snapshot = await service.loadSnapshot();
     expect(snapshot.documents, hasLength(1));
-    expect(snapshot.profile.storageSummary.limitBytes, 1000);
+    expect(snapshot.profile.storageSummary.limitDocuments, 1);
   });
 
-  test('emptying space into the recycle bin makes room', () async {
+  test('moving a document to the recycle bin makes room', () async {
     final first = await service.importExtractedZipEntries(file('a.txt', 600));
     await service.moveToTrash([first.documents.single.id]);
 

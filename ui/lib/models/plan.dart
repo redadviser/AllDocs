@@ -1,4 +1,4 @@
-/// What a plan offers beyond space. Mirrors `PlanFeature` in the backend's
+/// What a plan offers beyond the number of documents. Mirrors `PlanFeature` in the backend's
 /// src/lib/plans.ts (same names, sent as strings).
 enum PlanFeature {
   autoBackup,
@@ -30,7 +30,7 @@ class AppPlan {
     required this.name,
     required this.priceMonthlyCents,
     required this.priceYearlyCents,
-    required this.storageBytes,
+    required this.maxDocuments,
     required this.maxActiveReminders,
     required this.maxDevices,
     required this.features,
@@ -48,8 +48,8 @@ class AppPlan {
   final int priceMonthlyCents;
   final int priceYearlyCents;
 
-  /// How much the library may hold on this phone (the recycle bin aside).
-  final int storageBytes;
+  /// Documents the library may hold (the recycle bin aside); null = no limit.
+  final int? maxDocuments;
 
   /// Expiry reminders that can be scheduled at once; null = no limit.
   final int? maxActiveReminders;
@@ -68,7 +68,7 @@ class AppPlan {
       name: json['name'] as String,
       priceMonthlyCents: (json['priceMonthlyCents'] as num).toInt(),
       priceYearlyCents: (json['priceYearlyCents'] as num).toInt(),
-      storageBytes: (json['storageBytes'] as num).toInt(),
+      maxDocuments: (json['maxDocuments'] as num?)?.toInt(),
       maxActiveReminders: (json['maxActiveReminders'] as num?)?.toInt(),
       maxDevices: (json['maxDevices'] as num?)?.toInt() ?? 1,
       features: {
@@ -83,7 +83,7 @@ class AppPlan {
     'name': name,
     'priceMonthlyCents': priceMonthlyCents,
     'priceYearlyCents': priceYearlyCents,
-    'storageBytes': storageBytes,
+    'maxDocuments': maxDocuments,
     'maxActiveReminders': maxActiveReminders,
     'maxDevices': maxDevices,
     'features': [for (final feature in features) feature.name],
@@ -97,9 +97,6 @@ class PlanCatalog {
 
   final List<AppPlan> plans;
   final Set<PlanFeature> comingSoon;
-
-  static const _mb = 1024 * 1024;
-  static const _gb = 1024 * _mb;
 
   static const _folioFeatures = {
     PlanFeature.autoBackup,
@@ -118,7 +115,7 @@ class PlanCatalog {
         name: 'Pocket',
         priceMonthlyCents: 0,
         priceYearlyCents: 0,
-        storageBytes: 500 * _mb,
+        maxDocuments: 10,
         maxActiveReminders: 3,
         maxDevices: 1,
         features: {},
@@ -128,7 +125,7 @@ class PlanCatalog {
         name: 'Folio',
         priceMonthlyCents: 199,
         priceYearlyCents: 1599,
-        storageBytes: 5 * _gb,
+        maxDocuments: null,
         maxActiveReminders: null,
         maxDevices: 2,
         features: _folioFeatures,
@@ -138,7 +135,7 @@ class PlanCatalog {
         name: 'Vault',
         priceMonthlyCents: 499,
         priceYearlyCents: 3999,
-        storageBytes: 50 * _gb,
+        maxDocuments: null,
         maxActiveReminders: null,
         maxDevices: 3,
         features: {
@@ -170,10 +167,14 @@ class PlanCatalog {
   }
 
   factory PlanCatalog.fromJson(Map<String, dynamic> json) {
-    final plans = [
+    final raw = [
       for (final plan in (json['plans'] as List))
-        AppPlan.fromJson((plan as Map).cast<String, dynamic>()),
+        (plan as Map).cast<String, dynamic>(),
     ];
+    // A catalog from before the document limit (cached or an old backend)
+    // would read as unlimited: use the built-in one instead.
+    if (raw.any((plan) => !plan.containsKey('maxDocuments'))) return builtIn;
+    final plans = [for (final plan in raw) AppPlan.fromJson(plan)];
     if (plans.isEmpty) return builtIn;
     return PlanCatalog(
       plans: plans,

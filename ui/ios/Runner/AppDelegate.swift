@@ -1,5 +1,6 @@
 import Flutter
 import UIKit
+import Vision
 
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
@@ -14,6 +15,9 @@ import UIKit
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
     if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "AllDocsICloud") {
       ICloudChannel.register(with: registrar.messenger())
+    }
+    if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "AllDocsOCR") {
+      OCRChannel.register(with: registrar.messenger())
     }
   }
 }
@@ -61,5 +65,78 @@ enum ICloudChannel {
       Thread.sleep(forTimeInterval: 0.3)
     }
     return false
+  }
+}
+
+/// On-device OCR with Apple Vision (TextRecognition on the Dart side).
+/// Boxes go back in image pixels with a top-left origin, like ML Kit's.
+enum OCRChannel {
+  static func register(with messenger: FlutterBinaryMessenger) {
+    let channel = FlutterMethodChannel(name: "alldocs/ocr", binaryMessenger: messenger)
+    channel.setMethodCallHandler { call, result in
+      guard call.method == "recognize" else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+      guard let path = (call.arguments as? [String: Any])?["path"] as? String,
+        let image = UIImage(contentsOfFile: path)?.cgImage
+      else {
+        result(FlutterError(code: "bad_args", message: "Unreadable image", details: nil))
+        return
+      }
+      DispatchQueue.global(qos: .userInitiated).async {
+        let reply: Any
+        do {
+          reply = try recognize(image, orientation: orientation(of: path))
+        } catch {
+          reply = FlutterError(code: "ocr_failed", message: error.localizedDescription, details: nil)
+        }
+        DispatchQueue.main.async { result(reply) }
+      }
+    }
+  }
+
+  private static func orientation(of path: String) -> CGImagePropertyOrientation {
+    let raw = UIImage(contentsOfFile: path)?.imageOrientation ?? .up
+    switch raw {
+    case .down: return .down
+    case .left: return .left
+    case .right: return .right
+    case .upMirrored: return .upMirrored
+    case .downMirrored: return .downMirrored
+    case .leftMirrored: return .leftMirrored
+    case .rightMirrored: return .rightMirrored
+    default: return .up
+    }
+  }
+
+  private static func recognize(
+    _ image: CGImage, orientation: CGImagePropertyOrientation
+  ) throws -> [String: Any] {
+    let request = VNRecognizeTextRequest()
+    request.recognitionLevel = .accurate
+    request.usesLanguageCorrection = true
+    request.recognitionLanguages = ["pt-BR", "en-US", "es-ES", "fr-FR"]  // Vision has no pt-PT; pt-BR reads it fine
+    try VNImageRequestHandler(cgImage: image, orientation: orientation).perform([request])
+
+    // Vision's boxes are normalized to the upright image.
+    let rotated = [.left, .right, .leftMirrored, .rightMirrored].contains(orientation)
+    let width = Double(rotated ? image.height : image.width)
+    let height = Double(rotated ? image.width : image.height)
+    var lines: [[String: Any]] = []
+    var text: [String] = []
+    for observation in request.results ?? [] {
+      guard let candidate = observation.topCandidates(1).first else { continue }
+      let box = observation.boundingBox
+      text.append(candidate.string)
+      lines.append([
+        "text": candidate.string,
+        "left": box.minX * width,
+        "top": (1 - box.maxY) * height,
+        "width": box.width * width,
+        "height": box.height * height,
+      ])
+    }
+    return ["text": text.joined(separator: "\n"), "lines": lines]
   }
 }

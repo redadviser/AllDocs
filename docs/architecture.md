@@ -154,32 +154,22 @@ Xcode/Apple Developer setup: the App ID `com.alldocs.app` needs the
 `iCloud.com.alldocs.app`) capabilities; `Runner.entitlements` already
 lists them.
 
-## iOS scanning parity (known gap, accepted for now)
+## Scanning and OCR
 
-`DocumentScannerService` uses `google_mlkit_document_scanner` on Android (real
-edge detection, auto-crop, multi-page capture). On iOS it falls back to a
-plain `image_picker` camera shot: no edge detection, no auto-crop, no
-multi-page batching. This is a real, currently-accepted gap, not an
-oversight — an iOS scanner reads worse than Apple's own free Notes app
-(which uses VisionKit).
+`DocumentScannerService` uses `cunning_document_scanner`: Google's ML Kit
+document scanner (Play services) on Android and Apple's VisionKit
+document camera on iOS, both with edge detection, auto-crop and several
+pages. The scanner's own PDF is kept as a fallback if building the
+searchable PDF fails.
 
-Researched options to close this later (evaluated 2026-07-28, re-check
-maintenance status before committing to one):
+OCR goes through our own `alldocs/ocr` channel (`TextRecognition`): ML
+Kit text recognition in `MainActivity.kt` on Android, Apple Vision in
+`AppDelegate.swift` on iOS. The Flutter `google_mlkit_*` plugins were
+dropped because their iOS pods have no arm64 simulator slice, which kept
+the app off the iOS 26 simulators on Apple silicon.
 
-- **`flutter_doc_scanner`** — wraps native `VNDocumentCameraViewController`
-  (VisionKit) on iOS and ML Kit on Android behind one API
-  (`getScanDocumentsUri()` returns page image URIs, compatible with our
-  existing OCR/searchable-PDF pipeline). v0.0.21, 162 likes/150 pub points,
-  but an unverified pub.dev uploader — worth a second look at adoption/issues
-  before depending on it.
-- **`cunning_document_scanner`**, **`doclens`**, **`aio_scanner`** — same
-  VisionKit-backed approach on iOS, not yet compared in depth.
-
-Decision: deferred. Ship with the `image_picker` fallback for now rather than
-add a native dependency from an unverified author without the ability to
-test on real iOS hardware in the session that evaluated it. Revisit as part
-of the roadmap's Phase 6 (hardening) before a paid iOS launch, testing
-candidates on a real device/simulator first.
+`pdf_manipulator` compiles its PDF engine from Rust source for iOS: the
+build machine needs Rust (rustup). The first build takes about 10 minutes.
 
 ## Cloud integrations (Google Drive, Dropbox)
 

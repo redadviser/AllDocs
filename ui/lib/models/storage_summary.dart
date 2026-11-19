@@ -9,20 +9,22 @@ class StorageBucket {
       StorageBucket(count: count + 1, bytes: bytes + size);
 }
 
-/// Space taken by every document file stored in the app — gallery, albums,
-/// archive and recycle bin — measured on disk, against the plan's limit.
+/// Every document stored in the app (gallery, albums, archive and recycle
+/// bin) with the space its files take, against the plan's document limit.
 /// The recycle bin is shown but doesn't count towards the limit, so a full
 /// library can always make room by deleting.
 class StorageSummary {
   const StorageSummary({
-    required this.limitBytes,
+    required this.limitDocuments,
     this.inAlbums = const StorageBucket(),
     this.withoutAlbum = const StorageBucket(),
     this.archivedOrDeleted = const StorageBucket(),
     this.trashBytes = 0,
+    this.trashCount = 0,
   });
 
-  final int limitBytes;
+  /// null = no limit.
+  final int? limitDocuments;
 
   /// Gallery documents that are in at least one album.
   final StorageBucket inAlbums;
@@ -35,28 +37,40 @@ class StorageSummary {
 
   /// The part of [archivedOrDeleted] that is in the recycle bin.
   final int trashBytes;
+  final int trashCount;
 
   int get documentCount =>
       inAlbums.count + withoutAlbum.count + archivedOrDeleted.count;
   int get usedBytes =>
       inAlbums.bytes + withoutAlbum.bytes + archivedOrDeleted.bytes;
 
-  /// What counts towards [limitBytes]: everything but the recycle bin.
-  int get countedBytes => usedBytes - trashBytes;
-  int get freeBytes =>
-      countedBytes >= limitBytes ? 0 : limitBytes - countedBytes;
-  bool get isFull => countedBytes >= limitBytes;
-  bool hasRoomFor(int bytes) => countedBytes + bytes <= limitBytes;
+  /// What counts towards [limitDocuments]: everything but the recycle bin.
+  int get countedDocuments => documentCount - trashCount;
+  int? get freeDocuments => switch (limitDocuments) {
+    null => null,
+    final limit => countedDocuments >= limit ? 0 : limit - countedDocuments,
+  };
+  bool get isFull => !hasRoomFor(1);
+  bool hasRoomFor(int documents) {
+    final limit = limitDocuments;
+    return limit == null || countedDocuments + documents <= limit;
+  }
 
-  double get usedRatio =>
-      limitBytes <= 0 ? 0 : (countedBytes / limitBytes).clamp(0.0, 1.0);
+  double get usedRatio {
+    final limit = limitDocuments;
+    return limit == null || limit <= 0
+        ? 0
+        : (countedDocuments / limit).clamp(0.0, 1.0);
+  }
+
   int get usedPercent => (usedRatio * 100).round();
 
-  StorageSummary withLimit(int limitBytes) => StorageSummary(
-    limitBytes: limitBytes,
+  StorageSummary withLimit(int? limitDocuments) => StorageSummary(
+    limitDocuments: limitDocuments,
     inAlbums: inAlbums,
     withoutAlbum: withoutAlbum,
     archivedOrDeleted: archivedOrDeleted,
     trashBytes: trashBytes,
+    trashCount: trashCount,
   );
 }

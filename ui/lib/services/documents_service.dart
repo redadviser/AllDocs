@@ -19,21 +19,20 @@ import 'secure_zip_extractor.dart';
 import 'security_lock_service.dart';
 import 'thumbnail_cache.dart';
 
-/// An import that doesn't fit in the space the plan allows.
+/// An import that would pass the plan's document limit.
 class StorageFullException implements Exception {
   const StorageFullException({
     required this.summary,
-    required this.neededBytes,
+    required this.neededDocuments,
   });
 
   final StorageSummary summary;
 
-  /// What the import would have added (0 when it isn't known up front,
-  /// like a camera scan, and the library is already full).
-  final int neededBytes;
+  /// Documents the import would have added.
+  final int neededDocuments;
 
   @override
-  String toString() => 'StorageFullException($neededBytes bytes)';
+  String toString() => 'StorageFullException($neededDocuments documents)';
 }
 
 class DocumentsService {
@@ -95,34 +94,19 @@ class DocumentsService {
         planName: plan.name,
         avatarUrl: avatarUrl,
         storageSummary: snapshot.profile.storageSummary.withLimit(
-          plan.storageBytes,
+          plan.maxDocuments,
         ),
       ),
     );
   }
 
-  /// Throws [StorageFullException] unless [bytes] more fit in the plan's
-  /// space. With [bytes] unknown (0), only a library that is already full
-  /// is refused.
-  Future<void> ensureRoomFor(int bytes) async {
+  /// Throws [StorageFullException] unless [documents] more fit in the
+  /// plan's document limit.
+  Future<void> ensureRoomFor(int documents) async {
     final summary = (await loadSnapshot()).profile.storageSummary;
-    final fits = bytes <= 0 ? !summary.isFull : summary.hasRoomFor(bytes);
-    if (!fits) {
-      throw StorageFullException(summary: summary, neededBytes: bytes);
+    if (!summary.hasRoomFor(documents)) {
+      throw StorageFullException(summary: summary, neededDocuments: documents);
     }
-  }
-
-  static Future<int> _sizeOfPaths(Iterable<String?> paths) async {
-    var total = 0;
-    for (final path in paths) {
-      if (path == null || path.isEmpty) continue;
-      try {
-        total += await File(path).length();
-      } catch (_) {
-        // Unreadable here; the import itself will skip or report it.
-      }
-    }
-    return total;
   }
 
   // Import --------------------------------------------------------------
@@ -140,7 +124,7 @@ class DocumentsService {
     List<PlatformFile> files, {
     String? albumId,
   }) async {
-    await ensureRoomFor(files.fold(0, (sum, file) => sum + file.size));
+    await ensureRoomFor(files.length);
     return _notifyIfImported(_store.importPickedFiles(files, albumId: albumId));
   }
 
@@ -149,7 +133,7 @@ class DocumentsService {
     String? albumId,
     DocumentSource source = DocumentSource.shared,
   }) async {
-    await ensureRoomFor(await _sizeOfPaths(paths));
+    await ensureRoomFor(paths.length);
     return _notifyIfImported(
       _store.importFilePaths(paths, albumId: albumId, source: source),
     );
@@ -167,9 +151,7 @@ class DocumentsService {
     List<ExtractedZipEntry> entries, {
     String? albumId,
   }) async {
-    await ensureRoomFor(
-      entries.fold(0, (sum, entry) => sum + entry.bytes.length),
-    );
+    await ensureRoomFor(entries.length);
     return _notifyIfImported(
       _store.importExtractedZipEntries(entries, albumId: albumId),
     );
@@ -179,8 +161,7 @@ class DocumentsService {
     String? albumId,
     ScanFilterChooser? chooseFilter,
   }) async {
-    // A scan's size is only known afterwards; refuse only a full library.
-    await ensureRoomFor(0);
+    await ensureRoomFor(1);
     return _notifyIfImported(
       SecurityLockService.withoutAutoLock(
         () => _store.scanDocumentWithCamera(
@@ -219,9 +200,7 @@ class DocumentsService {
     List<DocumentFile> documents, {
     String? albumId,
   }) async {
-    await ensureRoomFor(
-      await _sizeOfPaths(documents.map((document) => document.localPath)),
-    );
+    await ensureRoomFor(documents.length);
     return _notifyIfImported(
       _store.importScannedDocuments(documents, albumId: albumId),
     );
@@ -233,9 +212,7 @@ class DocumentsService {
     String? albumId,
     void Function(int done, int total)? onProgress,
   }) async {
-    await ensureRoomFor(
-      items.fold(0, (sum, item) => sum + (item.sizeBytes ?? 0)),
-    );
+    await ensureRoomFor(items.length);
     return _notifyIfImported(
       cloud.importItems(
         provider,

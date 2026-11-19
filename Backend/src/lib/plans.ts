@@ -2,8 +2,8 @@ import { sql } from './db'
 
 // AllDocs plans. `id` is what profiles.plan stores (and what the Adapty
 // access levels are called); `name` is what the app shows. Documents stay on
-// the phone, so `storageBytes` is how much the app lets a library hold, not
-// space on a server.
+// the phone, so the free plan is limited by how many documents it holds, not
+// by space.
 export type PlanId = 'free' | 'premium' | 'pro'
 export type BillingPeriod = 'monthly' | 'yearly'
 
@@ -27,15 +27,13 @@ export interface Plan {
   priceMonthlyCents: number
   priceYearlyCents: number
   currency: 'EUR'
-  storageBytes: number
+  // Documents the library may hold (recycle bin aside); null = no limit.
+  maxDocuments: number | null
   // null = no limit.
   maxActiveReminders: number | null
   maxDevices: number
   features: PlanFeature[]
 }
-
-const MB = 1024 * 1024
-const GB = 1024 * MB
 
 const FOLIO_FEATURES: PlanFeature[] = [
   'autoBackup',
@@ -52,7 +50,7 @@ export const PLANS: Plan[] = [
     priceMonthlyCents: 0,
     priceYearlyCents: 0,
     currency: 'EUR',
-    storageBytes: 500 * MB,
+    maxDocuments: 10,
     maxActiveReminders: 3,
     maxDevices: 1,
     features: [],
@@ -63,7 +61,7 @@ export const PLANS: Plan[] = [
     priceMonthlyCents: 199,
     priceYearlyCents: 1599,
     currency: 'EUR',
-    storageBytes: 5 * GB,
+    maxDocuments: null,
     maxActiveReminders: null,
     maxDevices: 2,
     features: FOLIO_FEATURES,
@@ -74,7 +72,7 @@ export const PLANS: Plan[] = [
     priceMonthlyCents: 499,
     priceYearlyCents: 3999,
     currency: 'EUR',
-    storageBytes: 50 * GB,
+    maxDocuments: null,
     maxActiveReminders: null,
     maxDevices: 3,
     features: [

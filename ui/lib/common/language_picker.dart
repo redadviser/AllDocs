@@ -7,10 +7,10 @@ import 'app_constants.dart';
 /// The app's languages, each named in itself so anyone can find their own
 /// whatever language the app is showing.
 const appLanguages = [
-  (locale: Locale('pt'), name: 'Português', flag: '🇵🇹'),
-  (locale: Locale('en'), name: 'English', flag: '🇬🇧'),
-  (locale: Locale('es'), name: 'Español', flag: '🇪🇸'),
-  (locale: Locale('fr'), name: 'Français', flag: '🇫🇷'),
+  (locale: Locale('pt'), name: 'Português'),
+  (locale: Locale('en'), name: 'English'),
+  (locale: Locale('es'), name: 'Español'),
+  (locale: Locale('fr'), name: 'Français'),
 ];
 
 /// Switches the app to [locale] and repaints it at once.
@@ -80,10 +80,7 @@ Future<void> showLanguageSheet(BuildContext context) {
                   ),
                   selected: language.locale.languageCode == current,
                   selectedTileColor: AppTheme.accent.withValues(alpha: 0.12),
-                  leading: Text(
-                    language.flag,
-                    style: const TextStyle(fontSize: 22),
-                  ),
+                  leading: LanguageFlag(language.locale.languageCode),
                   title: Text(
                     language.name,
                     style: const TextStyle(
@@ -111,7 +108,7 @@ Future<void> showLanguageSheet(BuildContext context) {
   );
 }
 
-/// A compact "🇵🇹 PT" chip that opens [showLanguageSheet] — for screens
+/// A compact flag + "PT" chip that opens [showLanguageSheet] — for screens
 /// shown before the settings are reachable, like sign-in.
 class LanguageButton extends StatelessWidget {
   const LanguageButton({super.key});
@@ -119,10 +116,6 @@ class LanguageButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final code = context.locale.languageCode;
-    final language = appLanguages.firstWhere(
-      (language) => language.locale.languageCode == code,
-      orElse: () => appLanguages.first,
-    );
     return Tooltip(
       message: AppConstants.authLanguage.tr(),
       child: Material(
@@ -138,7 +131,7 @@ class LanguageButton extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(language.flag, style: const TextStyle(fontSize: 15)),
+                LanguageFlag(code, width: 20),
                 const SizedBox(width: 6),
                 Text(
                   code.toUpperCase(),
@@ -157,6 +150,36 @@ class LanguageButton extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// The flag for a language (English shows the UK one). Images, not emoji:
+/// flag emojis render with uneven size and baseline across platforms.
+class LanguageFlag extends StatelessWidget {
+  const LanguageFlag(this.languageCode, {super.key, this.width = 28});
+
+  final String languageCode;
+  final double width;
+
+  @override
+  Widget build(BuildContext context) {
+    final country = languageCode == 'en' ? 'gb' : languageCode;
+    return Container(
+      width: width,
+      height: width * 0.7,
+      clipBehavior: Clip.antiAlias,
+      foregroundDecoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(4),
+        // Keeps white parts of a flag visible on light surfaces.
+        border: Border.all(color: Colors.black.withValues(alpha: 0.12)),
+      ),
+      decoration: BoxDecoration(borderRadius: BorderRadius.circular(4)),
+      child: Image.asset(
+        'assets/images/flags/$country.png',
+        fit: BoxFit.cover,
+        excludeFromSemantics: true,
       ),
     );
   }

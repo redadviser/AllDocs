@@ -589,7 +589,7 @@
   "plans": {
     "title": "Plans",
     "subtitle": "Your documents always stay on your phone. Choose how much space and which features you want.",
-    "usage": "{used} of {limit} used",
+    "usage": "{used} of {limit} documents",
     "monthly": "Monthly",
     "yearly": "Yearly",
     "save": "Save {percent}%",
@@ -602,7 +602,6 @@
     "current": "Current plan",
     "recommended": "Recommended",
     "choose": "Choose {plan}",
-    "storage": "{size} of space",
     "any_size": "Documents of any size",
     "reminders_limited": "Up to {count} expiry alerts",
     "reminders_unlimited": "Unlimited expiry alerts",
@@ -626,12 +625,14 @@
     "pending": "The purchase is pending. The plan turns on as soon as it's confirmed.",
     "failed": "That didn't go through. Check your connection and try again.",
     "unavailable": "Purchases aren't available in this version of the app yet.",
-    "storage_full_title": "No space left in {plan}",
-    "storage_full_message": "This needs {needed}, but you only have {free} free of your plan's {limit}. Change plan or free up space by deleting documents.",
-    "storage_full_message_unknown": "You've used your plan's {limit}. Change plan or free up space by deleting documents.",
+    "storage_full_title": "{plan} limit reached",
+    "storage_full_message": "This adds {needed} documents, but you only have {free} left of your plan's {limit}. What you've saved stays here. Change plan or delete documents to make room.",
+    "storage_full_message_unknown": "You already have your plan's {limit} documents. What you've saved stays here. Change plan or delete documents to make room.",
     "see_plans": "See plans",
     "not_now": "Not now",
-    "auto_backup_locked": "Automatic backup is included in Folio and Vault."
+    "auto_backup_locked": "Automatic backup is included in Folio and Vault.",
+    "documents_limited": "Up to {count} documents",
+    "documents_unlimited": "Unlimited documents"
   },
   "pdf": {
     "tools": "PDF tools",

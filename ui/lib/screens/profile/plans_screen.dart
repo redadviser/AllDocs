@@ -8,21 +8,9 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../common/app_constants.dart';
 import '../../common/document_actions.dart' show showSnack;
-import '../../common/zip_preview_sheet.dart' show formatBytes;
 import '../../models/models.dart';
 import '../../services/services.dart';
 import '../../theme/app_theme.dart';
-
-/// A plan's space as people say it: "500 MB", "5 GB".
-String _planSize(int bytes) {
-  const mb = 1024 * 1024;
-  const gb = 1024 * mb;
-  return bytes >= gb && bytes % gb == 0
-      ? '${bytes ~/ gb} GB'
-      : bytes % mb == 0
-      ? '${bytes ~/ mb} MB'
-      : formatBytes(bytes);
-}
 
 Future<void> openPlansScreen(BuildContext context, {StorageSummary? summary}) {
   return Navigator.of(context).push(
@@ -315,7 +303,7 @@ class _PlansPanelState extends State<PlansPanel> {
 
   Widget _buildContent(AppPlan current) {
     final catalog = PlanService.catalog;
-    final summary = widget.summary?.withLimit(current.storageBytes);
+    final summary = widget.summary?.withLimit(current.maxDocuments);
     final storeName = Platform.isIOS ? 'App Store' : 'Google Play';
 
     return Column(
@@ -326,7 +314,7 @@ class _PlansPanelState extends State<PlansPanel> {
           const _DebugPlanSwitch(),
           const SizedBox(height: 12),
         ],
-        if (summary != null) ...[
+        if (summary != null && summary.limitDocuments != null) ...[
           _UsageBar(summary: summary, plan: current),
           const SizedBox(height: 12),
         ],
@@ -428,8 +416,8 @@ class _UsageBar extends StatelessWidget {
               Text(
                 AppConstants.plansUsage.tr(
                   namedArgs: {
-                    'used': formatBytes(summary.countedBytes),
-                    'limit': _planSize(summary.limitBytes),
+                    'used': '${summary.countedDocuments}',
+                    'limit': '${summary.limitDocuments}',
                   },
                 ),
                 style: const TextStyle(
@@ -443,7 +431,7 @@ class _UsageBar extends StatelessWidget {
           ClipRRect(
             borderRadius: BorderRadius.circular(99),
             child: LinearProgressIndicator(
-              value: summary.countedBytes == 0
+              value: summary.countedDocuments == 0
                   ? 0
                   : summary.usedRatio.clamp(0.01, 1.0),
               minHeight: 8,
@@ -775,10 +763,12 @@ class _PlanCard extends StatelessWidget {
   List<Widget> _features() {
     final rows = <Widget>[
       _FeatureRow(
-        icon: Icons.folder_outlined,
-        text: AppConstants.plansStorage.tr(
-          namedArgs: {'size': _planSize(plan.storageBytes)},
-        ),
+        icon: Icons.description_outlined,
+        text: plan.maxDocuments == null
+            ? AppConstants.plansDocumentsUnlimited.tr()
+            : AppConstants.plansDocumentsLimited.tr(
+                namedArgs: {'count': '${plan.maxDocuments}'},
+              ),
         strong: true,
       ),
       _FeatureRow(
