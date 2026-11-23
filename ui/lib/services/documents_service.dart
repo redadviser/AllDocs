@@ -109,6 +109,32 @@ class DocumentsService {
     }
   }
 
+  /// Imports the [items] no bigger than the plan allows per document; the
+  /// rest are counted in [ImportResult.skippedTooLarge].
+  Future<ImportResult> _importWithinSizeLimit<T>(
+    List<T> items,
+    int Function(T item) sizeOf,
+    Future<ImportResult> Function(List<T> kept) import,
+  ) async {
+    final maxBytes = PlanService.current.value.maxDocumentBytes;
+    final kept = [
+      for (final item in items)
+        if (sizeOf(item) <= maxBytes) item,
+    ];
+    final tooLarge = ImportResult(skippedTooLarge: items.length - kept.length);
+    if (kept.isEmpty) return tooLarge;
+    await ensureRoomFor(kept.length);
+    return await _notifyIfImported(import(kept)) + tooLarge;
+  }
+
+  static int _fileSize(String path) {
+    try {
+      return File(path).lengthSync();
+    } on FileSystemException {
+      return 0;
+    }
+  }
+
   // Import --------------------------------------------------------------
 
   Future<List<PlatformFile>> pickFilesForImport({
@@ -124,8 +150,11 @@ class DocumentsService {
     List<PlatformFile> files, {
     String? albumId,
   }) async {
-    await ensureRoomFor(files.length);
-    return _notifyIfImported(_store.importPickedFiles(files, albumId: albumId));
+    return _importWithinSizeLimit(
+      files,
+      (file) => file.size,
+      (kept) => _store.importPickedFiles(kept, albumId: albumId),
+    );
   }
 
   Future<ImportResult> importFilePaths(
@@ -133,9 +162,10 @@ class DocumentsService {
     String? albumId,
     DocumentSource source = DocumentSource.shared,
   }) async {
-    await ensureRoomFor(paths.length);
-    return _notifyIfImported(
-      _store.importFilePaths(paths, albumId: albumId, source: source),
+    return _importWithinSizeLimit(
+      paths,
+      _fileSize,
+      (kept) => _store.importFilePaths(kept, albumId: albumId, source: source),
     );
   }
 
@@ -151,9 +181,10 @@ class DocumentsService {
     List<ExtractedZipEntry> entries, {
     String? albumId,
   }) async {
-    await ensureRoomFor(entries.length);
-    return _notifyIfImported(
-      _store.importExtractedZipEntries(entries, albumId: albumId),
+    return _importWithinSizeLimit(
+      entries,
+      (entry) => entry.bytes.length,
+      (kept) => _store.importExtractedZipEntries(kept, albumId: albumId),
     );
   }
 
@@ -200,9 +231,10 @@ class DocumentsService {
     List<DocumentFile> documents, {
     String? albumId,
   }) async {
-    await ensureRoomFor(documents.length);
-    return _notifyIfImported(
-      _store.importScannedDocuments(documents, albumId: albumId),
+    return _importWithinSizeLimit(
+      documents,
+      (document) => document.sizeBytes,
+      (kept) => _store.importScannedDocuments(kept, albumId: albumId),
     );
   }
 
@@ -212,12 +244,15 @@ class DocumentsService {
     String? albumId,
     void Function(int done, int total)? onProgress,
   }) async {
-    await ensureRoomFor(items.length);
-    return _notifyIfImported(
-      cloud.importItems(
+    // Items without a reported size are checked again once downloaded.
+    return _importWithinSizeLimit(
+      items,
+      (item) => item.sizeBytes ?? 0,
+      (kept) => cloud.importItems(
         provider,
-        items,
+        kept,
         albumId: albumId,
+        maxBytes: PlanService.current.value.maxDocumentBytes,
         onProgress: onProgress,
       ),
     );

@@ -1,6 +1,9 @@
 import crypto from 'crypto'
-import { mkdir, readFile, rm, writeFile } from 'fs/promises'
+import { createReadStream, createWriteStream } from 'fs'
+import { appendFile, mkdir, open, readFile, rename, rm, stat, writeFile } from 'fs/promises'
 import path from 'path'
+import { Readable, Transform } from 'stream'
+import { pipeline } from 'stream/promises'
 
 // Files people send through document requests wait here — encrypted
 // (AES-256-GCM), one file each — only until the requester's app collects
@@ -25,8 +28,14 @@ function key(): Buffer {
     .digest()
 }
 
+// Files written by storeEncryptedStream carry this suffix: their layout is
+// IV, ciphertext, auth tag (the tag is only known at the end of a stream).
+const STREAMED = '.gcm2'
+
+export class StoredTooLargeError extends Error {}
+
 function pathFor(name: string): string {
-  if (!/^[0-9a-f-]{36}$/.test(name)) throw new Error('Invalid stored file name')
+  if (!/^[0-9a-f-]{36}(\.gcm2)?$/.test(name)) throw new Error('Invalid stored file name')
   return path.join(DIR, name)
 }
 
@@ -51,4 +60,64 @@ export async function readDecrypted(name: string): Promise<Buffer> {
 
 export async function removeStored(name: string): Promise<void> {
   await rm(pathFor(name), { force: true })
+}
+
+/// Streams [source] to disk encrypted, failing once it passes [maxBytes],
+/// so a large file never sits in memory. Returns the name to read or
+/// delete it by and the plaintext size (0 = nothing was sent).
+export async function storeEncryptedStream(
+  source: Readable,
+  maxBytes: number
+): Promise<{ name: string; size: number }> {
+  await mkdir(DIR, { recursive: true })
+  const name = `${crypto.randomUUID()}${STREAMED}`
+  const target = pathFor(name)
+  const temp = `${target}.part`
+  const iv = crypto.randomBytes(12)
+  const cipher = crypto.createCipheriv('aes-256-gcm', key(), iv)
+  let size = 0
+  const limit = new Transform({
+    transform(chunk: Buffer, _encoding, callback) {
+      size += chunk.length
+      if (size > maxBytes) callback(new StoredTooLargeError('File too large'))
+      else callback(null, chunk)
+    },
+  })
+  try {
+    await writeFile(temp, iv)
+    await pipeline(source, limit, cipher, createWriteStream(temp, { flags: 'a' }))
+    await appendFile(temp, cipher.getAuthTag())
+    await rename(temp, target)
+  } catch (error) {
+    await rm(temp, { force: true })
+    throw error
+  }
+  return { name, size }
+}
+
+/// A stored file as a decrypting stream, plus its plaintext size. Files
+/// from storeEncrypted are small and decrypted in memory.
+export async function openDecrypted(name: string): Promise<{ stream: Readable; size: number }> {
+  if (!name.endsWith(STREAMED)) {
+    const bytes = await readDecrypted(name)
+    return { stream: Readable.from([bytes]), size: bytes.length }
+  }
+  const file = pathFor(name)
+  const { size } = await stat(file)
+  const iv = Buffer.alloc(12)
+  const tag = Buffer.alloc(16)
+  const handle = await open(file, 'r')
+  try {
+    await handle.read(iv, 0, 12, 0)
+    await handle.read(tag, 0, 16, size - 16)
+  } finally {
+    await handle.close()
+  }
+  const decipher = crypto.createDecipheriv('aes-256-gcm', key(), iv)
+  decipher.setAuthTag(tag)
+  // A tampered file fails at the end of the stream (the tag check), after
+  // the bytes before it went out: the response is cut short, not served whole.
+  const encrypted = createReadStream(file, { start: 12, end: size - 17 })
+  encrypted.on('error', (error) => decipher.destroy(error))
+  return { stream: encrypted.pipe(decipher), size: size - 28 }
 }

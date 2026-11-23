@@ -99,6 +99,19 @@ void main() {
       expect(entries.map((e) => e.fileName), ['small.pdf']);
     });
 
+    test('counts the entries over the per-file cap', () async {
+      final zip = _buildZip([
+        ('huge.pdf', List<int>.filled(1000, 65)),
+        ('small.pdf', _text('ok')),
+      ]);
+
+      final inspection = await const SecureZipExtractor(
+        limits: ZipExtractionLimits(maxEntryUncompressedBytes: 500),
+      ).inspectInBackground(zip);
+
+      expect(inspection.oversizedCount, 1);
+    });
+
     test('stops once the combined size budget is exceeded', () {
       final zip = _buildZip([
         ('a.pdf', List<int>.filled(300, 65)),

@@ -6,6 +6,7 @@ import '../screens/profile/plans_screen.dart';
 import '../services/services.dart';
 import '../theme/app_theme.dart';
 import 'app_constants.dart';
+import 'document_actions.dart';
 
 /// Runs an import; one that doesn't fit in the plan's space explains why
 /// and offers the plans instead of failing silently.
@@ -86,3 +87,29 @@ Future<void> showPlansPrompt(
     await openPlansScreen(context, summary: summary);
   }
 }
+
+/// Files left out of an import for being bigger than the plan allows per
+/// document. The top plan has nothing to upgrade to, so it only gets a note.
+Future<void> showTooLargeNotice(BuildContext context, int count) {
+  final plan = PlanService.current.value;
+  final message = AppConstants.plansDocumentTooLargeMessage.tr(
+    namedArgs: {
+      'count': '$count',
+      'plan': plan.name,
+      'limit': megabytes(plan.maxDocumentBytes),
+    },
+  );
+  if (plan.id == AppPlan.pro) {
+    showSnack(context, message);
+    return Future.value();
+  }
+  return showPlansPrompt(
+    context,
+    title: AppConstants.plansStorageFullTitle.tr(
+      namedArgs: {'plan': plan.name},
+    ),
+    message: message,
+  );
+}
+
+String megabytes(int bytes) => '${(bytes / (1024 * 1024)).ceil()} MB';

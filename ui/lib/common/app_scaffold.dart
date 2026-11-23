@@ -144,7 +144,11 @@ class _MainNavScreenState extends State<MainNavScreen> {
             onOpenArchive: _openArchive,
             onOpenCloud: _openCloud,
           ),
-          ProfileScreen(documentsService: _documentsService),
+          ProfileScreen(
+            documentsService: _documentsService,
+            onOpenShelf: () => _selectPage(_shelfTab),
+            onOpenGallery: () => _selectPage(_galleryTab),
+          ),
         ];
 
         return Scaffold(

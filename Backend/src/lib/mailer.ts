@@ -1,4 +1,5 @@
 import nodemailer, { type Transporter } from 'nodemailer'
+import { isLocalDevelopment } from './env'
 
 // Outgoing email over SMTP (any provider: Google Workspace, Zoho, Mailgun,
 // SES...). Configured with SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASS and
@@ -35,7 +36,7 @@ export async function sendMail(mail: Mail): Promise<void> {
   if (!isMailConfigured()) {
     // Local development: show what would have been sent. Never in
     // production — the message can carry a password reset link.
-    if (process.env.NODE_ENV !== 'production') {
+    if (isLocalDevelopment()) {
       console.log(`[mail not configured] To: ${mail.to}\nSubject: ${mail.subject}\n\n${mail.text}`)
     } else {
       console.error('sendMail: SMTP is not configured, email not sent')

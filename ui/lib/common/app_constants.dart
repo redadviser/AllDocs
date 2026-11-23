@@ -30,6 +30,7 @@ class AppConstants {
   static const authDisplayName = 'auth.display_name';
   static const authEmail = 'auth.email';
   static const authPassword = 'auth.password';
+  static const authPasswordTooShort = 'auth.password_too_short';
   static const authForgot = 'auth.forgot';
   static const authForgotTitle = 'auth.forgot_title';
   static const authForgotMessage = 'auth.forgot_message';
@@ -67,6 +68,7 @@ class AppConstants {
   static const securityForgotMessage = 'security.forgot_message';
   static const securityForgotAction = 'security.forgot_action';
   static const securityInvalidPin = 'security.invalid_pin';
+  static const securityPinLocked = 'security.pin_locked';
   static const securityChangePin = 'security.change_pin';
   static const securityChangePinCurrent = 'security.change_pin_current';
   static const securityChangePinNew = 'security.change_pin_new';
@@ -428,6 +430,7 @@ class AppConstants {
   static const zipLargeMessage = 'zip.large_message';
   static const zipLargeContinue = 'zip.large_continue';
   static const zipNestedSkipped = 'zip.nested_skipped';
+  static const zipOversizedSkipped = 'zip.oversized_skipped';
   static const scanFilterTitle = 'scan_filter.title';
   static const scanFilterPages = 'scan_filter.pages';
   static const scanFilterOriginal = 'scan_filter.original';
@@ -616,6 +619,8 @@ class AppConstants {
   static const plansStorageFullMessage = 'plans.storage_full_message';
   static const plansStorageFullMessageUnknown =
       'plans.storage_full_message_unknown';
+  static const plansDocumentTooLargeMessage =
+      'plans.document_too_large_message';
   static const plansSeePlans = 'plans.see_plans';
   static const plansNotNow = 'plans.not_now';
   static const plansAutoBackupLocked = 'plans.auto_backup_locked';

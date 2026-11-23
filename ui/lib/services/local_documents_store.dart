@@ -1606,33 +1606,15 @@ class LocalDocumentsStore {
     final cached = _cachedState;
     if (cached != null) return cached;
 
-    final file = await _stateFile();
-    if (!await file.exists()) {
+    final stored = await _readStateFile(await _stateFile());
+    if (stored == null) {
       final initial = _initialState();
       await _writeState(initial);
       return initial;
     }
-
-    try {
-      // Parsing runs off the UI thread — with enough accumulated documents
-      // (each carrying its own extracted text) this file stops being "small
-      // JSON", and this is only the cold path anyway: every read after this
-      // one is served straight from _cachedState.
-      final raw = await file.readAsString();
-      final decoded = await Isolate.run(() => jsonDecode(raw));
-      if (decoded is Map<String, dynamic>) {
-        final migrated = _migrateState(decoded);
-        if (migrated) await _writeState(decoded);
-        _cachedState = decoded;
-        return decoded;
-      }
-    } catch (_) {
-      // Fall through to a clean state if the local JSON becomes unreadable.
-    }
-
-    final initial = _initialState();
-    await _writeState(initial);
-    return initial;
+    if (stored.migrated) await _writeState(stored.state);
+    _cachedState = stored.state;
+    return stored.state;
   }
 
   Future<void> _writeState(
@@ -1704,7 +1686,7 @@ class LocalDocumentsStore {
         await sharedDocuments.rename(userDocuments.path);
       }
       await sharedState.rename(userState.path);
-      final state = await _readStateFile(userState);
+      final state = (await _readStateFile(userState))?.state;
       if (state == null) return;
       await userDocuments.create(recursive: true);
       _relinkStoredFiles(state, userDocuments);
@@ -1764,12 +1746,12 @@ class LocalDocumentsStore {
       final noMedia = File('${library.path}/.nomedia');
       if (!await noMedia.exists()) await noMedia.create();
 
-      final libraryState = await _readStateFile(
+      final libraryState = (await _readStateFile(
         File('${library.path}/$stateFileName'),
-      );
+      ))?.state;
       final internal = await _internalDirectory();
       final internalStateFile = File('${internal.path}/$stateFileName');
-      final internalState = await _readStateFile(internalStateFile);
+      final internalState = (await _readStateFile(internalStateFile))?.state;
 
       final state = libraryState ?? internalState ?? _initialState();
       if (internalState != null && libraryState != null) {
@@ -1791,16 +1773,30 @@ class LocalDocumentsStore {
     }
   }
 
-  Future<Map<String, dynamic>?> _readStateFile(File file) async {
+  /// The state in [file] (and whether it needed migrating), or null when
+  /// there is none. A file that can't be parsed is renamed aside, never
+  /// written over: the documents are still on disk and it's what holds their
+  /// names, albums and tags. A failed read (storage unmounted, permission
+  /// revoked) throws, so it's never taken for an empty library.
+  Future<({Map<String, dynamic> state, bool migrated})?> _readStateFile(
+    File file,
+  ) async {
     if (!await file.exists()) return null;
+    final bytes = await file.readAsBytes();
     try {
-      final decoded = jsonDecode(await file.readAsString());
-      if (decoded is! Map<String, dynamic>) return null;
-      _migrateState(decoded);
-      return decoded;
+      // Off the UI thread: with a long document history (each carrying its
+      // extracted text) this is no longer a small file.
+      final decoded = await Isolate.run(() => jsonDecode(utf8.decode(bytes)));
+      if (decoded is Map<String, dynamic>) {
+        return (state: decoded, migrated: _migrateState(decoded));
+      }
     } catch (_) {
-      return null;
+      // Not JSON, not UTF-8, or a shape the migration can't handle.
     }
+    await file.rename(
+      '${file.path}.unreadable-${DateTime.now().millisecondsSinceEpoch}',
+    );
+    return null;
   }
 
   /// Adds [other]'s documents and albums that [state] doesn't have yet.

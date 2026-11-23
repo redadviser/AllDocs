@@ -502,11 +502,14 @@ class _PinUnlockScreenState extends State<PinUnlockScreen> {
       _errorText = null;
     });
     final ok = await widget.onUnlockWithPin(pin);
+    final error = ok
+        ? null
+        : await _wrongPinMessage(SecurityLockService().pinLockRemaining());
     if (!mounted) return;
     if (!ok) HapticFeedback.mediumImpact();
     setState(() {
       _submitting = false;
-      _errorText = ok ? null : AppConstants.securityInvalidPin.tr();
+      _errorText = error;
       if (!ok) {
         _pin = '';
         _errorCount++;
@@ -627,8 +630,14 @@ class _PinChangeScreenState extends State<PinChangeScreen> {
       case _PinChangeStep.current:
         setState(() => _submitting = true);
         final valid = await _securityLockService.verifyPin(_pin);
+        if (!valid) {
+          final error = await _wrongPinMessage(
+            _securityLockService.pinLockRemaining(),
+          );
+          if (mounted) _fail(error);
+          return;
+        }
         if (!mounted) return;
-        if (!valid) return _fail(AppConstants.securityInvalidPin.tr());
         setState(() {
           _submitting = false;
           _pin = '';
@@ -793,12 +802,18 @@ class _HiddenAlbumsPinScreenState extends State<HiddenAlbumsPinScreen> {
     switch (_step) {
       case _HiddenPinStep.enter:
         final valid = await HiddenAlbumsLock.verifyPin(_pin);
+        if (!valid) {
+          final error = await _wrongPinMessage(
+            HiddenAlbumsLock.lockRemaining(),
+          );
+          if (mounted) _fail(error);
+          return;
+        }
         if (!mounted) return;
-        if (!valid) return _fail(AppConstants.securityInvalidPin.tr());
         Navigator.of(context).pop(true);
       case _HiddenPinStep.create:
         // The app PIN would defeat the point of a second lock.
-        if (await SecurityLockService().verifyPin(_pin)) {
+        if (await SecurityLockService().isAppPin(_pin)) {
           return _fail(AppConstants.hiddenSameAsApp.tr());
         }
         if (!mounted) return;
@@ -1369,4 +1384,13 @@ String _securityGreeting(BuildContext context, String name) {
       ? AppConstants.securityGreetingAfternoon
       : AppConstants.securityGreetingEvening;
   return key.tr(namedArgs: {'name': name});
+}
+
+/// "Wrong PIN", or how long to wait once too many were wrong.
+Future<String> _wrongPinMessage(Future<Duration> remaining) async {
+  final wait = await remaining;
+  if (wait <= Duration.zero) return AppConstants.securityInvalidPin.tr();
+  return AppConstants.securityPinLocked.tr(
+    namedArgs: {'time': pinWaitLabel(wait)},
+  );
 }

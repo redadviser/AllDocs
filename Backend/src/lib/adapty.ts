@@ -1,3 +1,5 @@
+import crypto from 'crypto'
+
 // Adapty: the app buys subscriptions through the Adapty SDK (App Store /
 // Google Play billing), identifying the buyer with the AllDocs user id as
 // `customer_user_id`. This server learns about them two ways: Adapty's
@@ -32,7 +34,10 @@ function configuredWebhookAuthValues(): string[] {
 export function isAdaptyWebhookAuthorized(headerValue: string | undefined): boolean {
   const allowed = configuredWebhookAuthValues()
   const received = headerValue?.trim()
-  return allowed.length > 0 && !!received && allowed.includes(received)
+  if (!received) return false
+  // Constant-time, so the secret can't be guessed from response timing.
+  const digest = (value: string) => crypto.createHash('sha256').update(value).digest()
+  return allowed.some((value) => crypto.timingSafeEqual(digest(value), digest(received)))
 }
 
 export function isAdaptyServerApiConfigured(): boolean {

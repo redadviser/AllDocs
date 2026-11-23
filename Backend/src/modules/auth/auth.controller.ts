@@ -9,6 +9,7 @@ import {
 import { sql } from '../../lib/db'
 import { releaseSessionDevices } from '../sync/sync.service'
 import * as authService from './auth.service'
+import { MIN_PASSWORD_LENGTH } from '../password/password.service'
 
 export async function login(req: Request, res: Response) {
   try {
@@ -35,8 +36,11 @@ export async function signup(req: Request, res: Response) {
       res.status(400).json({ error: 'Email and password are required' })
       return
     }
-    if (password.length < 6) {
-      res.status(400).json({ error: 'Password must be at least 6 characters' })
+    if (typeof password !== 'string' || password.length < MIN_PASSWORD_LENGTH) {
+      res.status(400).json({
+        error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters`,
+        code: 'passwordTooShort',
+      })
       return
     }
 

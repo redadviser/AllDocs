@@ -105,6 +105,7 @@ export const openApiSpec = {
           priceYearlyCents: { type: 'integer', example: 1599 },
           currency: { type: 'string', example: 'EUR' },
           maxDocuments: { type: 'integer', nullable: true, description: 'Documents the library may hold; null = unlimited', example: 10 },
+          maxDocumentBytes: { type: 'integer', description: 'Largest single document that can be imported, in bytes', example: 52428800 },
           maxActiveReminders: { type: 'integer', nullable: true, description: 'null = unlimited', example: null },
           maxDevices: { type: 'integer', example: 2 },
           features: {
@@ -1151,6 +1152,49 @@ export const openApiSpec = {
         summary: 'Snapshot loaded: carry on from its sequence number',
         security: [{ sessionCookie: [] }],
         responses: { 200: { description: 'OK' } },
+      },
+    },
+    '/api/security/vault-key': {
+      get: {
+        tags: ['Auth'],
+        summary: "The copy of the account's library key, to open the library after a reinstall",
+        security: [{ sessionCookie: [] }],
+        responses: {
+          200: { description: '{key (base64, 32 bytes), keyCheck (64 hex)}' },
+          401: { description: 'Not authenticated' },
+          404: { description: 'notFound: no key stored' },
+          429: { description: 'rateLimited (20 per 15 min)' },
+          503: { description: 'unavailable: KEY_ESCROW_SECRET not configured' },
+        },
+      },
+      put: {
+        tags: ['Auth'],
+        summary: "Store the library key once; never replaces a stored one",
+        security: [{ sessionCookie: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['key', 'keyCheck'],
+                properties: {
+                  key: { type: 'string', description: '32 bytes in base64' },
+                  keyCheck: { type: 'string', description: '64 hex characters' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          201: { description: 'Stored' },
+          200: { description: 'The same key was already stored' },
+          400: { description: 'badKey' },
+          401: { description: 'Not authenticated' },
+          409: { description: 'conflict: a different key is stored' },
+          429: { description: 'rateLimited (20 per 15 min)' },
+          503: { description: 'unavailable: KEY_ESCROW_SECRET not configured' },
+        },
       },
     },
     '/api/security/hidden-pin-reset': {

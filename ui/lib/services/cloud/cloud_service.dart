@@ -65,6 +65,7 @@ class CloudService {
     CloudProvider provider,
     List<CloudItem> items, {
     String? albumId,
+    int? maxBytes,
     void Function(int done, int total)? onProgress,
   }) async {
     final files = items
@@ -74,6 +75,11 @@ class CloudService {
     for (var index = 0; index < files.length; index++) {
       final item = files[index];
       final downloaded = await provider.download(item);
+      if (maxBytes != null && downloaded.bytes.length > maxBytes) {
+        result += const ImportResult(skippedTooLarge: 1);
+        onProgress?.call(index + 1, files.length);
+        continue;
+      }
       result =
           result +
           await _store.importBytes(

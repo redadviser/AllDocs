@@ -11,13 +11,32 @@ class SettingsCard extends StatelessWidget {
     super.key,
     required this.child,
     this.padding = const EdgeInsets.all(12),
+    this.onTap,
   });
 
   final Widget child;
   final EdgeInsetsGeometry padding;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
+    if (onTap != null) {
+      return Material(
+        color: AppTheme.surface,
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: const BorderSide(color: AppTheme.border),
+        ),
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: padding,
+            child: SizedBox(width: double.infinity, child: child),
+          ),
+        ),
+      );
+    }
     return Container(
       width: double.infinity,
       padding: padding,

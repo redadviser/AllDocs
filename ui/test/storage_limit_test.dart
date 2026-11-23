@@ -24,6 +24,7 @@ void main() {
       priceMonthlyCents: 0,
       priceYearlyCents: 0,
       maxDocuments: 1,
+      maxDocumentBytes: 1000,
       maxActiveReminders: 3,
       maxDevices: 1,
       features: {},
@@ -42,6 +43,18 @@ void main() {
   List<ExtractedZipEntry> file(String name, int length) => [
     ExtractedZipEntry(fileName: name, bytes: utf8.encode(name[0] * length)),
   ];
+
+  test('a document bigger than the plan allows is left out', () async {
+    final result = await service.importExtractedZipEntries([
+      ...file('big.txt', 1001),
+      ...file('a.txt', 600),
+    ]);
+
+    expect(result.count, 1);
+    expect(result.skippedTooLarge, 1);
+    final snapshot = await service.loadSnapshot();
+    expect(snapshot.documents.single.fileName, 'a.txt');
+  });
 
   test('an import that would pass the plan limit is refused', () async {
     await service.importExtractedZipEntries(file('a.txt', 600));

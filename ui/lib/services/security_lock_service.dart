@@ -6,6 +6,7 @@ import 'package:local_auth/local_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'current_user.dart';
+import 'pin_throttle.dart';
 
 class SecurityLockService {
   SecurityLockService({LocalAuthentication? localAuthentication})
@@ -24,6 +25,8 @@ class SecurityLockService {
   static String get _pinSaltKey => CurrentUser.scoped(_baseKeys[2]);
   static String get _biometricEnabledKey => CurrentUser.scoped(_baseKeys[3]);
   static const _biometricProbeTimeout = Duration(seconds: 2);
+  static PinThrottle get _throttle =>
+      PinThrottle(CurrentUser.scoped('security.pin_throttle.v1'));
 
   final LocalAuthentication _localAuthentication;
 
@@ -83,6 +86,7 @@ class SecurityLockService {
     await prefs.setString(_pinSaltKey, salt);
     await prefs.setString(_pinHashKey, _hashPin(pin, salt));
     await prefs.remove(_legacyPinKey);
+    await _throttle.reset();
   }
 
   /// Forgets this account's PIN (and the biometrics that stood in for it),
@@ -96,7 +100,20 @@ class SecurityLockService {
     await prefs.remove(_biometricEnabledKey);
   }
 
+  /// Checks an unlock attempt. Wrong ones count towards [pinLockRemaining];
+  /// while that runs, every attempt fails without being checked.
   Future<bool> verifyPin(String pin) async {
+    if (await _throttle.remaining() > Duration.zero) return false;
+    final ok = await isAppPin(pin);
+    ok ? await _throttle.reset() : await _throttle.recordFailure();
+    return ok;
+  }
+
+  Future<Duration> pinLockRemaining() => _throttle.remaining();
+
+  /// Whether [pin] is the app PIN, without counting as an unlock attempt
+  /// (e.g. refusing it as the hidden albums' PIN).
+  Future<bool> isAppPin(String pin) async {
     final prefs = await _prefs();
     final pinHash = prefs.getString(_pinHashKey);
     if (pinHash != null && pinHash.isNotEmpty) {

@@ -20,6 +20,8 @@ import { syncRouter } from './modules/sync/sync.routes'
 import { accountRouter, deletionPageRouter } from './modules/account/account.routes'
 import { hiddenPinPageRouter, hiddenPinRouter } from './modules/hidden-pin/hidden-pin.routes'
 import { purgeOld as purgeOldSync } from './modules/sync/sync.service'
+import { vaultKeyRouter } from './modules/vault-key/vault-key.routes'
+import { isEscrowConfigured } from './lib/key-escrow'
 
 const app = express()
 
@@ -91,6 +93,7 @@ app.use('/api/shares', sharesRouter)
 app.use('/api/sync', syncRouter)
 app.use('/api/account', accountRouter)
 app.use('/api/security/hidden-pin-reset', hiddenPinRouter)
+app.use('/api/security/vault-key', vaultKeyRouter)
 app.use(hiddenPinPageRouter)
 
 app.use((_req, res) => {
@@ -103,6 +106,11 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 })
 
 const port = Number(process.env.PORT || 3000)
+// Not fatal: the rest of the API keeps working and the key endpoints
+// answer 503 until it is set.
+if (!isEscrowConfigured()) {
+  console.error('KEY_ESCROW_SECRET is missing or invalid: library key backup is off')
+}
 ensureSchema()
   .catch((error) => {
     // Keep serving: the tables may already exist and the DB be briefly

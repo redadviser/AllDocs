@@ -284,4 +284,14 @@ CREATE TABLE IF NOT EXISTS account_deletions (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- A copy of each account's library key (documents are encrypted on the
+-- phone with it), sealed with KEY_ESCROW_SECRET. Written once, never
+-- replaced; deleting the account deletes it.
+CREATE TABLE IF NOT EXISTS vault_keys (
+  user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  sealed TEXT NOT NULL,
+  key_check TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 COMMIT;

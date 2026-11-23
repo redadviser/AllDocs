@@ -102,7 +102,9 @@ Future<ImportResult> importIncomingFiles(
   if (!context.mounted) return result;
   // Opened / shared from another app: straight into the gallery, with a
   // shortcut to open it, instead of asking for details first.
-  if (result.count == 1 && result.skippedDuplicates == 0) {
+  if (result.count == 1 &&
+      result.skippedDuplicates == 0 &&
+      result.skippedTooLarge == 0) {
     final document = result.documents.single;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
@@ -205,6 +207,17 @@ Future<ImportResult> _extractPreviewAndImport(
       ),
     );
   }
+  if (inspection.oversizedCount > 0) {
+    showSnack(
+      context,
+      AppConstants.zipOversizedSkipped.tr(
+        namedArgs: {
+          'count': '${inspection.oversizedCount}',
+          'limit': megabytes(extractor.limits.maxEntryUncompressedBytes),
+        },
+      ),
+    );
+  }
 
   if (entries.isEmpty) {
     showSnack(context, AppConstants.archiveZipEmpty.tr());
@@ -269,6 +282,10 @@ Future<void> reportImport(
   ImportResult result, {
   bool showDetails = true,
 }) async {
+  if (result.skippedTooLarge > 0) {
+    await showTooLargeNotice(context, result.skippedTooLarge);
+    if (!context.mounted) return;
+  }
   if (result.isEmpty && result.skippedDuplicates == 0) return;
   if (result.skippedDuplicates > 0) {
     showSnack(

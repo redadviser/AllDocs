@@ -21,6 +21,7 @@ class ZipInspection {
     required this.declaredBytes,
     required this.nestedZipCount,
     required this.exceedsLimits,
+    this.oversizedCount = 0,
   });
 
   final int fileCount;
@@ -29,6 +30,9 @@ class ZipInspection {
   /// Zips inside the zip are never opened (see [SecureZipExtractor]).
   final int nestedZipCount;
   final bool exceedsLimits;
+
+  /// Files over the per-entry limit, left out of the extraction.
+  final int oversizedCount;
 }
 
 class ExtractedZipEntry {
@@ -93,16 +97,22 @@ class SecureZipExtractor {
         var total = 0;
         var files = 0;
         var nestedZips = 0;
+        var oversized = 0;
         for (final entry in archive.files) {
           if (!entry.isFile) continue;
           files++;
           total += entry.size;
-          if (entry.name.toLowerCase().endsWith('.zip')) nestedZips++;
+          if (entry.name.toLowerCase().endsWith('.zip')) {
+            nestedZips++;
+          } else if (entry.size > limits.maxEntryUncompressedBytes) {
+            oversized++;
+          }
         }
         return ZipInspection(
           fileCount: files,
           declaredBytes: total,
           nestedZipCount: nestedZips,
+          oversizedCount: oversized,
           exceedsLimits:
               total > limits.maxTotalUncompressedBytes ||
               files > limits.maxEntries,

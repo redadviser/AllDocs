@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "tsx watch src/main.ts",
     "build": "tsc -p tsconfig.json",
-    "start": "node dist/main.js"
+    "start": "node dist/main.js",
+    "test": "node --import tsx --test test/*.test.ts"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

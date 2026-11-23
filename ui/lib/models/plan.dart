@@ -31,6 +31,7 @@ class AppPlan {
     required this.priceMonthlyCents,
     required this.priceYearlyCents,
     required this.maxDocuments,
+    required this.maxDocumentBytes,
     required this.maxActiveReminders,
     required this.maxDevices,
     required this.features,
@@ -51,6 +52,9 @@ class AppPlan {
   /// Documents the library may hold (the recycle bin aside); null = no limit.
   final int? maxDocuments;
 
+  /// Largest single document that can be imported, in bytes.
+  final int maxDocumentBytes;
+
   /// Expiry reminders that can be scheduled at once; null = no limit.
   final int? maxActiveReminders;
   final int maxDevices;
@@ -63,12 +67,17 @@ class AppPlan {
       period == BillingPeriod.yearly ? priceYearlyCents : priceMonthlyCents;
 
   factory AppPlan.fromJson(Map<String, dynamic> json) {
+    final id = json['id'] as String;
     return AppPlan(
-      id: json['id'] as String,
+      id: id,
       name: json['name'] as String,
       priceMonthlyCents: (json['priceMonthlyCents'] as num).toInt(),
       priceYearlyCents: (json['priceYearlyCents'] as num).toInt(),
       maxDocuments: (json['maxDocuments'] as num?)?.toInt(),
+      // A catalog cached from an older backend has no size limit yet.
+      maxDocumentBytes:
+          (json['maxDocumentBytes'] as num?)?.toInt() ??
+          PlanCatalog.builtIn.byId(id).maxDocumentBytes,
       maxActiveReminders: (json['maxActiveReminders'] as num?)?.toInt(),
       maxDevices: (json['maxDevices'] as num?)?.toInt() ?? 1,
       features: {
@@ -84,6 +93,7 @@ class AppPlan {
     'priceMonthlyCents': priceMonthlyCents,
     'priceYearlyCents': priceYearlyCents,
     'maxDocuments': maxDocuments,
+    'maxDocumentBytes': maxDocumentBytes,
     'maxActiveReminders': maxActiveReminders,
     'maxDevices': maxDevices,
     'features': [for (final feature in features) feature.name],
@@ -97,6 +107,8 @@ class PlanCatalog {
 
   final List<AppPlan> plans;
   final Set<PlanFeature> comingSoon;
+
+  static const _mb = 1024 * 1024;
 
   static const _folioFeatures = {
     PlanFeature.autoBackup,
@@ -116,6 +128,7 @@ class PlanCatalog {
         priceMonthlyCents: 0,
         priceYearlyCents: 0,
         maxDocuments: 10,
+        maxDocumentBytes: 50 * _mb,
         maxActiveReminders: 3,
         maxDevices: 1,
         features: {},
@@ -126,6 +139,7 @@ class PlanCatalog {
         priceMonthlyCents: 199,
         priceYearlyCents: 1599,
         maxDocuments: null,
+        maxDocumentBytes: 200 * _mb,
         maxActiveReminders: null,
         maxDevices: 2,
         features: _folioFeatures,
@@ -136,6 +150,7 @@ class PlanCatalog {
         priceMonthlyCents: 499,
         priceYearlyCents: 3999,
         maxDocuments: null,
+        maxDocumentBytes: 500 * _mb,
         maxActiveReminders: null,
         maxDevices: 3,
         features: {

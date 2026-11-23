@@ -29,11 +29,15 @@ export interface Plan {
   currency: 'EUR'
   // Documents the library may hold (recycle bin aside); null = no limit.
   maxDocuments: number | null
+  // Largest single document that can be imported, in bytes.
+  maxDocumentBytes: number
   // null = no limit.
   maxActiveReminders: number | null
   maxDevices: number
   features: PlanFeature[]
 }
+
+const MB = 1024 * 1024
 
 const FOLIO_FEATURES: PlanFeature[] = [
   'autoBackup',
@@ -51,6 +55,7 @@ export const PLANS: Plan[] = [
     priceYearlyCents: 0,
     currency: 'EUR',
     maxDocuments: 10,
+    maxDocumentBytes: 50 * MB,
     maxActiveReminders: 3,
     maxDevices: 1,
     features: [],
@@ -62,6 +67,7 @@ export const PLANS: Plan[] = [
     priceYearlyCents: 1599,
     currency: 'EUR',
     maxDocuments: null,
+    maxDocumentBytes: 200 * MB,
     maxActiveReminders: null,
     maxDevices: 2,
     features: FOLIO_FEATURES,
@@ -73,6 +79,7 @@ export const PLANS: Plan[] = [
     priceYearlyCents: 3999,
     currency: 'EUR',
     maxDocuments: null,
+    maxDocumentBytes: 500 * MB,
     maxActiveReminders: null,
     maxDevices: 3,
     features: [

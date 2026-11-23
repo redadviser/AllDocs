@@ -72,6 +72,14 @@ export const codeLimiter = limiter({ windowMs: 15 * MINUTE, limit: 30 })
 export const publicPageLimiter = limiter({ windowMs: MINUTE, limit: 60 })
 export const publicUploadLimiter = limiter({ windowMs: 10 * MINUTE, limit: 60 })
 
+/// The copy of the library key: a phone reads it after a reinstall and
+/// stores it once, so a handful of calls is plenty.
+export const vaultKeyLimiter = limiter({
+  windowMs: 15 * MINUTE,
+  limit: 20,
+  keyGenerator: (req) => req.user?.id ?? ip(req),
+})
+
 /// The document assistant, on top of its monthly quota: no bursts.
 export const assistantLimiter = limiter({
   windowMs: MINUTE,

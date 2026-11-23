@@ -3,9 +3,10 @@ import { hashPassword } from '../../lib/auth'
 import { sql } from '../../lib/db'
 import { sendMail } from '../../lib/mailer'
 import { type Lang, texts } from './password.texts'
+import { isLocalDevelopment } from '../../lib/env'
 
 const TOKEN_LIFETIME_MINUTES = 60
-export const MIN_PASSWORD_LENGTH = 6
+export const MIN_PASSWORD_LENGTH = 8
 
 // One reset email per address per minute — stops the endpoint from being
 // used to flood someone's inbox. In memory: good enough for one instance.
@@ -22,10 +23,8 @@ function hashToken(token: string): string {
 export function publicBaseUrl(requestOrigin: string): string {
   const configured = process.env.PUBLIC_URL?.trim().replace(/\/+$/, '')
   if (configured) return configured
-  if (process.env.NODE_ENV === 'production') {
-    return 'https://all-docs-backend.triplanai.eupasoft.com'
-  }
-  return requestOrigin
+  if (isLocalDevelopment()) return requestOrigin
+  return 'https://all-docs-backend.triplanai.eupasoft.com'
 }
 
 // Sends the reset email when an account has this email. Callers answer the

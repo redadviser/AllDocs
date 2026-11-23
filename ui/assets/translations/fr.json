@@ -23,6 +23,7 @@
     "display_name": "Nom affiché",
     "email": "Email",
     "password": "Mot de passe",
+    "password_too_short": "Le mot de passe doit contenir au moins {count} caractères.",
     "forgot": "Oublié",
     "forgot_title": "Réinitialiser le mot de passe",
     "forgot_message": "Saisis l'email de ton compte. Nous t'enverrons un lien pour définir un nouveau mot de passe.",
@@ -59,6 +60,7 @@
     "pin_length": "Le PIN doit contenir 4 chiffres.",
     "pin_mismatch": "Les PIN ne correspondent pas.",
     "invalid_pin": "PIN incorrect.",
+    "pin_locked": "Trop de tentatives. Réessayez dans {time}.",
     "change_pin": "Modifier le code PIN",
     "change_pin_current": "Saisissez votre code PIN actuel",
     "change_pin_new": "Choisissez un nouveau code PIN",
@@ -415,7 +417,8 @@
     "large_title": "ZIP très volumineux",
     "large_message": "Une fois extrait, ce ZIP pourrait occuper {size}. Par sécurité, seuls {limit} sont extraits.",
     "large_continue": "Continuer",
-    "nested_skipped": "{count} ZIP à l'intérieur du ZIP ont été ignorés."
+    "nested_skipped": "{count} ZIP à l'intérieur du ZIP ont été ignorés.",
+    "oversized_skipped": "Fichiers du ZIP ignorés car ils dépassent {limit} : {count}."
   },
   "scan_filter": {
     "title": "Apparence du document",
@@ -628,6 +631,7 @@
     "storage_full_title": "Limite de {plan} atteinte",
     "storage_full_message": "Cela ajoute {needed} documents, mais il ne vous en reste que {free} sur les {limit} de votre forfait. Ce que vous avez enregistré reste ici. Changez de forfait ou supprimez des documents pour faire de la place.",
     "storage_full_message_unknown": "Vous avez déjà les {limit} documents de votre forfait. Ce que vous avez enregistré reste ici. Changez de forfait ou supprimez des documents pour faire de la place.",
+    "document_too_large_message": "Fichiers non enregistrés : {count}. Avec {plan}, chaque document peut faire jusqu'à {limit}.",
     "see_plans": "Voir les forfaits",
     "not_now": "Plus tard",
     "auto_backup_locked": "La sauvegarde automatique est incluse dans Folio et Vault.",
@@ -799,7 +803,7 @@
     "copy_code": "Copier le code",
     "copied": "Copié.",
     "share_text": "Je partage « {title} » avec vous via AllDocs (disponible jusqu’au {date}) : {url}",
-    "too_big": "Le fichier dépasse 50 Mo, le maximum pour un lien sécurisé.",
+    "too_big": "Le fichier dépasse 200 Mo, le maximum pour un lien sécurisé.",
     "bad_type": "Ce type de fichier ne peut pas être partagé par lien.",
     "locked": "Le partage par lien sécurisé est inclus dans l’offre Vault.",
     "failed": "Impossible de créer le lien. Réessayez.",

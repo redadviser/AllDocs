@@ -1,5 +1,6 @@
 import crypto from 'crypto'
 import type { Request, Response } from 'express'
+import { pipeline } from 'stream/promises'
 import { pickLang } from '../requests/requests.texts'
 import { sharePage } from './shares.page'
 import * as service from './shares.service'
@@ -36,8 +37,14 @@ function shareMeta(req: Request): Record<string, unknown> {
 
 // ---- The owner (signed in) ----
 
+// The body is the file, streamed to disk; a declared size over the limit is
+// refused before reading any of it.
 export function create(req: Request, res: Response) {
-  return handle(res, () => service.createShare(req.user!, shareMeta(req), req.body, origin(req)))
+  if (Number(req.get('content-length')) > service.MAX_SHARE_BYTES) {
+    res.status(413).json({ error: 'File too large', code: 'tooBig' })
+    return
+  }
+  return handle(res, () => service.createShare(req.user!, shareMeta(req), req, origin(req)))
 }
 
 export function list(req: Request, res: Response) {
@@ -105,9 +112,20 @@ export async function file(req: Request, res: Response) {
       'X-Content-Type-Options': 'nosniff',
       // Shown as a document, never run as a page.
       'Content-Security-Policy': "sandbox; default-src 'none'; img-src 'self'; style-src 'unsafe-inline'",
+      'Content-Length': String(opened.size),
     })
-    res.send(opened.bytes)
+    try {
+      await pipeline(opened.stream, res)
+    } finally {
+      await opened.afterSend().catch((error) => console.error('Share afterSend failed:', error))
+    }
   } catch (error) {
+    // Failed mid-file: the headers are gone, so just cut the connection.
+    if (res.headersSent) {
+      console.error('Secure share stream failed:', error)
+      res.destroy()
+      return
+    }
     if (error instanceof service.ShareError) {
       const share = await service.findShareByToken(token).catch(() => null)
       if (error.code === 'wrongCode') return sendPage(req, res, 403, share, 'wrongCode')

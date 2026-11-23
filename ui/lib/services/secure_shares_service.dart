@@ -76,7 +76,7 @@ class SecureSharesService {
   const SecureSharesService._();
 
   /// The server's limit for one shared file.
-  static const maxBytes = 50 * 1024 * 1024;
+  static const maxBytes = 200 * 1024 * 1024;
 
   static String get _linksKey => CurrentUser.scoped('shares.links.v1');
 
@@ -123,17 +123,30 @@ class SecureSharesService {
     );
     final http.Response res;
     try {
-      res = await http
-          .post(
-            Uri.parse('${ApiBaseUrl.baseUrl}/api/shares'),
-            headers: {
+      // Streamed from disk: a 200 MB file never sits in memory whole.
+      final request =
+          http.StreamedRequest(
+              'POST',
+              Uri.parse('${ApiBaseUrl.baseUrl}/api/shares'),
+            )
+            ..headers.addAll({
               ...await _headers(),
               'Content-Type': 'application/octet-stream',
               'X-Share-Meta': meta,
+            })
+            ..contentLength = length;
+      request.sink
+          .addStream(file.openRead())
+          .then(
+            (_) => request.sink.close(),
+            onError: (Object error) {
+              request.sink.addError(error);
+              request.sink.close();
             },
-            body: await file.readAsBytes(),
-          )
-          .timeout(const Duration(minutes: 3));
+          );
+      res = await http.Response.fromStream(
+        await request.send().timeout(const Duration(minutes: 20)),
+      );
     } catch (_) {
       throw const SecureShareException(SecureShareProblem.unavailable);
     }

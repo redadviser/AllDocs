@@ -5,6 +5,7 @@ import {
   isAccessLevelActive,
   isAdaptyServerApiConfigured,
 } from '../../lib/adapty'
+import { isLocalDevelopment } from '../../lib/env'
 import {
   type BillingPeriod,
   type PlanId,
@@ -95,7 +96,7 @@ export function canSwitchPlanByHand(email: string): boolean {
     .map((value) => value.trim().toLowerCase())
     .filter(Boolean)
   if (allowed.includes(email.trim().toLowerCase())) return true
-  return process.env.NODE_ENV !== 'production'
+  return isLocalDevelopment()
 }
 
 /// Sets the plan by hand (until switched back with [planId] = null, which

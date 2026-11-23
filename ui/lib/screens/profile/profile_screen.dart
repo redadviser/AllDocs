@@ -21,7 +21,9 @@ import '../../models/models.dart';
 import '../../services/services.dart';
 import '../../theme/app_theme.dart';
 import '../auth/auth_gate.dart';
+import '../albums/album_detail_screen.dart';
 import '../albums/hidden_albums_screen.dart';
+import '../albums/tags_section.dart' show documentsWithTag;
 import '../auth/security_gate.dart';
 import '../cloud/cloud_screen.dart';
 import '../security/devices_screen.dart';
@@ -33,9 +35,15 @@ class ProfileScreen extends StatefulWidget {
     super.key,
     required this.documentsService,
     this.showBackButton = false,
+    this.onOpenShelf,
+    this.onOpenGallery,
   });
 
   final DocumentsService documentsService;
+
+  /// Switch to the bookshelf / gallery tab (the stats cards open them).
+  final VoidCallback? onOpenShelf;
+  final VoidCallback? onOpenGallery;
 
   /// True when opened as its own page (from the gallery avatar).
   final bool showBackButton;
@@ -87,6 +95,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       profile: profile,
                       snapshot: snapshot,
                       documentsService: widget.documentsService,
+                      onOpenShelf: widget.onOpenShelf,
+                      onOpenGallery: widget.onOpenGallery,
                     ),
                     _ProfileSettingsPage(
                       profile: profile,
@@ -118,7 +128,12 @@ class _ProfileOverviewPage extends StatelessWidget {
     required this.profile,
     required this.snapshot,
     required this.documentsService,
+    this.onOpenShelf,
+    this.onOpenGallery,
   });
+
+  final VoidCallback? onOpenShelf;
+  final VoidCallback? onOpenGallery;
 
   final UserProfile profile;
   final DocumentsSnapshot snapshot;
@@ -135,7 +150,13 @@ class _ProfileOverviewPage extends StatelessWidget {
           onEditPhoto: () => _pickAndSaveAvatar(documentsService),
         ),
         const SizedBox(height: 12),
-        _StatsGrid(profile: profile, tagsCount: snapshot.tags.length),
+        _StatsGrid(
+          profile: profile,
+          snapshot: snapshot,
+          documentsService: documentsService,
+          onOpenShelf: onOpenShelf,
+          onOpenGallery: onOpenGallery,
+        ),
         const SizedBox(height: 12),
         _BackupSection(documentsService: documentsService),
         const SizedBox(height: 12),
@@ -187,10 +208,73 @@ class _ProfileSettingsPage extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _StatsGrid extends StatelessWidget {
-  const _StatsGrid({required this.profile, required this.tagsCount});
+  const _StatsGrid({
+    required this.profile,
+    required this.snapshot,
+    required this.documentsService,
+    this.onOpenShelf,
+    this.onOpenGallery,
+  });
 
   final UserProfile profile;
-  final int tagsCount;
+  final DocumentsSnapshot snapshot;
+  final DocumentsService documentsService;
+  final VoidCallback? onOpenShelf;
+  final VoidCallback? onOpenGallery;
+
+  void _openCollection(
+    BuildContext context,
+    String title,
+    List<DocumentFile> Function(DocumentsSnapshot snapshot) select,
+  ) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => AlbumDetailScreen(
+          documentsService: documentsService,
+          title: title,
+          select: select,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickTag(BuildContext context) async {
+    final tag = await showAppSheet<String>(
+      context: context,
+      builder: (sheetContext) => ListView(
+        shrinkWrap: true,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+            child: Text(
+              AppConstants.profileTags.tr(),
+              style: const TextStyle(
+                color: AppTheme.text,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          for (final tag in snapshot.tags)
+            ListTile(
+              leading: const Icon(Icons.sell_outlined),
+              title: Text('#$tag'),
+              trailing: Text(
+                '${documentsWithTag(snapshot, tag).length}',
+                style: const TextStyle(color: AppTheme.mutedText),
+              ),
+              onTap: () => Navigator.of(sheetContext).pop(tag),
+            ),
+        ],
+      ),
+    );
+    if (tag == null || !context.mounted) return;
+    _openCollection(
+      context,
+      '#$tag',
+      (snapshot) => documentsWithTag(snapshot, tag),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -199,21 +283,29 @@ class _StatsGrid extends StatelessWidget {
         icon: Icons.description_outlined,
         value: _formatNumber(profile.documentsCount),
         label: AppConstants.profileDocuments.tr(),
+        onTap: onOpenGallery,
       ),
       (
         icon: Icons.collections_bookmark_outlined,
         value: _formatNumber(profile.categoriesCount),
         label: AppConstants.profileAlbums.tr(),
+        onTap: onOpenShelf,
       ),
       (
         icon: Icons.sell_outlined,
-        value: _formatNumber(tagsCount),
+        value: _formatNumber(snapshot.tags.length),
         label: AppConstants.profileTags.tr(),
+        onTap: snapshot.tags.isEmpty ? null : () => _pickTag(context),
       ),
       (
         icon: Icons.star_outline_rounded,
         value: _formatNumber(profile.favoritesCount),
         label: AppConstants.profileFavorites.tr(),
+        onTap: () => _openCollection(
+          context,
+          AppConstants.docshelfFavorites.tr(),
+          (snapshot) => snapshot.documents.where((d) => d.isFavorite).toList(),
+        ),
       ),
     ];
     return SettingsGrid(
@@ -222,6 +314,7 @@ class _StatsGrid extends StatelessWidget {
       children: [
         for (final stat in stats)
           SettingsCard(
+            onTap: stat.onTap,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             child: Column(
               children: [

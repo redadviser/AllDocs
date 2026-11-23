@@ -2,7 +2,6 @@ import express, { type NextFunction, type Request, type Response, Router } from 
 import { requireAuth } from '../../lib/middleware'
 import { codeLimiter } from '../../lib/rate-limit'
 import * as controller from './shares.controller'
-import { MAX_SHARE_BYTES } from './shares.service'
 
 // The owner's side, mounted under /api/shares. Creating one sends the file
 // as the raw body, with its details in the X-Share-Meta header.
@@ -10,11 +9,7 @@ export const sharesRouter = Router()
 
 sharesRouter.use(requireAuth)
 sharesRouter.get('/', controller.list)
-sharesRouter.post(
-  '/',
-  express.raw({ type: () => true, limit: MAX_SHARE_BYTES }),
-  controller.create
-)
+sharesRouter.post('/', controller.create)
 sharesRouter.post('/:id/revoke', controller.revoke)
 sharesRouter.delete('/:id', controller.remove)
 

@@ -23,6 +23,7 @@
     "display_name": "Display name",
     "email": "Email",
     "password": "Password",
+    "password_too_short": "The password must be at least {count} characters.",
     "forgot": "Forgot",
     "forgot_title": "Reset password",
     "forgot_message": "Enter your account's email. We'll send you a link to set a new password.",
@@ -59,6 +60,7 @@
     "pin_length": "The PIN must have 4 digits.",
     "pin_mismatch": "The PINs do not match.",
     "invalid_pin": "Incorrect PIN.",
+    "pin_locked": "Too many attempts. Try again in {time}.",
     "change_pin": "Change PIN",
     "change_pin_current": "Enter your current PIN",
     "change_pin_new": "Choose a new PIN",
@@ -415,7 +417,8 @@
     "large_title": "Very large ZIP",
     "large_message": "Once extracted, this ZIP could take up {size}. For safety only up to {limit} is extracted.",
     "large_continue": "Continue",
-    "nested_skipped": "{count} ZIP files inside the ZIP were skipped."
+    "nested_skipped": "{count} ZIP files inside the ZIP were skipped.",
+    "oversized_skipped": "Files in the ZIP left out for being over {limit}: {count}."
   },
   "scan_filter": {
     "title": "Document look",
@@ -628,6 +631,7 @@
     "storage_full_title": "{plan} limit reached",
     "storage_full_message": "This adds {needed} documents, but you only have {free} left of your plan's {limit}. What you've saved stays here. Change plan or delete documents to make room.",
     "storage_full_message_unknown": "You already have your plan's {limit} documents. What you've saved stays here. Change plan or delete documents to make room.",
+    "document_too_large_message": "Files not saved: {count}. On {plan}, each document can be up to {limit}.",
     "see_plans": "See plans",
     "not_now": "Not now",
     "auto_backup_locked": "Automatic backup is included in Folio and Vault.",
@@ -799,7 +803,7 @@
     "copy_code": "Copy code",
     "copied": "Copied.",
     "share_text": "Sharing «{title}» with you through AllDocs (available until {date}): {url}",
-    "too_big": "The file is over 50 MB, the most a secure link takes.",
+    "too_big": "The file is over 200 MB, the most a secure link takes.",
     "bad_type": "This kind of file can't be shared by link.",
     "locked": "Secure link sharing is included in the Vault plan.",
     "failed": "Couldn't create the link. Try again.",

@@ -23,6 +23,7 @@
     "display_name": "Nombre a mostrar",
     "email": "Email",
     "password": "Contraseña",
+    "password_too_short": "La contraseña debe tener al menos {count} caracteres.",
     "forgot": "Olvidé",
     "forgot_title": "Recuperar contraseña",
     "forgot_message": "Escribe el email de tu cuenta. Te enviaremos un enlace para definir una nueva contraseña.",
@@ -59,6 +60,7 @@
     "pin_length": "El PIN debe tener 4 números.",
     "pin_mismatch": "Los PIN no coinciden.",
     "invalid_pin": "PIN incorrecto.",
+    "pin_locked": "Demasiados intentos. Vuelve a intentarlo en {time}.",
     "change_pin": "Cambiar PIN",
     "change_pin_current": "Introduce tu PIN actual",
     "change_pin_new": "Elige el nuevo PIN",
@@ -415,7 +417,8 @@
     "large_title": "ZIP muy grande",
     "large_message": "Una vez extraído, este ZIP puede ocupar {size}. Por seguridad solo se extraen hasta {limit}.",
     "large_continue": "Continuar",
-    "nested_skipped": "Se ignoraron {count} ZIP dentro del ZIP."
+    "nested_skipped": "Se ignoraron {count} ZIP dentro del ZIP.",
+    "oversized_skipped": "Archivos del ZIP que se omitieron por superar {limit}: {count}."
   },
   "scan_filter": {
     "title": "Aspecto del documento",
@@ -628,6 +631,7 @@
     "storage_full_title": "Límite de {plan} alcanzado",
     "storage_full_message": "Esto añade {needed} documentos, pero solo te quedan {free} de los {limit} de tu plan. Lo que ya guardaste sigue aquí. Cambia de plan o elimina documentos para hacer sitio.",
     "storage_full_message_unknown": "Ya tienes los {limit} documentos de tu plan. Lo que guardaste sigue aquí. Cambia de plan o elimina documentos para hacer sitio.",
+    "document_too_large_message": "Archivos no guardados: {count}. En {plan}, cada documento puede ocupar hasta {limit}.",
     "see_plans": "Ver planes",
     "not_now": "Ahora no",
     "auto_backup_locked": "La copia automática está incluida en Folio y Vault.",
@@ -799,7 +803,7 @@
     "copy_code": "Copiar código",
     "copied": "Copiado.",
     "share_text": "Te comparto «{title}» a través de AllDocs (disponible hasta el {date}): {url}",
-    "too_big": "El archivo supera los 50 MB, el máximo para un enlace seguro.",
+    "too_big": "El archivo supera los 200 MB, el máximo para un enlace seguro.",
     "bad_type": "Este tipo de archivo no se puede compartir por enlace.",
     "locked": "Compartir con enlace seguro está incluido en el plan Vault.",
     "failed": "No se pudo crear el enlace. Inténtalo de nuevo.",

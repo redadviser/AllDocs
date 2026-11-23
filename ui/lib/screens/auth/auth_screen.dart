@@ -96,6 +96,19 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   Future<void> _submit() {
+    if (_mode != _AuthMode.login &&
+        _passwordController.text.length < AuthService.minPasswordLength) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            AppConstants.authPasswordTooShort.tr(
+              namedArgs: {'count': '${AuthService.minPasswordLength}'},
+            ),
+          ),
+        ),
+      );
+      return Future.value();
+    }
     return _run(() {
       final email = _emailController.text;
       final password = _passwordController.text;

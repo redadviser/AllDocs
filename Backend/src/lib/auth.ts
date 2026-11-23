@@ -4,6 +4,7 @@ import { SignJWT, jwtVerify } from 'jose'
 import type { Request } from 'express'
 import { sql } from './db'
 import { effectivePlanColumn } from './plans'
+import { isLocalDevelopment } from './env'
 
 // Session tokens are signed with this server's own secret. Whoever knows it
 // can sign in as anyone, so it must be long, random, and never in git; the
@@ -233,7 +234,7 @@ export function sessionCookieConfig(token: string) {
     value: token,
     options: {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: !isLocalDevelopment(),
       sameSite: 'lax' as const,
       maxAge: SESSION_DURATION * 1000,
       path: '/',
@@ -246,7 +247,7 @@ export function clearSessionCookieConfig() {
     name: COOKIE_NAME,
     options: {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: !isLocalDevelopment(),
       sameSite: 'lax' as const,
       maxAge: 0,
       path: '/',

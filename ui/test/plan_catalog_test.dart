@@ -9,6 +9,9 @@ void main() {
 
     final pocket = catalog.byId(AppPlan.free);
     expect(pocket.maxDocuments, 10);
+    expect(pocket.maxDocumentBytes, 50 * 1024 * 1024);
+    expect(catalog.byId(AppPlan.premium).maxDocumentBytes, 200 * 1024 * 1024);
+    expect(catalog.byId(AppPlan.pro).maxDocumentBytes, 500 * 1024 * 1024);
     expect(pocket.maxActiveReminders, 3);
     expect(pocket.has(PlanFeature.autoBackup), isFalse);
 
@@ -66,6 +69,8 @@ void main() {
     expect(catalog.plans, hasLength(2));
     expect(catalog.byId('premium').features, {PlanFeature.autoBackup});
     expect(catalog.comingSoon, {PlanFeature.watermark});
+    // No maxDocumentBytes in this older catalog: the built-in size applies.
+    expect(catalog.byId('premium').maxDocumentBytes, 200 * 1024 * 1024);
 
     final roundTrip = PlanCatalog.fromJson(catalog.toJson());
     expect(roundTrip.byId('free').maxDocuments, 10);

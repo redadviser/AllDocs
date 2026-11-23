@@ -2,12 +2,18 @@ import crypto from 'crypto'
 import path from 'path'
 import { promisify } from 'util'
 import { sql } from '../../lib/db'
-import { readDecrypted, removeStored, storeEncrypted } from '../../lib/file-vault'
+import type { Readable } from 'stream'
+import {
+  StoredTooLargeError,
+  openDecrypted,
+  removeStored,
+  storeEncryptedStream,
+} from '../../lib/file-vault'
 import { getPlanById } from '../../lib/plans'
 import { LINK_TOKEN_PATTERN, linksBaseUrl } from '../../lib/public-links'
 import { pickLang } from '../requests/requests.texts'
 
-export const MAX_SHARE_BYTES = 50 * 1024 * 1024
+export const MAX_SHARE_BYTES = 200 * 1024 * 1024
 const DEFAULT_DAYS = 7
 const MAX_DAYS = 30
 // Wrong codes tried before the link locks for good.
@@ -87,7 +93,7 @@ function statusOf(row: Record<string, unknown>): ShareStatus {
   return 'active'
 }
 
-/// Creates a share (Vault) from the file in [body]. [meta] comes from the
+/// Creates a share (Vault) from the file streamed in [body]. [meta] comes from the
 /// X-Share-Meta header. The link carries a token only its hash is stored
 /// for, so it's returned once — the app keeps it to share again.
 export async function createShare(
@@ -100,16 +106,12 @@ export async function createShare(
     maxViews?: unknown
     language?: unknown
   },
-  body: unknown,
+  body: Readable,
   requestOrigin: string
 ) {
   if (!getPlanById(user.plan).features.includes('secureSharing')) {
     throw new ShareError(403, 'Secure sharing is included in the Vault plan')
   }
-  if (!Buffer.isBuffer(body) || body.length === 0) {
-    throw new ShareError(400, 'The request body must be the file')
-  }
-  if (body.length > MAX_SHARE_BYTES) throw new ShareError(413, 'File too large', 'tooBig')
   const fileName = cleanFileName(meta.fileName)
   const extension = extensionOf(fileName)
   const contentType = CONTENT_TYPES[extension]
@@ -129,7 +131,18 @@ export async function createShare(
   const id = crypto.randomUUID()
   const token = crypto.randomBytes(16).toString('base64url')
   const expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000)
-  const stored = await storeEncrypted(body)
+  let saved: { name: string; size: number }
+  try {
+    saved = await storeEncryptedStream(body, MAX_SHARE_BYTES)
+  } catch (error) {
+    if (error instanceof StoredTooLargeError) throw new ShareError(413, 'File too large', 'tooBig')
+    throw error
+  }
+  const stored = saved.name
+  if (saved.size === 0) {
+    await removeStored(stored)
+    throw new ShareError(400, 'The request body must be the file')
+  }
   try {
     await sql`
       INSERT INTO document_shares (
@@ -137,7 +150,7 @@ export async function createShare(
         stored_name, language, code_hash, max_views, expires_at
       ) VALUES (
         ${id}, ${user.id}, ${hashToken(token)}, ${title}, ${fileName}, ${contentType},
-        ${body.length}, ${stored}, ${language}, ${code ? await hashCode(code) : null},
+        ${saved.size}, ${stored}, ${language}, ${code ? await hashCode(code) : null},
         ${maxViews}, ${expiresAt}
       )
     `
@@ -286,14 +299,18 @@ export async function openShareFile(token: string, code: unknown, download: bool
     RETURNING view_count, max_views
   `
   if (counted.length === 0) throw new ShareError(404, 'Not available', 'invalid')
-  const bytes = await readDecrypted(row.stored_name as string)
+  const { stream, size } = await openDecrypted(row.stored_name as string)
   const last =
     counted[0].max_views != null && Number(counted[0].view_count) >= Number(counted[0].max_views)
-  if (last) await dropFile(row.id as string, row.stored_name as string)
 
   const extension = extensionOf(row.file_name as string)
   return {
-    bytes,
+    stream,
+    size,
+    // The last allowed view deletes the file once it has been sent.
+    afterSend: last
+      ? () => dropFile(row.id as string, row.stored_name as string)
+      : async () => {},
     fileName: row.file_name as string,
     contentType: row.content_type as string,
     inline: !download && VIEWABLE.has(extension),

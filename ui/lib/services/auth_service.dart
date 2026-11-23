@@ -88,6 +88,9 @@ class AuthService {
   static const _displayNameKey = 'auth.display_name.v1';
   static const _emailKey = 'auth.email.v1';
   static const _planKey = 'auth.plan.v1';
+
+  /// Same as MIN_PASSWORD_LENGTH in the backend.
+  static const minPasswordLength = 8;
   static const _userIdKey = 'auth.user_id.v1';
   static const _avatarUrlKey = 'auth.avatar_url.v1';
   static const _deviceIdKey = 'auth.device_id.v1';
