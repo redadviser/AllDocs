@@ -38,7 +38,8 @@ export const apiLimiter = limiter({
 })
 
 /// Signing in: failed attempts per IP and email, so one address can't be
-/// guessed at, plus a cap per IP across all emails.
+/// guessed at, a cap per IP across all emails, and one per account across
+/// all addresses.
 export const loginLimiter = [
   limiter({
     windowMs: 15 * MINUTE,
@@ -47,6 +48,14 @@ export const loginLimiter = [
     keyGenerator: (req) => `${ip(req)}|${emailOf(req)}`,
   }),
   limiter({ windowMs: 15 * MINUTE, limit: 100, skipSuccessfulRequests: true }),
+  // Guesses spread over many addresses (a botnet) against one account.
+  // Generous enough that the owner mistyping is never stopped by it.
+  limiter({
+    windowMs: 60 * MINUTE,
+    limit: 30,
+    skipSuccessfulRequests: true,
+    keyGenerator: (req) => `account|${emailOf(req)}`,
+  }),
 ]
 
 /// New accounts per IP.

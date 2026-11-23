@@ -1752,7 +1752,20 @@ class LocalDocumentsStore {
       // Damaged (set aside by _readStateFile): an unfinished migration may
       // still have the plain state.
     }
-    return _readStateFile(File('${dir.path}/$stateFileName'));
+    final plain = File('${dir.path}/$stateFileName');
+    if (_sealing && await plain.exists()) {
+      // Once encrypted, the library's state is only ever written sealed: a
+      // plain one appearing afterwards was put there by someone else. It is
+      // set aside, never loaded.
+      final meta = await VaultMeta.read(dir);
+      if (meta != null && meta.migrated) {
+        await plain.rename(
+          '${plain.path}.unreadable-${DateTime.now().millisecondsSinceEpoch}',
+        );
+        return null;
+      }
+    }
+    return _readStateFile(plain);
   }
 
   Future<void> _writeState(

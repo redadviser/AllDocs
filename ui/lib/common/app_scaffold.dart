@@ -113,7 +113,10 @@ class _MainNavScreenState extends State<MainNavScreen> {
     // isn't one, while a .txt/.csv opened with AllDocs is typed as text.
     final paths = [
       for (final file in files)
-        if (file.path.isNotEmpty && File(file.path).existsSync()) file.path,
+        if (file.path.isNotEmpty &&
+            File(file.path).existsSync() &&
+            !DocumentVault.isPrivatePath(file.path))
+          file.path,
     ];
     if (paths.isEmpty) return;
     // "Open with AllDocs" while the app is locked: import only once the PIN

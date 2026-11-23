@@ -32,5 +32,8 @@
     "@types/swagger-ui-express": "^4.1.8",
     "tsx": "^4.20.5",
     "typescript": "5.7.3"
+  },
+  "overrides": {
+    "uuid": "^11.1.1"
   }
 }

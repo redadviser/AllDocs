@@ -214,6 +214,24 @@ class DocumentVault {
     } catch (_) {}
   }
 
+  /// Whether [path] is one of AllDocs' own working files (decrypted copies,
+  /// staged imports, thumbnails, the library itself). Another app handing
+  /// such a path back ("open with AllDocs") is refused: it must never make
+  /// AllDocs copy its own private files around.
+  static bool isPrivatePath(String path) {
+    final normalized = File(path).absolute.path.replaceAll('\\', '/');
+    if (normalized.split('/').contains('..')) return true;
+    return const [
+      '/$_openFolder/',
+      '/alldocs_import/',
+      '/alldocs_thumbnails/',
+      '/.AllDocs/',
+      // The private libraries: Android's app_flutter, iOS's Documents.
+      '/app_flutter/users/',
+      '/Documents/users/',
+    ].any(normalized.contains);
+  }
+
   /// Deletes every decrypted or staged copy and the thumbnails of plain
   /// documents: on start, when the app locks, on sign out and when the
   /// account changes.
