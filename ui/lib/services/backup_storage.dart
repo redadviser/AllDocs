@@ -48,6 +48,29 @@ abstract class BackupStorage {
     }
   }
 
+  Future<void> writeBytes(String path, List<int> bytes) async {
+    final temp = await _tempFile();
+    try {
+      await temp.writeAsBytes(bytes, flush: true);
+      await upload(path, temp);
+    } finally {
+      if (await temp.exists()) await temp.delete();
+    }
+  }
+
+  /// Null when [path] doesn't exist.
+  Future<List<int>?> readBytes(String path) async {
+    final temp = await _tempFile();
+    try {
+      await download(path, temp);
+      return await temp.readAsBytes();
+    } on BackupNotFoundException {
+      return null;
+    } finally {
+      if (await temp.exists()) await temp.delete();
+    }
+  }
+
   /// Null when [path] doesn't exist.
   Future<String?> readText(String path) async {
     final temp = await _tempFile();

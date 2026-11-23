@@ -54,7 +54,10 @@ export function seal(userId: string, key: Buffer): string {
 export function open(userId: string, sealed: string): Buffer {
   const [version, iv, ciphertext, tag] = sealed.split('.')
   if (version !== 'v1' || !iv || !ciphertext || !tag) throw new Error('Unknown sealed key format')
-  const decipher = crypto.createDecipheriv('aes-256-gcm', secret(), Buffer.from(iv, 'base64url'))
+  // A fixed 16-byte tag: Node would otherwise accept a shortened one.
+  const decipher = crypto.createDecipheriv('aes-256-gcm', secret(), Buffer.from(iv, 'base64url'), {
+    authTagLength: 16,
+  })
   decipher.setAAD(aad(userId))
   decipher.setAuthTag(Buffer.from(tag, 'base64url'))
   return Buffer.concat([decipher.update(Buffer.from(ciphertext, 'base64url')), decipher.final()])

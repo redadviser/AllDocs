@@ -1,4 +1,6 @@
 import type { Request, Response } from 'express'
+import { decodeJwt } from 'jose'
+import { sessionToken } from '../../lib/auth'
 import { isEscrowConfigured } from '../../lib/key-escrow'
 import * as service from './vault-key.service'
 
@@ -21,11 +23,30 @@ async function handle(res: Response, work: () => Promise<void>) {
   }
 }
 
+// The key is only needed right after signing in (reinstall, new phone), so
+// a stolen long-lived session can't fetch it. Sessions without a device id
+// can't be revoked, so they never qualify.
+const FRESH_SESSION_SECONDS = 15 * 60
+
+function isFreshSession(req: Request): boolean {
+  try {
+    const { iat } = decodeJwt(sessionToken(req) ?? '')
+    if (typeof iat !== 'number' || !req.user?.deviceId) return false
+    return Date.now() / 1000 - iat <= FRESH_SESSION_SECONDS
+  } catch {
+    return false
+  }
+}
+
 export function get(req: Request, res: Response) {
   return handle(res, async () => {
     const stored = await service.getKey(req.user!.id)
     if (!stored) {
       res.status(404).json({ error: 'No key stored', code: 'notFound' })
+      return
+    }
+    if (!isFreshSession(req)) {
+      res.status(403).json({ error: 'Sign in again to get the key', code: 'reauth' })
       return
     }
     res.json(stored)

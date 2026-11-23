@@ -19,6 +19,41 @@ import Vision
     if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "AllDocsOCR") {
       OCRChannel.register(with: registrar.messenger())
     }
+    if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "AllDocsStorage") {
+      StorageChannel.register(with: registrar.messenger())
+    }
+  }
+}
+
+/// Free space on the volume holding a path (FreeSpace on the Dart side),
+/// checked before encrypting the library, which needs room for a copy.
+/// "Important usage" counts space iOS would free by purging caches.
+enum StorageChannel {
+  static func register(with messenger: FlutterBinaryMessenger) {
+    let channel = FlutterMethodChannel(name: "alldocs/storage", binaryMessenger: messenger)
+    channel.setMethodCallHandler { call, result in
+      guard call.method == "freeBytes",
+        let args = call.arguments as? [String: Any],
+        let path = args["path"] as? String
+      else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+      do {
+        let values = try URL(fileURLWithPath: path).resourceValues(forKeys: [
+          .volumeAvailableCapacityForImportantUsageKey, .volumeAvailableCapacityKey,
+        ])
+        if let important = values.volumeAvailableCapacityForImportantUsage {
+          result(NSNumber(value: important))
+        } else if let available = values.volumeAvailableCapacity {
+          result(NSNumber(value: available))
+        } else {
+          result(FlutterError(code: "stat_failed", message: "no capacity", details: nil))
+        }
+      } catch {
+        result(FlutterError(code: "stat_failed", message: error.localizedDescription, details: nil))
+      }
+    }
   }
 }
 

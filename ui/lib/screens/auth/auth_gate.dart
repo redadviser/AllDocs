@@ -12,6 +12,7 @@ import '../../services/services.dart';
 import '../../theme/app_theme.dart';
 import 'auth_screen.dart';
 import 'security_gate.dart';
+import '../vault/vault_gate.dart';
 
 class AuthGate extends StatefulWidget {
   const AuthGate({super.key, this.notice});
@@ -156,7 +157,14 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
       return SecurityGate(
         userName: _userName,
         avatarUrl: _avatarUrl,
-        child: const StoragePermissionGate(child: MainNavScreen()),
+        // The library's folder is settled by StoragePermissionGate before its
+        // encryption is opened; a new account gets its own VaultGate.
+        child: StoragePermissionGate(
+          child: VaultGate(
+            key: ValueKey(LocalDocumentsStore.libraryId),
+            child: const MainNavScreen(),
+          ),
+        ),
       );
     }
 

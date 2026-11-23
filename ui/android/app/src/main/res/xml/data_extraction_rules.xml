@@ -1,12 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- FlutterSecureStorage.xml: its values are wrapped by Keystore keys that are never backed up, so a restored copy can't be read (and holds the library key). -->
 <!-- Merges the rules from cunning_document_scanner and the Adapty SDK, which clash otherwise. -->
 <data-extraction-rules>
     <cloud-backup>
         <exclude domain="external" path="Pictures/" />
         <exclude domain="sharedpref" path="AdaptySDKPrefs.xml" />
+        <exclude domain="sharedpref" path="FlutterSecureStorage.xml" />
     </cloud-backup>
     <device-transfer>
         <exclude domain="external" path="Pictures/" />
         <exclude domain="sharedpref" path="AdaptySDKPrefs.xml" />
+        <exclude domain="sharedpref" path="FlutterSecureStorage.xml" />
     </device-transfer>
 </data-extraction-rules>

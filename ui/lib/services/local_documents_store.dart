@@ -21,6 +21,8 @@ import 'expiry_reminder_service.dart';
 import 'plan_service.dart';
 import 'secure_zip_extractor.dart';
 import 'storage_permission_service.dart';
+import 'vault/document_vault.dart';
+import 'vault/vault_format.dart';
 
 final _expiryReminderService = ExpiryReminderService();
 
@@ -94,6 +96,17 @@ class LocalDocumentsStore {
   }
 
   static const stateFileName = 'alldocs_state.json';
+
+  /// The state once the library is encrypted: ADV1 over gzip'd JSON.
+  static const sealedStateFileName = 'alldocs_state.adv';
+
+  /// Whose library is open: the signed-in account, or `root` without one.
+  /// Each has its own key (see VaultKeyring).
+  static String get libraryId => CurrentUser.key ?? 'root';
+
+  /// New files are sealed, and the state is written sealed, once this
+  /// library's key is unlocked (DocumentVault.activate).
+  static bool get _sealing => DocumentVault.isActiveFor(libraryId);
   static const documentsFolderName = 'documents';
   static const _stateVersion = 3;
   static const _documentExtensions = [
@@ -382,11 +395,16 @@ class LocalDocumentsStore {
     DateTime? validityDate,
   }) async {
     final id = _newId('doc');
+    // An encrypted library never holds a plain copy: the file is staged in
+    // the app's private temp folder, read there (checksum, text), sealed
+    // into the library and the staged copy deleted.
+    final sealing = _sealing;
     final storedPath = await _copyPickedFile(
       id: id,
       originalName: originalName,
       pickedPath: sourcePath,
       bytes: bytes,
+      staging: sealing,
     );
 
     final checksum = await _checksumOf(storedPath);
@@ -431,11 +449,33 @@ class LocalDocumentsStore {
       cloudVersion: cloudVersion,
     );
 
-    final json = document.toJson();
+    final stored = sealing
+        ? await _sealStaged(id, storedPath, document)
+        : document;
+    final json = stored.toJson();
     if (textIndexed) json['text_indexed'] = true;
     _documentsRaw(state).add(json);
     if (albumId != null) _addDocumentToAlbum(state, albumId, id);
-    return document;
+    return stored;
+  }
+
+  /// Seals a staged import into `documents/<id>.adv` and deletes the staged
+  /// plain copy.
+  Future<DocumentFile> _sealStaged(
+    String id,
+    String stagedPath,
+    DocumentFile document,
+  ) async {
+    final staged = File(stagedPath);
+    try {
+      final target = File('${(await _documentsDirectory()).path}/$id.adv');
+      await DocumentVault.sealTo(staged.openRead(), target);
+      return document.copyWith(localPath: target.path, sealed: true);
+    } finally {
+      try {
+        await staged.delete();
+      } catch (_) {}
+    }
   }
 
   Future<ImportResult> _finishImport(
@@ -501,10 +541,17 @@ class LocalDocumentsStore {
         final path = pending['local_path']?.toString();
         String? text;
         if (path != null && await File(path).exists()) {
-          text = await indexer.recognizeText(
-            path,
-            documentTypeFromName(pending['type']?.toString()),
+          final opened = await DocumentVault.materialize(
+            DocumentFile.fromJson(pending),
           );
+          try {
+            text = await indexer.recognizeText(
+              opened.file.path,
+              documentTypeFromName(pending['type']?.toString()),
+            );
+          } finally {
+            await opened.release();
+          }
         }
 
         // The entry may have been replaced (renamed, moved...) while OCR
@@ -1386,11 +1433,32 @@ class LocalDocumentsStore {
     final document = DocumentFile.fromJson(raw);
     final path = document.localPath;
     if (path == null) return;
-    await File(path).writeAsBytes(bytes, flush: true);
-    final checksum = await _checksumOf(path);
+    // Text is read from a plain copy: the stored file itself when it isn't
+    // sealed, a staged one in the private temp folder when it is.
+    File? staged;
+    final String plainPath;
+    if (document.sealed) {
+      staged = File(
+        '${(await _stagingDirectory()).path}/${documentId}_${_safeFileName(document.fileName)}',
+      );
+      await staged.writeAsBytes(bytes, flush: true);
+      await DocumentVault.sealTo(Stream.value(bytes), File(path));
+      plainPath = staged.path;
+    } else {
+      await File(path).writeAsBytes(bytes, flush: true);
+      plainPath = path;
+    }
+    final String? checksum;
     String? text;
-    if (DocumentTextExtractor.canExtract(document.fileName)) {
-      text = await const DocumentTextIndexer().extractPlainText(path);
+    try {
+      checksum = await _checksumOf(plainPath);
+      if (DocumentTextExtractor.canExtract(document.fileName)) {
+        text = await const DocumentTextIndexer().extractPlainText(plainPath);
+      }
+    } finally {
+      try {
+        await staged?.delete();
+      } catch (_) {}
     }
     _updateDocumentJson(state, documentId, (document) {
       return document.copyWith(
@@ -1504,7 +1572,9 @@ class LocalDocumentsStore {
   Future<void> openDocument(DocumentFile document) async {
     final localPath = document.localPath;
     if (localPath == null || localPath.isEmpty) return;
-    await OpenFilex.open(localPath);
+    // The other app still reads it after this returns: left for purgeTemp.
+    final opened = await DocumentVault.materialize(document, handoff: true);
+    await OpenFilex.open(opened.file.path);
   }
 
   Future<DocumentExportResult> exportDocuments({String? dialogTitle}) async {
@@ -1536,8 +1606,15 @@ class LocalDocumentsStore {
       final source = File(localPath);
       if (!await source.exists()) continue;
 
+      // Exporting is the user taking plain copies out on purpose.
       final target = await _uniqueExportFile(exportDir, document.fileName);
-      await source.copy(target.path);
+      try {
+        await DocumentVault.openRead(document).pipe(target.openWrite());
+      } catch (_) {
+        // A damaged file isn't left half-written as if it were fine.
+        if (await target.exists()) await target.delete();
+        continue;
+      }
       exported++;
     }
 
@@ -1549,6 +1626,43 @@ class LocalDocumentsStore {
   // ---------------------------------------------------------------------
 
   Future<Directory> appDirectory() => _appDirectory();
+
+  /// Forgets the cached state and folders, so the next read loads the
+  /// library from disk (after it's unlocked or migrated).
+  static void reload() {
+    _cachedState = null;
+    _userDirectory = null;
+    _cacheOwner = CurrentUser.key;
+  }
+
+  /// For VaultMigration: the live state, which it changes in place.
+  /// [previous] is the key the library is moving away from: the state is
+  /// opened with the current key first, then with it, and never set aside
+  /// (a wrong key isn't a damaged file).
+  Future<Map<String, dynamic>> readStateForVault({
+    VaultFormat? previous,
+  }) async {
+    if (previous == null) return _readState();
+    _dropCacheIfUserChanged();
+    final sealed = File('${(await _appDirectory()).path}/$sealedStateFileName');
+    for (final key in [DocumentVault.format, previous]) {
+      final opened = await _readStateFile(
+        sealed,
+        sealedWith: key,
+        setAside: false,
+      );
+      if (opened != null) {
+        _cachedState = opened.state;
+        return opened.state;
+      }
+    }
+    throw const VaultLockedException();
+  }
+
+  /// For VaultMigration: writes the live state (sealed, as the library is
+  /// unlocked).
+  Future<void> writeStateForVault(Map<String, dynamic> state) =>
+      _writeState(state);
 
   Future<Directory> documentsDirectory() => _documentsDirectory();
 
@@ -1606,15 +1720,39 @@ class LocalDocumentsStore {
     final cached = _cachedState;
     if (cached != null) return cached;
 
-    final stored = await _readStateFile(await _stateFile());
+    final dir = await _appDirectory();
+    final stored = await _readLibraryState(dir);
     if (stored == null) {
       final initial = _initialState();
       await _writeState(initial);
       return initial;
     }
+    _relinkStoredFiles(stored.state, await _documentsDirectory());
     if (stored.migrated) await _writeState(stored.state);
     _cachedState = stored.state;
     return stored.state;
+  }
+
+  /// The state of the library in [dir]: the sealed one when there is one
+  /// (it is the newer: the plain one is only deleted after the sealed one
+  /// was checked), the plain one otherwise. A sealed state without the key
+  /// unlocked throws [VaultLockedException]: it must never be taken for an
+  /// empty library.
+  Future<({Map<String, dynamic> state, bool migrated})?> _readLibraryState(
+    Directory dir,
+  ) async {
+    final sealed = File('${dir.path}/$sealedStateFileName');
+    if (await sealed.exists()) {
+      if (!_sealing) throw const VaultLockedException();
+      final opened = await _readStateFile(
+        sealed,
+        sealedWith: DocumentVault.format,
+      );
+      if (opened != null) return opened;
+      // Damaged (set aside by _readStateFile): an unfinished migration may
+      // still have the plain state.
+    }
+    return _readStateFile(File('${dir.path}/$stateFileName'));
   }
 
   Future<void> _writeState(
@@ -1624,7 +1762,52 @@ class LocalDocumentsStore {
     _cachedState = state;
     _revision++;
     if (!fromSync) onLocalChange?.call();
-    await _writeStateFile(await _stateFile(), state);
+    if (_sealing) {
+      await _writeSealedState(await _appDirectory(), state);
+    } else {
+      await _writeStateFile(await _stateFile(), state);
+    }
+  }
+
+  /// Writes [state] sealed. The first time (a plain state is still there),
+  /// the sealed file is read back and compared before the plain one is
+  /// deleted, so a bad write can never lose the library.
+  Future<void> _writeSealedState(
+    Directory dir,
+    Map<String, dynamic> state,
+  ) async {
+    final file = File('${dir.path}/$sealedStateFileName');
+    await file.parent.create(recursive: true);
+    final plain = await Isolate.run(
+      () => gzip.encode(utf8.encode(jsonEncode(state))),
+    );
+    final temp = File(
+      '${file.path}.${DateTime.now().microsecondsSinceEpoch}.tmp',
+    );
+    await temp.writeAsBytes(
+      await DocumentVault.format.sealBytes(plain),
+      flush: true,
+    );
+    await temp.rename(file.path);
+
+    final plainState = File('${dir.path}/$stateFileName');
+    if (await plainState.exists()) {
+      final readBack = await DocumentVault.format.openBytes(
+        await file.readAsBytes(),
+      );
+      if (!_sameBytes(readBack, plain)) {
+        throw const FileSystemException('Sealed state did not read back');
+      }
+      await plainState.delete();
+    }
+  }
+
+  static bool _sameBytes(List<int> a, List<int> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
   }
 
   Future<void> _writeStateFile(File file, Map<String, dynamic> state) async {
@@ -1678,12 +1861,29 @@ class LocalDocumentsStore {
   Future<void> _claimSharedLibrary(Directory root, Directory userDir) async {
     final userState = File('${userDir.path}/$stateFileName');
     final sharedState = File('${root.path}/$stateFileName');
-    if (await userState.exists() || !await sharedState.exists()) return;
+    final userSealed = File('${userDir.path}/$sealedStateFileName');
+    final sharedSealed = File('${root.path}/$sealedStateFileName');
+    if (await userState.exists() || await userSealed.exists()) return;
+    if (!await sharedState.exists() && !await sharedSealed.exists()) return;
     try {
       final sharedDocuments = Directory('${root.path}/$documentsFolderName');
       final userDocuments = Directory('${userDir.path}/$documentsFolderName');
       if (await sharedDocuments.exists() && !await userDocuments.exists()) {
         await sharedDocuments.rename(userDocuments.path);
+      }
+      if (await sharedSealed.exists()) {
+        // Encrypted: moved as it is (with its vault.json and any plain state
+        // an unfinished migration left). Paths are relinked when it's read;
+        // the key moves over when the library is unlocked (VaultGate).
+        await sharedSealed.rename(userSealed.path);
+        final meta = File('${root.path}/${VaultMeta.fileName}');
+        if (await meta.exists()) {
+          await meta.rename('${userDir.path}/${VaultMeta.fileName}');
+        }
+        if (await sharedState.exists()) {
+          await sharedState.rename(userState.path);
+        }
+        return;
       }
       await sharedState.rename(userState.path);
       final state = (await _readStateFile(userState))?.state;
@@ -1746,10 +1946,25 @@ class LocalDocumentsStore {
       final noMedia = File('${library.path}/.nomedia');
       if (!await noMedia.exists()) await noMedia.create();
 
+      final internal = await _internalDirectory();
+      final internalSealed = File('${internal.path}/$sealedStateFileName');
+      if (await File('${library.path}/$sealedStateFileName').exists() ||
+          await internalSealed.exists()) {
+        // An encrypted library can't be read before it's unlocked, so the
+        // two can't be merged here.
+        // shortcut: if both folders hold a library, the private one stays in
+        // use and both are kept untouched; merge after unlock if it matters.
+        final internalHasState =
+            await internalSealed.exists() ||
+            await File('${internal.path}/$stateFileName').exists();
+        if (internalHasState) return null;
+        _persistentDirectory = library;
+        return library;
+      }
+
       final libraryState = (await _readStateFile(
         File('${library.path}/$stateFileName'),
       ))?.state;
-      final internal = await _internalDirectory();
       final internalStateFile = File('${internal.path}/$stateFileName');
       final internalState = (await _readStateFile(internalStateFile))?.state;
 
@@ -1774,25 +1989,34 @@ class LocalDocumentsStore {
   }
 
   /// The state in [file] (and whether it needed migrating), or null when
-  /// there is none. A file that can't be parsed is renamed aside, never
-  /// written over: the documents are still on disk and it's what holds their
-  /// names, albums and tags. A failed read (storage unmounted, permission
-  /// revoked) throws, so it's never taken for an empty library.
+  /// there is none. [sealedWith] opens a sealed (ADV1 over gzip) state. A
+  /// file that can't be parsed or opened is renamed aside, never written
+  /// over: the documents are still on disk and it's what holds their names,
+  /// albums and tags. A failed read (storage unmounted, permission revoked)
+  /// throws, so it's never taken for an empty library.
   Future<({Map<String, dynamic> state, bool migrated})?> _readStateFile(
-    File file,
-  ) async {
+    File file, {
+    VaultFormat? sealedWith,
+    bool setAside = true,
+  }) async {
     if (!await file.exists()) return null;
-    final bytes = await file.readAsBytes();
+    var bytes = await file.readAsBytes();
     try {
+      if (sealedWith != null) {
+        final plain = await sealedWith.openBytes(bytes);
+        bytes = Uint8List.fromList(gzip.decode(plain));
+      }
+      final text = bytes;
       // Off the UI thread: with a long document history (each carrying its
       // extracted text) this is no longer a small file.
-      final decoded = await Isolate.run(() => jsonDecode(utf8.decode(bytes)));
+      final decoded = await Isolate.run(() => jsonDecode(utf8.decode(text)));
       if (decoded is Map<String, dynamic>) {
         return (state: decoded, migrated: _migrateState(decoded));
       }
     } catch (_) {
-      // Not JSON, not UTF-8, or a shape the migration can't handle.
+      // Not JSON, not UTF-8, damaged, or a shape the migration can't handle.
     }
+    if (!setAside) return null;
     await file.rename(
       '${file.path}.unreadable-${DateTime.now().millisecondsSinceEpoch}',
     );
@@ -1876,8 +2100,11 @@ class LocalDocumentsStore {
     required String originalName,
     required String? pickedPath,
     required Uint8List? bytes,
+    bool staging = false,
   }) async {
-    final documentsDir = await _documentsDirectory();
+    final documentsDir = staging
+        ? await _stagingDirectory()
+        : await _documentsDirectory();
     final safeName = _safeFileName(originalName);
     final target = File('${documentsDir.path}/${id}_$safeName');
 
@@ -1892,6 +2119,16 @@ class LocalDocumentsStore {
     }
 
     throw Exception('Não foi possível ler o ficheiro selecionado.');
+  }
+
+  /// Private (app temp) folder where imports wait before being sealed.
+  Future<Directory> _stagingDirectory() async {
+    final base = debugDirectory != null
+        ? Directory.systemTemp
+        : await getTemporaryDirectory();
+    final dir = Directory('${base.path}/alldocs_import');
+    await dir.create(recursive: true);
+    return dir;
   }
 
   Future<DocumentFile> _documentFromStoredFile({

@@ -47,6 +47,23 @@ class ApiHelpers {
     );
   }
 
+  static Future<http.Response> put(
+    String path, {
+    Map<String, String>? headers,
+    Object? body,
+  }) {
+    return _guardRequest(
+      () => http
+          .put(
+            Uri.parse('${ApiBaseUrl.baseUrl}$path'),
+            headers: headers,
+            body: body,
+          )
+          .timeout(ApiBaseUrl.requestTimeout),
+      path,
+    );
+  }
+
   static Future<http.Response> get(
     String path, {
     Map<String, String>? headers,

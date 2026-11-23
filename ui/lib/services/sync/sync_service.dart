@@ -14,6 +14,8 @@ import '../current_user.dart';
 import '../documents_service.dart';
 import '../local_documents_store.dart';
 import '../plan_service.dart';
+import '../vault/document_vault.dart';
+import '../vault/vault_format.dart';
 import 'sync_api.dart';
 import 'sync_crypto.dart';
 import 'sync_entities.dart';
@@ -154,6 +156,10 @@ class SyncService {
   final _api = SyncApi();
   final _store = const LocalDocumentsStore();
   static const _secure = FlutterSecureStorage();
+
+  /// This phone's library is encrypted: files it receives are sealed.
+  static bool get _sealing =>
+      DocumentVault.isActiveFor(LocalDocumentsStore.libraryId);
   static const stateFileName = 'sync_state.json';
   static const _invitePrefix = 'alldocs-sync:1:';
 
@@ -625,8 +631,10 @@ class SyncService {
     final mine = local.base[documentKey(localId)];
     final twin = local.server[documentKey(twinId)];
     final from = mine?['stored_name']?.toString();
-    final to = twin?['stored_name']?.toString();
-    if (mine == null || twin == null || from == null || to == null) return;
+    if (mine == null || twin == null || from == null) return;
+    if (!isSafeDocumentId(twinId) || from.contains('/')) return;
+    // Sealed files carry no document id, so a sealed copy serves as is.
+    final to = localFileName(twin, sealing: _sealing);
     final source = File('$documentsDir/$from');
     final target = File('$documentsDir/$to');
     if (!await source.exists()) return;
@@ -670,6 +678,7 @@ class SyncService {
     final documentsDir = (await _store.documentsDirectory()).path;
     // Files on this phone, by the id they have on the server.
     final here = <String, File>{};
+    // This phone's own names: `.adv` only for files its vault sealed.
     for (final entry in local.base.entries) {
       if (!isDocumentKey(entry.key)) continue;
       final stored = entry.value['stored_name']?.toString();
@@ -706,11 +715,20 @@ class SyncService {
       if (entry.value && already.contains(entry.key)) continue;
       final file = here[entry.key]!;
       if (!await file.exists()) continue;
+      final sealedHere = file.path.endsWith('.adv');
+      final plainLength = sealedHere
+          ? VaultFormat.plainLength(
+              await file.length(),
+              chunkLog2: (await file.openRead(5, 6).first).single,
+            )
+          : await file.length();
       try {
         await _api.putBlob(
           entry.key,
-          crypto.sealFile(file),
-          SyncCrypto.sealedLength(await file.length()),
+          crypto.sealStream(
+            sealedHere ? DocumentVault.openSealed(file.path) : file.openRead(),
+          ),
+          SyncCrypto.sealedLength(plainLength),
           forEveryone: entry.value,
         );
       } on SyncApiException catch (error) {
@@ -755,30 +773,42 @@ class SyncService {
         final documents = missing[blobId]!;
         final sealed = File('${temp.path}/$blobId.sealed');
         final plain = File('${temp.path}/$blobId');
+        final targets = [
+          for (final document in documents)
+            if (_safeStoredName(document)) document,
+        ];
         try {
           await _api.getBlob(blobId, sealed);
-          await crypto.openFile(sealed, plain);
+          if (_sealing) {
+            // Straight from the sync cipher into the library's: the plain
+            // content never reaches the disk.
+            if (!await _receiveSealed(crypto, sealed, targets, documentsDir)) {
+              continue;
+            }
+          } else {
+            await crypto.openFile(sealed, plain);
+            final checksum = documents.first['checksum']?.toString();
+            if (checksum != null && checksum.isNotEmpty) {
+              if (await _sha256Of(plain) != checksum) continue;
+            }
+            for (final document in targets) {
+              await plain.copy(
+                '$documentsDir/${localFileName(document, sealing: false)}',
+              );
+            }
+          }
         } on SyncApiException catch (error) {
           if (error.problem == SyncProblem.missing) continue;
           rethrow;
         } on SyncDecryptException {
           continue;
         }
-        final checksum = documents.first['checksum']?.toString();
-        if (checksum != null && checksum.isNotEmpty) {
-          if (await _sha256Of(plain) != checksum) continue;
-        }
-        for (final document in documents) {
-          final stored = document['stored_name']?.toString();
-          if (stored == null || stored.isEmpty || stored.contains('/')) {
-            continue;
-          }
-          await plain.copy('$documentsDir/$stored');
+        for (final document in targets) {
           local.files[document['id'].toString()] = fileKeyOf(document);
         }
         await _api.ackBlob(blobId);
-        await sealed.delete();
-        await plain.delete();
+        if (await sealed.exists()) await sealed.delete();
+        if (await plain.exists()) await plain.delete();
         done++;
         status.value = status.value.copyWith(toReceive: missing.length - done);
         if (done % 10 == 0) {
@@ -790,6 +820,57 @@ class SyncService {
     } finally {
       await temp.delete(recursive: true);
     }
+  }
+
+  /// A document another phone sent can only name a file inside the
+  /// documents folder.
+  static bool _safeStoredName(Map<String, dynamic> document) {
+    final stored = document['stored_name']?.toString() ?? '';
+    return isSafeDocumentId(document['id']?.toString()) &&
+        stored.isNotEmpty &&
+        !stored.contains('/') &&
+        !stored.contains(r'\') &&
+        stored != '.' &&
+        stored != '..';
+  }
+
+  /// Re-seals [sealed] (from sync) for each of [documents] (same content),
+  /// checking its checksum before anything replaces a library file.
+  Future<bool> _receiveSealed(
+    SyncCrypto crypto,
+    File sealed,
+    List<Map<String, dynamic>> documents,
+    String documentsDir,
+  ) async {
+    if (documents.isEmpty) return true;
+    final first = File(
+      '$documentsDir/${localFileName(documents.first, sealing: true)}.recv',
+    );
+    try {
+      final result = await DocumentVault.sealTo(
+        crypto.openStream(sealed),
+        first,
+      );
+      final checksum = documents.first['checksum']?.toString();
+      if (checksum != null &&
+          checksum.isNotEmpty &&
+          result.checksum != checksum) {
+        await first.delete();
+        return false;
+      }
+    } on VaultFormatException {
+      return false;
+    }
+    // Sealed files carry no document id, so the same copy serves them all.
+    for (final document in documents.skip(1)) {
+      await first.copy(
+        '$documentsDir/${localFileName(document, sealing: true)}',
+      );
+    }
+    await first.rename(
+      '$documentsDir/${localFileName(documents.first, sealing: true)}',
+    );
+    return true;
   }
 
   /// Writes the library as sync sees it — after recording anything the
@@ -814,6 +895,7 @@ class SyncService {
         current: now.state,
         documentsDirectory: documentsDir,
         withheld: withheld,
+        sealing: _sealing,
       );
       if (sameJson(next, now.state)) return;
       if (await _store.applySyncedState(next, now.revision)) {

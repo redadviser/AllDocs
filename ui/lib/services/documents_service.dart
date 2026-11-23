@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:flutter/foundation.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -18,6 +17,7 @@ import 'plan_service.dart';
 import 'secure_zip_extractor.dart';
 import 'security_lock_service.dart';
 import 'thumbnail_cache.dart';
+import 'vault/document_vault.dart';
 
 /// An import that would pass the plan's document limit.
 class StorageFullException implements Exception {
@@ -469,9 +469,10 @@ class DocumentsService {
     List<DocumentFile> documents, {
     required String title,
   }) async {
-    final bytes = await PdfTools.merge([
-      for (final document in documents) document.localPath!,
-    ]);
+    final bytes = await _withPlainFiles(
+      documents,
+      (paths) => PdfTools.merge(paths),
+    );
     return _importGenerated(bytes, title, documents.first.albumIds);
   }
 
@@ -482,7 +483,9 @@ class DocumentsService {
     required int to,
     required String title,
   }) async {
-    final bytes = await PdfTools.extractPages(document.localPath!, from, to);
+    final bytes = await _withPlainFiles([
+      document,
+    ], (paths) => PdfTools.extractPages(paths.single, from, to));
     return _importGenerated(bytes, title, document.albumIds);
   }
 
@@ -495,12 +498,15 @@ class DocumentsService {
     required SignatureCorner corner,
     required String title,
   }) async {
-    final bytes = await PdfTools.sign(
-      document.localPath!,
-      signaturePng: signaturePng,
-      aspectRatio: aspectRatio,
-      page: page,
-      corner: corner,
+    final bytes = await _withPlainFiles(
+      [document],
+      (paths) => PdfTools.sign(
+        paths.single,
+        signaturePng: signaturePng,
+        aspectRatio: aspectRatio,
+        page: page,
+        corner: corner,
+      ),
     );
     return _importGenerated(bytes, title, document.albumIds);
   }
@@ -508,14 +514,20 @@ class DocumentsService {
   /// Compresses [document]'s file in place. Returns its size before and
   /// after; a file that wouldn't get smaller is left as it was.
   Future<({int before, int after})> compressPdf(DocumentFile document) async {
-    final path = document.localPath!;
-    final before = await File(path).length();
-    final bytes = await PdfTools.compress(path);
+    final (before, bytes) = await _withPlainFiles([document], (paths) async {
+      return (
+        await File(paths.single).length(),
+        await PdfTools.compress(paths.single),
+      );
+    });
     if (bytes.length >= before) return (before: before, after: before);
     await _store.replaceDocumentContent(document.id, bytes);
     _notifyChanged();
     return (before: before, after: bytes.length);
   }
+
+  Future<int> pdfPageCount(DocumentFile document) =>
+      _withPlainFiles([document], (paths) => PdfTools.pageCount(paths.single));
 
   /// A copy of [document] with [overlay] over every page (an image is
   /// turned into a PDF first), in the temporary folder as [fileName]. The
@@ -525,18 +537,22 @@ class DocumentsService {
     required Future<Uint8List> Function(double width, double height) overlay,
     required String fileName,
   }) async {
-    final temp = await getTemporaryDirectory();
-    var source = document.localPath!;
-    if (document.type != DocumentType.pdf) {
-      final pdf = File('${temp.path}/watermark_source.pdf');
-      await pdf.writeAsBytes(await PdfTools.imageToPdf(source));
-      source = pdf.path;
-    }
+    // Plain, and handed to the share sheet or the upload: in a private
+    // scratch folder that purgeTemp clears.
+    final temp = await DocumentVault.scratch(handoff: true);
     final copy = File('${temp.path}/$fileName');
-    await copy.writeAsBytes(
-      await PdfTools.watermark(source, overlay: overlay),
-      flush: true,
-    );
+    await _withPlainFiles([document], (paths) async {
+      var source = paths.single;
+      if (document.type != DocumentType.pdf) {
+        final pdf = File('${temp.path}/watermark_source.pdf');
+        await pdf.writeAsBytes(await PdfTools.imageToPdf(source));
+        source = pdf.path;
+      }
+      await copy.writeAsBytes(
+        await PdfTools.watermark(source, overlay: overlay),
+        flush: true,
+      );
+    });
     return copy;
   }
 
@@ -563,7 +579,7 @@ class DocumentsService {
     String title,
     List<String> albumIds,
   ) async {
-    final temp = await getTemporaryDirectory();
+    final temp = await DocumentVault.scratch();
     final name = title.toLowerCase().endsWith('.pdf') ? title : '$title.pdf';
     final file = File('${temp.path}/${name.replaceAll('/', '-')}');
     await file.writeAsBytes(bytes, flush: true);
@@ -583,13 +599,34 @@ class DocumentsService {
     }
   }
 
+  /// Runs [work] with a plain file for each of [documents] (decrypted to
+  /// the private temp folder when sealed), deleted again afterwards.
+  Future<T> _withPlainFiles<T>(
+    List<DocumentFile> documents,
+    Future<T> Function(List<String> paths) work,
+  ) async {
+    final opened = <Materialized>[];
+    try {
+      for (final document in documents) {
+        opened.add(await DocumentVault.materialize(document));
+      }
+      return await work([for (final file in opened) file.file.path]);
+    } finally {
+      for (final file in opened) {
+        await file.release();
+      }
+    }
+  }
+
   Future<void> shareDocuments(List<DocumentFile> documents) async {
-    final files = [
-      for (final document in documents)
-        if (document.localPath != null &&
-            File(document.localPath!).existsSync())
-          XFile(document.localPath!, name: document.fileName),
-    ];
+    final files = <XFile>[];
+    for (final document in documents) {
+      final path = document.localPath;
+      if (path == null || !File(path).existsSync()) continue;
+      // The share target reads it after this returns: left for purgeTemp.
+      final opened = await DocumentVault.materialize(document, handoff: true);
+      files.add(XFile(opened.file.path, name: document.fileName));
+    }
     if (files.isEmpty) return;
     await SecurityLockService.withoutAutoLock(
       () => SharePlus.instance.share(ShareParams(files: files)),

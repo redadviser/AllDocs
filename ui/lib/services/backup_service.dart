@@ -5,7 +5,6 @@ import 'dart:isolate';
 import 'package:archive/archive_io.dart';
 import 'package:crypto/crypto.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:path_provider/path_provider.dart';
 
 import '../models/models.dart';
 import 'app_settings.dart';
@@ -13,6 +12,9 @@ import 'backup_storage.dart';
 import 'cloud/cloud_provider.dart';
 import 'local_documents_store.dart';
 import 'plan_service.dart';
+import 'vault/document_vault.dart';
+import 'vault/vault_format.dart';
+import 'vault/vault_migration.dart';
 
 class BackupInfo {
   const BackupInfo({
@@ -30,6 +32,12 @@ class BackupInfo {
 
 class InvalidBackupException implements Exception {
   const InvalidBackupException();
+}
+
+/// An encrypted backup made with another key (another account, or a
+/// library without one): it opens only from the account that made it.
+class BackupKeyMismatchException implements Exception {
+  const BackupKeyMismatchException();
 }
 
 /// One restore point of the history.
@@ -85,6 +93,21 @@ class BackupSnapshot {
 ///
 /// The same tree is written to a folder on the phone or to a cloud
 /// account (see [BackupStorage]).
+///
+/// An encrypted library is backed up in another layout (version 3), where
+/// nothing is readable without its key:
+///
+///     AllDocs Backups/
+///       Current/Files/<blob>.adv      each document's sealed file as it is
+///       Removed/<blob>.adv
+///       Backup 2026-11-23 14-30-05/
+///         alldocs-state.adv           the organization, sealed
+///         alldocs-backup.adv          the manifest, sealed (written last)
+///         alldocs-key.json            which key opens it (its check only)
+///
+/// `<blob>` is an HMAC of the content's checksum: the same file is sent
+/// once, but its name says nothing about it. Older plain backups in the
+/// same folder are left as they are until the user deletes them.
 class BackupService {
   const BackupService({this.store = const LocalDocumentsStore()});
 
@@ -99,6 +122,17 @@ class BackupService {
   static const backupManifestName = 'alldocs-backup.json';
   static const stateFileName = 'alldocs-state.json';
   static const backupFolderPrefix = 'Backup ';
+  static const sealedVersion = 3;
+  static const filesFolder = 'Files';
+  static const sealedManifestName = 'alldocs-backup.adv';
+  static const sealedStateName = 'alldocs-state.adv';
+  static const keyFileName = 'alldocs-key.json';
+
+  /// The unlocked library's key, when the library is encrypted.
+  static VaultFormat? get _vault =>
+      DocumentVault.isActiveFor(LocalDocumentsStore.libraryId)
+      ? DocumentVault.format
+      : null;
   static const autoBackupInterval = Duration(hours: 24);
 
   /// Restore points kept; older ones are deleted after each backup run (and
@@ -159,6 +193,11 @@ class BackupService {
     final plan = await _plan(state);
     _dropDocuments(state, plan.unavailableIds);
 
+    final vault = _vault;
+    if (vault != null) {
+      await _backupSealed(storage, vault, state, plan, createdAt);
+      return;
+    }
     await _syncCurrent(storage, plan);
 
     final rootEntries = await storage.list('');
@@ -243,7 +282,11 @@ class BackupService {
         unavailable.add(document.id);
         continue;
       }
-      final checksum = document.checksum ?? await _checksumOf(file);
+      final checksum =
+          document.checksum ??
+          (document.sealed
+              ? await DocumentVault.checksumOf(DocumentVault.openRead(document))
+              : await _checksumOf(file));
       if (checksum == null) {
         unavailable.add(document.id);
         continue;
@@ -272,6 +315,114 @@ class BackupService {
       unavailableIds: unavailable,
     );
   }
+
+  /// Version 3: `Current/Files` gets each document's sealed file once; a
+  /// file the library no longer has moves to Removed; the restore point
+  /// is sealed JSON.
+  Future<void> _backupSealed(
+    BackupStorage storage,
+    VaultFormat vault,
+    Map<String, dynamic> state,
+    _BackupPlan plan,
+    DateTime createdAt,
+  ) async {
+    final filesPath = '$currentFolder/$filesFolder';
+    await storage.ensureFolder(filesPath);
+    await storage.ensureFolder(removedFolder);
+    final listed = {
+      for (final entry in await storage.list(filesPath))
+        if (!entry.isFolder) entry.name: entry.sizeBytes,
+    };
+    final present = listed.keys.toSet();
+    final byName = {
+      for (final file in plan.files)
+        '${_blobId(vault, file.checksum)}.adv': file,
+    };
+    // A blob whose size isn't what its sealed file has (an upload cut short)
+    // is sent again.
+    Future<bool> intact(String name, _PlannedFile file) async {
+      final size = listed[name];
+      if (size == null) return present.contains(name);
+      final expected = file.document.sealed
+          ? await file.file.length()
+          : VaultFormat.sealedLength(await file.file.length());
+      return size == expected;
+    }
+
+    final toSend = [
+      for (final entry in byName.entries)
+        if (!await intact(entry.key, entry.value)) entry,
+    ];
+    await _inParallel(toSend, (entry) async {
+      final document = entry.value.document;
+      if (document.sealed) {
+        await storage.upload('$filesPath/${entry.key}', entry.value.file);
+        return;
+      }
+      // Not sealed in the library (device folder, or not migrated yet):
+      // sealed on the way out, through the private temp folder.
+      final temp = await DocumentVault.scratch();
+      try {
+        final sealed = File('${temp.path}/${entry.key}');
+        await DocumentVault.sealTo(entry.value.file.openRead(), sealed);
+        await storage.upload('$filesPath/${entry.key}', sealed);
+      } finally {
+        await temp.delete(recursive: true);
+      }
+    });
+    for (final name in present.difference(byName.keys.toSet())) {
+      await storage.delete('$removedFolder/$name');
+      await storage.move('$filesPath/$name', '$removedFolder/$name');
+    }
+
+    final taken = {
+      for (final entry in await storage.list(''))
+        if (entry.isFolder) entry.name,
+    };
+    var folder = backupFolderName(createdAt);
+    for (var n = 2; taken.contains(folder); n++) {
+      folder = '${backupFolderName(createdAt)} ($n)';
+    }
+    await storage.writeText(
+      '$folder/$keyFileName',
+      jsonEncode({'v': 1, 'keyCheck': vault.keyCheck}),
+    );
+    await storage.writeBytes(
+      '$folder/$sealedStateName',
+      await vault.sealBytes(utf8.encode(jsonEncode(state))),
+    );
+    // Written last: a folder without it is an interrupted run.
+    await storage.writeBytes(
+      '$folder/$sealedManifestName',
+      await vault.sealBytes(
+        utf8.encode(
+          jsonEncode({
+            'version': sealedVersion,
+            'app': 'AllDocs',
+            'created_at': createdAt.toIso8601String(),
+            'document_count': plan.files.length,
+            'documents': [
+              for (final file in plan.files)
+                {
+                  'id': file.document.id,
+                  'checksum': file.checksum,
+                  'blob': _blobId(vault, file.checksum),
+                },
+            ],
+          }),
+        ),
+      ),
+    );
+
+    try {
+      await _pruneHistory(storage, keep: folder);
+    } catch (_) {
+      // Best-effort, as for plain backups.
+    }
+  }
+
+  static String _blobId(VaultFormat vault, String checksum) =>
+      vault.hmac('backup:$checksum');
 
   Future<void> _syncCurrent(BackupStorage storage, _BackupPlan plan) async {
     final previous = await _readLiveIndex(storage);
@@ -471,28 +622,102 @@ class BackupService {
     ]..sort((a, b) => b.compareTo(a));
 
     final referenced = <String>{};
+    final referencedBlobs = <String>{};
+    // A sealed restore point this key can't open may need any sealed file.
+    var unknownBlobs = false;
     var kept = 0;
+    final vault = _vault;
     for (final folder in folders) {
       if (kept >= keptBackups && folder != keep) {
         await storage.delete(folder);
         continue;
       }
       final manifest = await storage.readText('$folder/$backupManifestName');
-      if (manifest == null) {
+      final sealed = manifest == null
+          ? await storage.readBytes('$folder/$sealedManifestName')
+          : null;
+      if (manifest == null && sealed == null) {
         if (folder != keep) await storage.delete(folder);
         continue;
       }
       kept++;
-      for (final document in _manifestDocuments(jsonDecode(manifest))) {
-        final checksum = document['checksum']?.toString();
-        if (checksum != null) referenced.add(_RemovedFolder.prefix(checksum));
+      if (manifest != null) {
+        for (final document in _manifestDocuments(jsonDecode(manifest))) {
+          final checksum = document['checksum']?.toString();
+          if (checksum != null) referenced.add(_RemovedFolder.prefix(checksum));
+        }
+        continue;
+      }
+      try {
+        if (vault == null) throw const VaultLockedException();
+        final opened = jsonDecode(utf8.decode(await vault.openBytes(sealed!)));
+        for (final document in _manifestDocuments(opened)) {
+          referencedBlobs.add('${document['blob']}.adv');
+        }
+      } catch (_) {
+        unknownBlobs = true;
       }
     }
 
     for (final entry in await storage.list(removedFolder)) {
       if (entry.isFolder) continue;
+      if (entry.name.endsWith('.adv')) {
+        if (!unknownBlobs && !referencedBlobs.contains(entry.name)) {
+          await storage.delete('$removedFolder/${entry.name}');
+        }
+        continue;
+      }
       final prefix = _RemovedFolder.prefixOf(entry.name);
       if (prefix == null || !referenced.contains(prefix)) {
+        await storage.delete('$removedFolder/${entry.name}');
+      }
+    }
+  }
+
+  /// Whether [storage] still has plain (version 2) backups next to an
+  /// encrypted one, which is when they can be deleted.
+  Future<bool> hasPlainBackupsToDelete(BackupStorage storage) async {
+    var plain = false;
+    var sealed = false;
+    for (final entry in await storage.list('')) {
+      if (!entry.isFolder || !entry.name.startsWith(backupFolderPrefix)) {
+        continue;
+      }
+      final names = {for (final f in await storage.list(entry.name)) f.name};
+      if (names.contains(sealedManifestName)) sealed = true;
+      if (names.contains(backupManifestName) || names.contains(stateFileName)) {
+        plain = true;
+      }
+    }
+    if (!plain) {
+      plain = (await storage.list(
+        currentFolder,
+      )).any((entry) => entry.name != filesFolder);
+    }
+    return plain && sealed;
+  }
+
+  /// Deletes every plain (version 2) backup in [storage]: its restore
+  /// points, the browsable copies in Current and the plain files in
+  /// Removed. Encrypted backups are left untouched. Irreversible: only on
+  /// the user's explicit confirmation.
+  Future<void> deletePlainBackups(BackupStorage storage) async {
+    for (final entry in await storage.list('')) {
+      if (!entry.isFolder || !entry.name.startsWith(backupFolderPrefix)) {
+        continue;
+      }
+      final names = {for (final f in await storage.list(entry.name)) f.name};
+      if (!names.contains(sealedManifestName)) {
+        await storage.delete(entry.name);
+      }
+    }
+    for (final entry in await storage.list(currentFolder)) {
+      if (entry.name != filesFolder) {
+        await storage.delete('$currentFolder/${entry.name}');
+      }
+    }
+    for (final entry in await storage.list(removedFolder)) {
+      if (!entry.name.endsWith('.adv')) {
         await storage.delete('$removedFolder/${entry.name}');
       }
     }
@@ -535,9 +760,10 @@ class BackupService {
       }
       final createdAt = _dateFromFolderName(entry.name);
       if (createdAt == null) continue;
-      final complete = (await storage.list(
-        entry.name,
-      )).any((file) => file.name == backupManifestName);
+      final complete = (await storage.list(entry.name)).any(
+        (file) =>
+            file.name == backupManifestName || file.name == sealedManifestName,
+      );
       if (!complete) continue;
       snapshots.add(
         BackupSnapshot(
@@ -634,15 +860,140 @@ class BackupService {
   /// Replaces AllDocs' current documents and organization with [snapshot].
   Future<BackupInfo> restoreSnapshot(BackupSnapshot snapshot) async {
     final legacyFile = snapshot.legacyFile;
-    if (legacyFile != null) return _restoreLegacyZip(legacyFile);
+    if (legacyFile != null) {
+      return _sealRestored(await _restoreLegacyZip(legacyFile));
+    }
     final legacyItem = snapshot.legacyCloudItem;
     final legacyProvider = snapshot.legacyProvider;
     if (legacyItem != null && legacyProvider != null) {
-      return _restoreLegacyCloudZip(legacyProvider, legacyItem);
+      return _sealRestored(
+        await _restoreLegacyCloudZip(legacyProvider, legacyItem),
+      );
     }
     final storage = snapshot.storage;
     if (storage == null) throw const InvalidBackupException();
+    final files = await storage.list(snapshot.name);
+    if (files.any((file) => file.name == sealedManifestName)) {
+      return _restoreSealed(storage, snapshot);
+    }
+    return _sealRestored(await _restorePlain(storage, snapshot));
+  }
 
+  /// A plain backup restored into an encrypted library: its files are
+  /// sealed right away, the same way the library itself was.
+  Future<BackupInfo> _sealRestored(BackupInfo info) async {
+    if (_vault != null) await VaultMigration(store).run();
+    return info;
+  }
+
+  Future<BackupInfo> _restoreSealed(
+    BackupStorage storage,
+    BackupSnapshot snapshot,
+  ) async {
+    final vault = _vault;
+    final keyText = await storage.readText('${snapshot.name}/$keyFileName');
+    Object? keyInfo;
+    try {
+      keyInfo = keyText == null ? null : jsonDecode(keyText);
+    } on FormatException {
+      keyInfo = null;
+    }
+    if (vault == null ||
+        keyInfo is! Map ||
+        keyInfo['keyCheck'] != vault.keyCheck) {
+      throw const BackupKeyMismatchException();
+    }
+    final sealedManifest = await storage.readBytes(
+      '${snapshot.name}/$sealedManifestName',
+    );
+    final sealedState = await storage.readBytes(
+      '${snapshot.name}/$sealedStateName',
+    );
+    if (sealedManifest == null || sealedState == null) {
+      throw const InvalidBackupException();
+    }
+    final Object? manifest;
+    final Object? state;
+    try {
+      manifest = jsonDecode(utf8.decode(await vault.openBytes(sealedManifest)));
+      state = jsonDecode(utf8.decode(await vault.openBytes(sealedState)));
+    } on VaultFormatException {
+      throw const InvalidBackupException();
+    } on FormatException {
+      throw const InvalidBackupException();
+    }
+    if (manifest is! Map ||
+        manifest['app'] != 'AllDocs' ||
+        state is! Map<String, dynamic>) {
+      throw const InvalidBackupException();
+    }
+
+    final documentsDir = await store.documentsDirectory();
+    final restored = <String>{};
+    final missing = <String>{};
+    await _inParallel(_manifestDocuments(manifest).toList(), (document) async {
+      final id = document['id']?.toString() ?? '';
+      final checksum = document['checksum']?.toString();
+      final blob = document['blob']?.toString() ?? '';
+      if (!RegExp(r'^[A-Za-z0-9_-]+$').hasMatch(id) ||
+          checksum == null ||
+          !RegExp(r'^[0-9a-f]{64}$').hasMatch(blob)) {
+        missing.add(id);
+        return;
+      }
+      // Downloaded as it is (the plain content never touches the disk),
+      // checked, and only then put in place.
+      final target = File('${documentsDir.path}/$id.adv');
+      final part = File('${target.path}.part');
+      for (final path in [
+        '$currentFolder/$filesFolder/$blob.adv',
+        '$removedFolder/$blob.adv',
+      ]) {
+        try {
+          await storage.download(path, part);
+          final opened = await DocumentVault.checksumOf(
+            DocumentVault.openSealed(part.path, using: vault),
+          );
+          if (opened == checksum) {
+            await part.rename(target.path);
+            restored.add(id);
+            return;
+          }
+        } on BackupNotFoundException {
+          continue;
+        } on VaultFormatException {
+          continue;
+        }
+      }
+      if (await part.exists()) await part.delete();
+      missing.add(id);
+    });
+
+    for (final raw in _documentsList(state)) {
+      final id = raw['id']?.toString();
+      if (!restored.contains(id)) continue;
+      raw['local_path'] = '${documentsDir.path}/$id.adv';
+      raw['sealed'] = true;
+    }
+    _dropDocuments(state, {
+      ...missing,
+      for (final raw in _documentsList(state))
+        if (!restored.contains(raw['id']?.toString())) ?raw['id']?.toString(),
+    });
+    await store.restoreState(state);
+    return BackupInfo(
+      createdAt:
+          DateTime.tryParse(manifest['created_at']?.toString() ?? '') ??
+          snapshot.createdAt,
+      documentCount: restored.length,
+      missingCount: missing.length,
+    );
+  }
+
+  Future<BackupInfo> _restorePlain(
+    BackupStorage storage,
+    BackupSnapshot snapshot,
+  ) async {
     final manifestText = await storage.readText(
       '${snapshot.name}/$backupManifestName',
     );
@@ -681,7 +1032,7 @@ class BackupService {
           _RemovedFolder.prefixOf(entry.name)!: '$removedFolder/${entry.name}',
     };
 
-    final staging = await Directory.systemTemp.createTemp('alldocs_restore_');
+    final staging = await DocumentVault.scratch();
     try {
       final restored = <String, File>{};
       final missing = <String>{};
@@ -754,7 +1105,7 @@ class BackupService {
     CloudItem backup,
   ) async {
     final downloaded = await provider.download(backup);
-    final temp = await getTemporaryDirectory();
+    final temp = await DocumentVault.scratch();
     final file = File(
       '${temp.path}/restore_${DateTime.now().millisecondsSinceEpoch}.zip',
     );

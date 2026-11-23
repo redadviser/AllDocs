@@ -306,7 +306,7 @@ Future<void> _extract(
 ) async {
   final total = await _run(
     context,
-    () => PdfTools.pageCount(document.localPath!),
+    () => documentsService.pdfPageCount(document),
   );
   if (total == null || !context.mounted) return;
   if (total < 2) {
@@ -405,7 +405,7 @@ Future<void> _sign(
 ) async {
   final total = await _run(
     context,
-    () => PdfTools.pageCount(document.localPath!),
+    () => documentsService.pdfPageCount(document),
   );
   if (total == null || !context.mounted) return;
   final signature = await showOptionsSheet<_Signature>(

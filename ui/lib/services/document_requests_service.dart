@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/models.dart';
@@ -9,6 +8,7 @@ import 'api_helpers.dart';
 import 'auth_service.dart';
 import 'current_user.dart';
 import 'documents_service.dart';
+import 'vault/document_vault.dart';
 
 enum DocumentRequestStatus { open, expired, closed }
 
@@ -210,7 +210,8 @@ class DocumentRequestsService {
     if (pending.isEmpty) return 0;
 
     final snapshot = await documentsService.loadSnapshot();
-    final temp = await getTemporaryDirectory();
+    // Plain until imported (sealed): kept in the private scratch folder.
+    final temp = await DocumentVault.scratch();
     final headers = await _headers();
     var added = 0;
     for (final (request, file) in pending) {

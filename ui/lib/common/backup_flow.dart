@@ -241,12 +241,11 @@ Future<bool> restoreBackupSnapshot(
     );
     return true;
   }
-  showSnack(
-    context,
-    failure is InvalidBackupException
-        ? AppConstants.backupInvalid.tr()
-        : AppConstants.backupFailed.tr(),
-  );
+  showSnack(context, switch (failure) {
+    InvalidBackupException() => AppConstants.backupInvalid.tr(),
+    BackupKeyMismatchException() => AppConstants.backupOtherKey.tr(),
+    _ => AppConstants.backupFailed.tr(),
+  });
   return false;
 }
 

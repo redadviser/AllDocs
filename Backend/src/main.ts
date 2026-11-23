@@ -101,7 +101,13 @@ app.use((_req, res) => {
 })
 
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  console.error(err)
+  // Never the error itself: a body parser error carries the raw request
+  // body, which can be a document or the library key.
+  console.error('Unhandled error:', err?.type ?? err?.name, err?.message)
+  if (err?.type === 'entity.parse.failed') {
+    res.status(400).json({ error: 'Invalid request body' })
+    return
+  }
   res.status(500).json({ error: 'Internal server error' })
 })
 

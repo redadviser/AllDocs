@@ -117,6 +117,7 @@ class _SecurityGateState extends State<SecurityGate>
       // Pages, sheets and dialogs opened on top of the app live above this
       // gate in the navigator; close them so nothing shows past the lock.
       Navigator.of(context).popUntil((route) => route.isFirst);
+      unawaited(DocumentVault.purgeTemp());
       setState(() {
         _unlocked = false;
         _promptedBiometrics = false;

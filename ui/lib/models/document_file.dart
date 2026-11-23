@@ -34,6 +34,7 @@ class DocumentFile {
     required this.dateLabel,
     required this.sizeLabel,
     this.localPath,
+    this.sealed = false,
     this.sizeBytes = 0,
     this.importedAt,
     this.timeLabel,
@@ -65,6 +66,10 @@ class DocumentFile {
   final String dateLabel;
   final String sizeLabel;
   final String? localPath;
+
+  /// [localPath] is an encrypted (ADV1) copy in the library; read it through
+  /// DocumentVault, never as a plain file.
+  final bool sealed;
   final int sizeBytes;
   final DateTime? importedAt;
   final String? timeLabel;
@@ -135,6 +140,7 @@ class DocumentFile {
     String? dateLabel,
     String? sizeLabel,
     String? localPath,
+    bool? sealed,
     int? sizeBytes,
     DateTime? importedAt,
     String? timeLabel,
@@ -168,6 +174,7 @@ class DocumentFile {
       dateLabel: dateLabel ?? this.dateLabel,
       sizeLabel: sizeLabel ?? this.sizeLabel,
       localPath: localPath ?? this.localPath,
+      sealed: sealed ?? this.sealed,
       sizeBytes: sizeBytes ?? this.sizeBytes,
       importedAt: importedAt ?? this.importedAt,
       timeLabel: timeLabel ?? this.timeLabel,
@@ -214,6 +221,7 @@ class DocumentFile {
       dateLabel: json['date_label']?.toString() ?? '',
       sizeLabel: json['size_label']?.toString() ?? '',
       localPath: json['local_path']?.toString(),
+      sealed: json['sealed'] == true,
       sizeBytes: json['size_bytes'] is int ? json['size_bytes'] as int : 0,
       importedAt: DateTime.tryParse(json['imported_at']?.toString() ?? ''),
       timeLabel: json['time_label']?.toString(),
@@ -253,6 +261,7 @@ class DocumentFile {
       'date_label': dateLabel,
       'size_label': sizeLabel,
       'local_path': localPath,
+      if (sealed) 'sealed': true,
       'size_bytes': sizeBytes,
       'imported_at': importedAt?.toIso8601String(),
       'time_label': timeLabel,

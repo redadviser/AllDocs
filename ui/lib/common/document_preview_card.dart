@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
@@ -184,6 +185,9 @@ class DocumentThumbnail extends StatelessWidget {
     final fallback = _TextPagePreview(document: document);
     if (path == null) return fallback;
 
+    if (document.type == DocumentType.image && document.sealed) {
+      return _SealedImageThumbnail(document: document, fallback: fallback);
+    }
     if (document.type == DocumentType.image) {
       return ColoredBox(
         color: AppTheme.surfaceStrong,
@@ -197,11 +201,15 @@ class DocumentThumbnail extends StatelessWidget {
       );
     }
     if (document.type == DocumentType.pdf) {
-      return _PdfThumbnail(path: path, fallback: fallback);
+      return _PdfThumbnail(document: document, fallback: fallback);
     }
     final officeKind = officeKindFor(document.fileName);
     if (officeKind != null) {
-      return _OfficeThumbnail(path: path, kind: officeKind, fallback: fallback);
+      return _OfficeThumbnail(
+        document: document,
+        kind: officeKind,
+        fallback: fallback,
+      );
     }
     return fallback;
   }
@@ -212,32 +220,32 @@ class DocumentThumbnail extends StatelessWidget {
 /// until it's ready, or if it can't be drawn.
 class _OfficeThumbnail extends StatelessWidget {
   const _OfficeThumbnail({
-    required this.path,
+    required this.document,
     required this.kind,
     required this.fallback,
   });
 
-  final String path;
+  final DocumentFile document;
   final OfficeKind kind;
   final Widget fallback;
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<File?>(
+    return FutureBuilder<Uint8List?>(
       future: ThumbnailCache.instance.officeThumbnail(
-        path,
-        () => OfficeThumbnailHost.render(path, kind),
+        document,
+        (plainPath) => OfficeThumbnailHost.render(plainPath, kind),
       ),
       builder: (context, snapshot) {
-        final file = snapshot.data;
-        if (file == null) return fallback;
+        final bytes = snapshot.data;
+        if (bytes == null) return fallback;
         // Slides are landscape: shown whole on a neutral card instead of
         // cropped to the card's portrait shape.
         final slide = kind == OfficeKind.pptx;
         return ColoredBox(
           color: slide ? const Color(0xFFE9ECF0) : Colors.white,
-          child: Image.file(
-            file,
+          child: Image.memory(
+            bytes,
             fit: slide ? BoxFit.contain : BoxFit.cover,
             alignment: slide ? Alignment.center : Alignment.topCenter,
             cacheWidth: 360,
@@ -250,27 +258,59 @@ class _OfficeThumbnail extends StatelessWidget {
   }
 }
 
-class _PdfThumbnail extends StatelessWidget {
-  const _PdfThumbnail({required this.path, required this.fallback});
+/// A sealed photo, from a small copy in the private thumbnail cache.
+class _SealedImageThumbnail extends StatelessWidget {
+  const _SealedImageThumbnail({required this.document, required this.fallback});
 
-  final String path;
+  final DocumentFile document;
   final Widget fallback;
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<File?>(
-      future: ThumbnailCache.instance.pdfThumbnail(path),
+    return FutureBuilder<Uint8List?>(
+      future: ThumbnailCache.instance.imageThumbnail(document),
       builder: (context, snapshot) {
-        final file = snapshot.data;
-        if (file == null) {
+        final bytes = snapshot.data;
+        if (bytes == null) {
+          return snapshot.connectionState == ConnectionState.done
+              ? fallback
+              : const ColoredBox(color: AppTheme.surfaceStrong);
+        }
+        return ColoredBox(
+          color: AppTheme.surfaceStrong,
+          child: Image.memory(
+            bytes,
+            fit: BoxFit.cover,
+            gaplessPlayback: true,
+            errorBuilder: (context, error, stackTrace) => fallback,
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _PdfThumbnail extends StatelessWidget {
+  const _PdfThumbnail({required this.document, required this.fallback});
+
+  final DocumentFile document;
+  final Widget fallback;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<Uint8List?>(
+      future: ThumbnailCache.instance.pdfThumbnail(document),
+      builder: (context, snapshot) {
+        final bytes = snapshot.data;
+        if (bytes == null) {
           return snapshot.connectionState == ConnectionState.done
               ? fallback
               : const ColoredBox(color: Color(0xFFF4F5F7));
         }
         return ColoredBox(
           color: Colors.white,
-          child: Image.file(
-            file,
+          child: Image.memory(
+            bytes,
             fit: BoxFit.cover,
             alignment: Alignment.topCenter,
             cacheWidth: 360,

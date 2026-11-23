@@ -39,9 +39,28 @@ before(async () => {
 
 after(() => close())
 
+// Signed in from a phone (with a device id), as the app does.
 async function newAccount() {
-  const { user, token } = await signUp(`vault-${crypto.randomUUID()}@test.local`, 'password123')
+  const deviceId = crypto.randomUUID()
+  const { user, token } = await signUp(
+    `vault-${crypto.randomUUID()}@test.local`,
+    'password123',
+    undefined,
+    deviceId
+  )
+  await sql`INSERT INTO devices (id, user_id) VALUES (${deviceId}, ${user.id})`
   return { id: user.id, cookie: `session_token=${token}` }
+}
+
+async function sessionWithoutDevice(userId: string, email: string) {
+  const { SignJWT } = await import('jose')
+  const secret = new TextEncoder().encode('default-dev-secret-change-in-production')
+  const token = await new SignJWT({ sub: userId, email })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime('1h')
+    .sign(secret)
+  return `session_token=${token}`
 }
 
 function call(method: string, cookie?: string, body?: unknown) {
@@ -75,6 +94,17 @@ test('stored once, never replaced, read back as stored', { skip }, async () => {
   assert.equal(read.status, 200)
   assert.equal(read.headers.get('cache-control'), 'no-store')
   assert.deepEqual(await read.json(), first)
+})
+
+test('the key is only handed to a fresh session from a phone', { skip }, async () => {
+  const { id, cookie } = await newAccount()
+  assert.equal((await call('PUT', cookie, keyBody())).status, 201)
+  assert.equal((await call('GET', cookie)).status, 200)
+  const [{ email }] = await sql`SELECT email FROM users WHERE id = ${id}`
+  const noDevice = await sessionWithoutDevice(id, email as string)
+  const refused = await call('GET', noDevice)
+  assert.equal(refused.status, 403)
+  assert.equal((await refused.json()).code, 'reauth')
 })
 
 test('a malformed key is refused', { skip }, async () => {

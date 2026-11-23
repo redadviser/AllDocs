@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
@@ -89,6 +91,50 @@ class CloudScreenState extends State<CloudScreen> {
       );
     }
     if (mounted) setState(() {});
+    unawaited(_checkPlainBackups());
+  }
+
+  // Plain (pre-encryption) backups next to encrypted ones in the backup
+  // cloud: offered for deletion, never deleted on their own.
+  bool _hasPlainBackups = false;
+
+  Future<void> _checkPlainBackups() async {
+    final provider = _backupProvider;
+    var found = false;
+    if (provider != null && DocumentVault.libraryId != null) {
+      try {
+        found = await widget.documentsService.backup.hasPlainBackupsToDelete(
+          provider.backupStorage(),
+        );
+      } catch (_) {}
+    }
+    if (mounted && found != _hasPlainBackups) {
+      setState(() => _hasPlainBackups = found);
+    }
+  }
+
+  Future<void> _deletePlainBackups() async {
+    final provider = _backupProvider;
+    if (provider == null) return;
+    final confirmed = await showConfirmDialog(
+      context,
+      title: AppConstants.backupDeletePlainTitle.tr(),
+      message: AppConstants.backupDeletePlainMessage.tr(),
+      actionLabel: AppConstants.backupDeletePlainAction.tr(),
+    );
+    if (!confirmed || !mounted) return;
+    setState(() => _backingUp = true);
+    try {
+      await widget.documentsService.backup.deletePlainBackups(
+        provider.backupStorage(),
+      );
+      if (mounted) showSnack(context, AppConstants.backupDeletePlainDone.tr());
+    } catch (_) {
+      if (mounted) showSnack(context, AppConstants.backupFailed.tr());
+    } finally {
+      if (mounted) setState(() => _backingUp = false);
+      unawaited(_checkPlainBackups());
+    }
   }
 
   /// Opens the file browser of [id], connecting first if needed. Used by
@@ -265,6 +311,7 @@ class CloudScreenState extends State<CloudScreen> {
           onChooseDestination: _chooseBackupDestination,
           onBackupNow: _backupNow,
           onRestore: _restore,
+          onDeletePlainBackups: _hasPlainBackups ? _deletePlainBackups : null,
         ),
       ],
     );
@@ -463,6 +510,7 @@ class CloudScreenState extends State<CloudScreen> {
           : await backupToCloud(context, widget.documentsService, provider);
     } finally {
       if (mounted) setState(() => _backingUp = false);
+      unawaited(_checkPlainBackups());
     }
   }
 
@@ -629,6 +677,7 @@ class _BackupSection extends StatelessWidget {
     required this.onChooseDestination,
     required this.onBackupNow,
     required this.onRestore,
+    this.onDeletePlainBackups,
   });
 
   final List<CloudProvider> providers;
@@ -637,6 +686,9 @@ class _BackupSection extends StatelessWidget {
   final VoidCallback onChooseDestination;
   final VoidCallback onBackupNow;
   final VoidCallback onRestore;
+
+  /// Shown only when there are plain backups to delete.
+  final VoidCallback? onDeletePlainBackups;
 
   @override
   Widget build(BuildContext context) {
@@ -726,6 +778,12 @@ class _BackupSection extends StatelessWidget {
                     title: AppConstants.backupRestore.tr(),
                     onTap: busy ? null : onRestore,
                   ),
+                  if (onDeletePlainBackups != null)
+                    SettingsGridAction(
+                      icon: Icons.delete_sweep_outlined,
+                      title: AppConstants.backupDeletePlain.tr(),
+                      onTap: busy ? null : onDeletePlainBackups,
+                    ),
                 ],
               ),
               const SizedBox(height: 8),

@@ -63,6 +63,13 @@ void main() {
     await _tapPin(tester, '1234');
     await tester.pump(const Duration(milliseconds: 800));
     await tester.pump(const Duration(milliseconds: 800));
+    // VaultGate reads the library folder (real I/O) before showing the app.
+    for (var i = 0; i < 10; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 50)),
+      );
+      await tester.pump(const Duration(milliseconds: 100));
+    }
 
     expect(find.text('Galeria'), findsWidgets);
     expect(find.text('Estante'), findsWidgets);

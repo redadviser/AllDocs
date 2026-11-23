@@ -113,8 +113,10 @@ class _SecureShareSheetState extends State<_SecureShareSheet> {
     final document = widget.document;
     final language = context.locale.languageCode;
     File? temporary;
+    Materialized? opened;
     try {
-      var file = File(document.localPath!);
+      opened = await DocumentVault.materialize(document);
+      var file = opened.file;
       var fileName = document.fileName;
       if (_watermark) {
         final text = AppConstants.pdfWatermarkText.tr(
@@ -164,6 +166,7 @@ class _SecureShareSheetState extends State<_SecureShareSheet> {
       setState(() => _working = false);
       showSnack(context, AppConstants.sharesFailed.tr());
     } finally {
+      await opened?.release();
       if (temporary != null && await temporary.exists()) {
         await temporary.delete();
       }

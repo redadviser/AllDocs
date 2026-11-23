@@ -30,3 +30,4 @@ export 'storage_permission_service.dart';
 export 'sync/sync_api.dart'
     show SyncProblem, SyncApiException, SyncDeviceInfo, SyncAccountStatus;
 export 'sync/sync_service.dart';
+export 'vault/document_vault.dart';

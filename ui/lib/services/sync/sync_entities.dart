@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import '../document_search.dart' show normalizeForSearch;
 
@@ -83,6 +84,8 @@ SyncEntities entitiesFromState(Map<String, dynamic> state) {
     final id = raw['id']?.toString() ?? '';
     if (id.isEmpty) continue;
     final document = _copy(raw);
+    // Whether this phone keeps it encrypted is its own business.
+    document.remove('sealed');
     final path = document.remove('local_path')?.toString();
     if (path != null && path.isNotEmpty) {
       document['stored_name'] = baseNameOf(path);
@@ -198,12 +201,40 @@ SyncEntities copyEntities(SyncEntities entities) => {
 /// documents (their file hasn't reached this phone yet). Keeps from
 /// [current] what isn't synced (this phone's own settings) and the order
 /// things were in, so applying a remote change doesn't shuffle the library.
+/// Document ids name files (`<id>.adv`); one from another phone that
+/// could point outside the documents folder is refused.
+bool isSafeDocumentId(String? id) =>
+    id != null && RegExp(r'^[A-Za-z0-9_-]+$').hasMatch(id);
+
+/// The name this phone keeps [document]'s file under in its documents
+/// folder: `<id>.adv` when its library is encrypted ([sealing]); otherwise
+/// the sender's name, unless that's an encrypted one, which a plain library
+/// mustn't use for a plain file.
+String localFileName(Map<String, dynamic> document, {required bool sealing}) {
+  final id = document['id'].toString();
+  if (sealing) return '$id.adv';
+  final stored = document['stored_name']?.toString() ?? '';
+  if (stored.isNotEmpty && !stored.endsWith('.adv')) return stored;
+  final name = (document['file_name']?.toString() ?? '').replaceAll(
+    RegExp(r'[\\/:*?"<>|]'),
+    '_',
+  );
+  return '${id}_${name.isEmpty ? 'documento' : name}';
+}
+
 Map<String, dynamic> stateFromEntities(
   SyncEntities entities, {
   required Map<String, dynamic> current,
   required String documentsDirectory,
   Set<String> withheld = const {},
+  bool sealing = false,
+  bool Function(String path)? fileExists,
 }) {
+  final exists = fileExists ?? (String path) => File(path).existsSync();
+  final mineById = {
+    for (final raw in (current['documents'] as List? ?? const []))
+      if (raw is Map) raw['id']?.toString(): raw,
+  };
   final state = <String, dynamic>{
     for (final entry in current.entries)
       if (entry.key != 'documents' && entry.key != 'shelves')
@@ -219,7 +250,9 @@ Map<String, dynamic> stateFromEntities(
   final currentDocuments = current['documents'] as List?;
   final documents = <Map<String, dynamic>>[
     for (final entry in entities.entries)
-      if (isDocumentKey(entry.key) && !withheld.contains(idOfKey(entry.key)))
+      if (isDocumentKey(entry.key) &&
+          !withheld.contains(idOfKey(entry.key)) &&
+          isSafeDocumentId(entry.value['id']?.toString()))
         _copy(entry.value),
   ];
   documents.sort((a, b) {
@@ -268,10 +301,21 @@ Map<String, dynamic> stateFromEntities(
     ];
     document['album_ids'] = ids;
     document['album_id'] = ids.isEmpty ? null : ids.first;
-    final stored = document.remove('stored_name')?.toString();
+    final stored = document['stored_name']?.toString();
     if (stored != null && stored.isNotEmpty) {
-      document['local_path'] = '$documentsDirectory/$stored';
+      final received =
+          '$documentsDirectory/${localFileName(document, sealing: sealing)}';
+      final mine = mineById[document['id']?.toString()];
+      if (mine != null && !exists(received)) {
+        // This phone's own copy, kept as it is (e.g. not encrypted yet).
+        document['local_path'] = mine['local_path'];
+        if (mine['sealed'] == true) document['sealed'] = true;
+      } else {
+        document['local_path'] = received;
+        if (sealing) document['sealed'] = true;
+      }
     }
+    document.remove('stored_name');
     for (final albumId in ids) {
       members.putIfAbsent(albumId, () => []).add(document['id'].toString());
     }

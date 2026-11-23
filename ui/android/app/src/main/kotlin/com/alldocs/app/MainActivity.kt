@@ -1,6 +1,7 @@
 package com.alldocs.app
 
 import android.net.Uri
+import android.os.StatFs
 import android.view.WindowManager
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
@@ -30,6 +31,23 @@ class MainActivity : FlutterFragmentActivity() {
                         result.success(null)
                     }
                     else -> result.notImplemented()
+                }
+            }
+
+        // Free space on the volume holding a path (FreeSpace on the Dart side),
+        // checked before encrypting the library, which needs room for a copy.
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "alldocs/storage")
+            .setMethodCallHandler { call, result ->
+                if (call.method != "freeBytes") {
+                    result.notImplemented()
+                    return@setMethodCallHandler
+                }
+                val path = call.argument<String>("path")
+                    ?: return@setMethodCallHandler result.error("bad_args", "path missing", null)
+                try {
+                    result.success(StatFs(path).availableBytes)
+                } catch (error: Exception) {
+                    result.error("stat_failed", error.message, null)
                 }
             }
 

@@ -18,6 +18,7 @@ import 'google_auth_config.dart';
 import 'local_mode_config.dart';
 import 'plan_service.dart';
 import 'sync/sync_service.dart';
+import 'vault/document_vault.dart';
 
 class _GoogleIdToken {
   const _GoogleIdToken({
@@ -431,6 +432,7 @@ class AuthService {
   }
 
   static Future<void> logout() async {
+    await DocumentVault.purgeTemp();
     if (_googleSignInInitialized) {
       try {
         await GoogleSignIn.instance.signOut();

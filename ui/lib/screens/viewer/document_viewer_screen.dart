@@ -56,25 +56,47 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
   int _page = 1;
   int _pages = 0;
 
-  String? get _path {
-    final path = _document.localPath;
-    if (path == null || path.isEmpty || !File(path).existsSync()) return null;
-    return path;
-  }
+  // A plain copy of the file (decrypted to the private temp folder when the
+  // library is encrypted), deleted when the viewer closes.
+  Materialized? _opened;
+  bool _opening = true;
+
+  String? get _path => _opened?.file.path;
 
   @override
   void initState() {
     super.initState();
-    final path = _path;
-    if (_document.type == DocumentType.pdf && path != null) {
-      _pdfController = PdfControllerPinch(document: PdfDocument.openFile(path));
-    }
+    _open();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  }
+
+  Future<void> _open() async {
+    final stored = _document.localPath;
+    Materialized? opened;
+    if (stored != null && stored.isNotEmpty && File(stored).existsSync()) {
+      try {
+        opened = await DocumentVault.materialize(_document);
+      } catch (_) {}
+    }
+    if (!mounted) {
+      await opened?.release();
+      return;
+    }
+    setState(() {
+      _opened = opened;
+      _opening = false;
+      if (_document.type == DocumentType.pdf && opened != null) {
+        _pdfController = PdfControllerPinch(
+          document: PdfDocument.openFile(opened.file.path),
+        );
+      }
+    });
   }
 
   @override
   void dispose() {
     _pdfController?.dispose();
+    _opened?.release();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
   }
@@ -189,6 +211,7 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
   }
 
   Widget _buildContent() {
+    if (_opening) return const Center(child: CircularProgressIndicator());
     final path = _path;
     if (path == null) return _missingFile();
 

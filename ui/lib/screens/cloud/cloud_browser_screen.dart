@@ -2,7 +2,6 @@ import 'dart:io';
 
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
-import 'package:path_provider/path_provider.dart';
 
 import '../../common/app_constants.dart';
 import '../../common/document_actions.dart';
@@ -350,7 +349,7 @@ class _CloudBrowserScreenState extends State<CloudBrowserScreen> {
     for (final zip in zips) {
       try {
         final downloaded = await widget.provider.download(zip);
-        final temp = await getTemporaryDirectory();
+        final temp = await DocumentVault.scratch();
         final file = File(
           '${temp.path}/${DateTime.now().microsecondsSinceEpoch}.zip',
         );

@@ -19,6 +19,9 @@ import '../../common/snapshot_builder.dart';
 import '../../common/user_initials.dart';
 import '../../models/models.dart';
 import '../../services/services.dart';
+import '../../services/vault/vault_keyring.dart';
+import '../../services/vault/vault_migration.dart';
+import '../../services/vault/vault_unlocker.dart';
 import '../../theme/app_theme.dart';
 import '../auth/auth_gate.dart';
 import '../albums/album_detail_screen.dart';
@@ -710,11 +713,60 @@ class _SecuritySectionState extends State<_SecuritySection> {
   bool _loading = true;
   bool _biometricEnabled = false;
   bool _canUseBiometrics = false;
+  VaultStatus? _vault;
+  bool _vaultBusy = false;
 
   @override
   void initState() {
     super.initState();
     _load();
+    _loadVault();
+  }
+
+  Future<void> _loadVault() async {
+    VaultStatus? status;
+    try {
+      status = await VaultStatus.load();
+    } catch (_) {}
+    if (mounted) setState(() => _vault = status);
+  }
+
+  /// Sends a key copy that didn't go through, or encrypts what was left
+  /// in plain files.
+  Future<void> _retryVault() async {
+    final status = _vault;
+    if (status == null || _vaultBusy) return;
+    setState(() => _vaultBusy = true);
+    try {
+      if (status.kind == VaultStatusKind.pendingBackup) {
+        await VaultKeyring().retryPending(LocalDocumentsStore.libraryId);
+      }
+      if (status.unsealed > 0) {
+        await VaultMigration(const LocalDocumentsStore()).run();
+        LocalDocumentsStore.reload();
+        widget.documentsService.refreshProfile();
+      }
+    } catch (_) {
+      // The row keeps saying what's left; the next start tries again too.
+    }
+    if (!mounted) return;
+    setState(() => _vaultBusy = false);
+    await _loadVault();
+  }
+
+  String? _vaultValue(VaultStatus status) {
+    final unsealed = status.unsealed > 0
+        ? AppConstants.vaultStatusUnsealed.tr(
+            namedArgs: {'count': '${status.unsealed}'},
+          )
+        : null;
+    final kind = switch (status.kind) {
+      VaultStatusKind.account => AppConstants.vaultStatusAccount.tr(),
+      VaultStatusKind.local => AppConstants.vaultStatusLocal.tr(),
+      VaultStatusKind.pendingBackup => AppConstants.vaultStatusPending.tr(),
+      VaultStatusKind.off => AppConstants.vaultStatusOff.tr(),
+    };
+    return unsealed == null ? kind : '$kind · $unsealed';
   }
 
   Future<void> _load() async {
@@ -795,6 +847,18 @@ class _SecuritySectionState extends State<_SecuritySection> {
               title: AppConstants.hiddenTitle.tr(),
               onTap: () => openHiddenAlbums(context, widget.documentsService),
             ),
+            if (_vault case final vault?)
+              SettingsGridAction(
+                icon: Icons.lock_outline_rounded,
+                title: AppConstants.vaultSettingsTitle.tr(),
+                value: _vaultValue(vault),
+                loading: _vaultBusy,
+                onTap:
+                    vault.kind == VaultStatusKind.pendingBackup ||
+                        vault.unsealed > 0
+                    ? _retryVault
+                    : null,
+              ),
             SettingsGridAction(
               icon: Icons.devices_outlined,
               title: AppConstants.profileDevices.tr(),
