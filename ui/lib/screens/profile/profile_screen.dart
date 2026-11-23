@@ -19,9 +19,6 @@ import '../../common/snapshot_builder.dart';
 import '../../common/user_initials.dart';
 import '../../models/models.dart';
 import '../../services/services.dart';
-import '../../services/vault/vault_keyring.dart';
-import '../../services/vault/vault_migration.dart';
-import '../../services/vault/vault_unlocker.dart';
 import '../../theme/app_theme.dart';
 import '../auth/auth_gate.dart';
 import '../albums/album_detail_screen.dart';
@@ -713,60 +710,25 @@ class _SecuritySectionState extends State<_SecuritySection> {
   bool _loading = true;
   bool _biometricEnabled = false;
   bool _canUseBiometrics = false;
-  VaultStatus? _vault;
-  bool _vaultBusy = false;
+  bool _encrypted = false;
 
   @override
   void initState() {
     super.initState();
     _load();
-    _loadVault();
+    _loadEncryption();
   }
 
-  Future<void> _loadVault() async {
-    VaultStatus? status;
+  Future<void> _loadEncryption() async {
+    var encrypted = false;
     try {
-      status = await VaultStatus.load();
+      encrypted =
+          await VaultMeta.read(
+            await const LocalDocumentsStore().appDirectory(),
+          ) !=
+          null;
     } catch (_) {}
-    if (mounted) setState(() => _vault = status);
-  }
-
-  /// Sends a key copy that didn't go through, or encrypts what was left
-  /// in plain files.
-  Future<void> _retryVault() async {
-    final status = _vault;
-    if (status == null || _vaultBusy) return;
-    setState(() => _vaultBusy = true);
-    try {
-      if (status.kind == VaultStatusKind.pendingBackup) {
-        await VaultKeyring().retryPending(LocalDocumentsStore.libraryId);
-      }
-      if (status.unsealed > 0) {
-        await VaultMigration(const LocalDocumentsStore()).run();
-        LocalDocumentsStore.reload();
-        widget.documentsService.refreshProfile();
-      }
-    } catch (_) {
-      // The row keeps saying what's left; the next start tries again too.
-    }
-    if (!mounted) return;
-    setState(() => _vaultBusy = false);
-    await _loadVault();
-  }
-
-  String? _vaultValue(VaultStatus status) {
-    final unsealed = status.unsealed > 0
-        ? AppConstants.vaultStatusUnsealed.tr(
-            namedArgs: {'count': '${status.unsealed}'},
-          )
-        : null;
-    final kind = switch (status.kind) {
-      VaultStatusKind.account => AppConstants.vaultStatusAccount.tr(),
-      VaultStatusKind.local => AppConstants.vaultStatusLocal.tr(),
-      VaultStatusKind.pendingBackup => AppConstants.vaultStatusPending.tr(),
-      VaultStatusKind.off => AppConstants.vaultStatusOff.tr(),
-    };
-    return unsealed == null ? kind : '$kind · $unsealed';
+    if (mounted) setState(() => _encrypted = encrypted);
   }
 
   Future<void> _load() async {
@@ -817,55 +779,71 @@ class _SecuritySectionState extends State<_SecuritySection> {
           AppSettings.autoLockMinutes,
           AppSettings.hidePreviews,
         ]),
-        builder: (context, _) => SettingsGrid(
+        builder: (context, _) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            SettingsGridAction(
-              icon: Icons.pin_outlined,
-              title: AppConstants.securityChangePin.tr(),
-              onTap: _changePin,
+            SettingsGrid(
+              children: [
+                SettingsGridAction(
+                  icon: Icons.pin_outlined,
+                  title: AppConstants.securityChangePin.tr(),
+                  onTap: _changePin,
+                ),
+                SettingsGridToggle(
+                  icon: Icons.fingerprint_rounded,
+                  title: AppConstants.profileBiometricLock.tr(),
+                  value: _biometricEnabled,
+                  onChanged: _loading ? null : _setBiometricEnabled,
+                ),
+                SettingsGridAction(
+                  icon: Icons.timer_outlined,
+                  title: AppConstants.settingsAutoLock.tr(),
+                  value: autoLockLabel(AppSettings.autoLockMinutes.value),
+                  onTap: () => _showAutoLockSheet(context),
+                ),
+                SettingsGridToggle(
+                  icon: Icons.visibility_off_outlined,
+                  title: AppConstants.settingsHidePreviews.tr(),
+                  value: AppSettings.hidePreviews.value,
+                  onChanged: AppSettings.setHidePreviews,
+                ),
+                SettingsGridAction(
+                  icon: Icons.visibility_off_outlined,
+                  title: AppConstants.hiddenTitle.tr(),
+                  onTap: () =>
+                      openHiddenAlbums(context, widget.documentsService),
+                ),
+                SettingsGridAction(
+                  icon: Icons.devices_outlined,
+                  title: AppConstants.profileDevices.tr(),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const DevicesScreen()),
+                  ),
+                ),
+              ],
             ),
-            SettingsGridToggle(
-              icon: Icons.fingerprint_rounded,
-              title: AppConstants.profileBiometricLock.tr(),
-              value: _biometricEnabled,
-              onChanged: _loading ? null : _setBiometricEnabled,
-            ),
-            SettingsGridAction(
-              icon: Icons.timer_outlined,
-              title: AppConstants.settingsAutoLock.tr(),
-              value: autoLockLabel(AppSettings.autoLockMinutes.value),
-              onTap: () => _showAutoLockSheet(context),
-            ),
-            SettingsGridToggle(
-              icon: Icons.visibility_off_outlined,
-              title: AppConstants.settingsHidePreviews.tr(),
-              value: AppSettings.hidePreviews.value,
-              onChanged: AppSettings.setHidePreviews,
-            ),
-            SettingsGridAction(
-              icon: Icons.visibility_off_outlined,
-              title: AppConstants.hiddenTitle.tr(),
-              onTap: () => openHiddenAlbums(context, widget.documentsService),
-            ),
-            if (_vault case final vault?)
-              SettingsGridAction(
-                icon: Icons.lock_outline_rounded,
-                title: AppConstants.vaultSettingsTitle.tr(),
-                value: _vaultValue(vault),
-                loading: _vaultBusy,
-                onTap:
-                    vault.kind == VaultStatusKind.pendingBackup ||
-                        vault.unsealed > 0
-                    ? _retryVault
-                    : null,
+            if (_encrypted) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.lock_outline_rounded,
+                    size: 15,
+                    color: AppTheme.mutedText,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      AppConstants.vaultEncryptedNote.tr(),
+                      style: const TextStyle(
+                        color: AppTheme.mutedText,
+                        fontSize: 12.5,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            SettingsGridAction(
-              icon: Icons.devices_outlined,
-              title: AppConstants.profileDevices.tr(),
-              onTap: () => Navigator.of(
-                context,
-              ).push(MaterialPageRoute(builder: (_) => const DevicesScreen())),
-            ),
+            ],
           ],
         ),
       ),

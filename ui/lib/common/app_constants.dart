@@ -90,15 +90,10 @@ class AppConstants {
   static const vaultLocalTitle = 'vault.local_title';
   static const vaultLocalMessage = 'vault.local_message';
   static const vaultLocalOk = 'vault.local_ok';
+  static const vaultEncryptedNote = 'vault.encrypted_note';
   static const vaultSignInTitle = 'vault.sign_in_title';
   static const vaultSignInMessage = 'vault.sign_in_message';
   static const vaultSignInAction = 'vault.sign_in_action';
-  static const vaultSettingsTitle = 'vault.settings_title';
-  static const vaultStatusAccount = 'vault.status_account';
-  static const vaultStatusLocal = 'vault.status_local';
-  static const vaultStatusPending = 'vault.status_pending';
-  static const vaultStatusOff = 'vault.status_off';
-  static const vaultStatusUnsealed = 'vault.status_unsealed';
   static const securityPinLocked = 'security.pin_locked';
   static const securityChangePin = 'security.change_pin';
   static const securityChangePinCurrent = 'security.change_pin_current';

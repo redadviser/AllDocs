@@ -924,14 +924,9 @@
     "local_title": "A chave fica só neste telemóvel",
     "local_message": "Os teus documentos vão ser encriptados com uma chave guardada aqui. Se desinstalares a app ou mudares de telemóvel, perdes o acesso aos documentos e às cópias de segurança.",
     "local_ok": "Entendi",
-    "settings_title": "Encriptação",
-    "status_account": "Ativa · cópia da chave na tua conta",
-    "status_local": "Ativa · chave só neste telemóvel",
-    "status_pending": "Ativa · cópia da chave por enviar",
-    "status_off": "Ainda não ativa · liga-te à internet",
-    "status_unsealed": "{count} documentos por proteger",
     "sign_in_title": "Entra de novo para abrir a biblioteca",
     "sign_in_message": "A chave dos teus documentos só é entregue logo depois de entrares na conta. Os documentos ficam como estão.",
-    "sign_in_action": "Entrar de novo"
+    "sign_in_action": "Entrar de novo",
+    "encrypted_note": "Os teus documentos estão encriptados neste telemóvel."
   }
 }

@@ -924,14 +924,9 @@
     "local_title": "La clé reste uniquement sur ce téléphone",
     "local_message": "Vos documents seront chiffrés avec une clé conservée ici. Si vous désinstallez l'app ou changez de téléphone, vous perdez l'accès aux documents et aux sauvegardes.",
     "local_ok": "Compris",
-    "settings_title": "Chiffrement",
-    "status_account": "Activé · copie de la clé dans votre compte",
-    "status_local": "Activé · clé uniquement sur ce téléphone",
-    "status_pending": "Activé · copie de la clé à envoyer",
-    "status_off": "Pas encore activé · connectez-vous à Internet",
-    "status_unsealed": "{count} documents à protéger",
     "sign_in_title": "Reconnectez-vous pour ouvrir la bibliothèque",
     "sign_in_message": "La clé de vos documents n'est remise que juste après la connexion. Vos documents restent tels quels.",
-    "sign_in_action": "Se reconnecter"
+    "sign_in_action": "Se reconnecter",
+    "encrypted_note": "Vos documents sont chiffrés sur ce téléphone."
   }
 }

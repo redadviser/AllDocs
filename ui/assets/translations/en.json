@@ -924,14 +924,9 @@
     "local_title": "The key stays on this phone only",
     "local_message": "Your documents will be encrypted with a key kept here. If you uninstall the app or change phones, you lose access to the documents and to the backups.",
     "local_ok": "Got it",
-    "settings_title": "Encryption",
-    "status_account": "On · a copy of the key is in your account",
-    "status_local": "On · key on this phone only",
-    "status_pending": "On · key copy not sent yet",
-    "status_off": "Not on yet · connect to the internet",
-    "status_unsealed": "{count} documents not protected yet",
     "sign_in_title": "Sign in again to open the library",
     "sign_in_message": "Your documents' key is only handed over right after you sign in. Your documents stay as they are.",
-    "sign_in_action": "Sign in again"
+    "sign_in_action": "Sign in again",
+    "encrypted_note": "Your documents are encrypted on this phone."
   }
 }

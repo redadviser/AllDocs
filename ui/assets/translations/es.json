@@ -924,14 +924,9 @@
     "local_title": "La clave se queda solo en este teléfono",
     "local_message": "Tus documentos se cifrarán con una clave guardada aquí. Si desinstalas la app o cambias de teléfono, pierdes el acceso a los documentos y a las copias de seguridad.",
     "local_ok": "Entendido",
-    "settings_title": "Cifrado",
-    "status_account": "Activo · copia de la clave en tu cuenta",
-    "status_local": "Activo · clave solo en este teléfono",
-    "status_pending": "Activo · copia de la clave pendiente",
-    "status_off": "Aún no activo · conéctate a internet",
-    "status_unsealed": "{count} documentos sin proteger",
     "sign_in_title": "Vuelve a entrar para abrir la biblioteca",
     "sign_in_message": "La clave de tus documentos solo se entrega justo después de entrar en la cuenta. Los documentos quedan como están.",
-    "sign_in_action": "Volver a entrar"
+    "sign_in_action": "Volver a entrar",
+    "encrypted_note": "Tus documentos están cifrados en este teléfono."
   }
 }
