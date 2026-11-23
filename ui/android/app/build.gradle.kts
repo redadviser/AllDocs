@@ -12,8 +12,8 @@ plugins {
 //   • appVersionCode: +1 every time (Play refuses a code it has already seen)
 //   • appVersionName: the version people see in the store (e.g. 1.0.1)
 // These override the version in pubspec.yaml for Android.
-val appVersionCode = 9
-val appVersionName = "9.0.0"
+val appVersionCode = 10
+val appVersionName = "10.0.0"
 
 // Release signing with the upload key: android/key.properties (git-ignored)
 // points at android/upload-keystore.jks. Without it (another machine, CI)
@@ -43,12 +43,10 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.alldocs.app"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
+        // Google Play requires API 36 for new apps and updates (since 31/08/2026).
+        targetSdk = 36
         versionCode = appVersionCode
         versionName = appVersionName
         // OAuth redirect scheme for Dropbox sign-in (flutter_appauth).
